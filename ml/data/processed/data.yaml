@@ -1,0 +1,35 @@
+# ============================================================
+# Dataset Configuration untuk YOLO11 Fall Detection
+# ============================================================
+# File ini mendefinisikan lokasi dataset dan daftar kelas
+# yang digunakan oleh YOLO11 saat training.
+#
+# Dataset: UR Fall Detection Dataset (MVP)
+# Sumber : https://fenix.ur.edu.pl/~mkepski/ds/uf.html
+#
+# Mapping label dari UR Fall:
+#   UR Fall -1 (person is not lying)        → 0: normal
+#   UR Fall  0 (temporary pose)             → 1: transitional
+#   UR Fall  1 (person is lying on ground)  → 2: lying_on_ground
+#
+# Struktur folder dataset (YOLO format):
+#   processed/
+#   ├── images/
+#   │   ├── train/
+#   │   └── val/
+#   └── labels/
+#       ├── train/
+#       └── val/
+# ============================================================
+
+path: .          # root dataset (relatif terhadap lokasi data.yaml ini)
+
+train: images/train
+val: images/val
+
+# Daftar kelas postur yang dideteksi
+# Mapping: UR Fall label → YOLO class index
+names:
+  0: normal            # UR Fall -1: person is not lying (berdiri/berjalan/duduk)
+  1: transitional      # UR Fall  0: temporary pose (sedang jatuh / transisi)
+  2: lying_on_ground   # UR Fall  1: person is lying on the ground (terbaring)

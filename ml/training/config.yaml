@@ -1,0 +1,52 @@
+# ============================================================
+# YOLO11 Training Configuration
+# ============================================================
+# File ini berisi hyperparameter untuk training model YOLO11
+# pada dataset UR Fall Detection (normal, transitional,
+# lying_on_ground).
+#
+# Referensi: https://docs.ultralytics.com/modes/train/
+# ============================================================
+
+# ---- Dataset -----------------------------------------------
+# Path ke file data.yaml yang mendefinisikan lokasi dataset
+# dan daftar kelas.
+data: "../data/processed/data.yaml"
+
+# ---- Model -------------------------------------------------
+# Base model yang digunakan. Pilihan:
+#   yolo11n.pt  (nano   - paling cepat, akurasi rendah)
+#   yolo11s.pt  (small  - balance speed & accuracy)
+#   yolo11m.pt  (medium - akurasi lebih baik)
+#   yolo11l.pt  (large  - akurasi tinggi, lambat)
+model: "yolo11s.pt"
+
+# ---- Training Hyperparameters ------------------------------
+epochs: 100
+batch: 16
+imgsz: 640
+patience: 20        # early stopping patience
+lr0: 0.01           # initial learning rate
+lrf: 0.01           # final learning rate (lr0 * lrf)
+momentum: 0.937
+weight_decay: 0.0005
+warmup_epochs: 3
+warmup_momentum: 0.8
+
+# ---- Augmentation ------------------------------------------
+hsv_h: 0.015        # hue augmentation
+hsv_s: 0.7          # saturation augmentation
+hsv_v: 0.4          # value augmentation
+degrees: 0.0        # rotation (+/- degrees)
+translate: 0.1      # translation (+/- fraction)
+scale: 0.5          # scale (+/- gain)
+flipud: 0.5         # vertical flip (penting untuk fall detection)
+fliplr: 0.5         # horizontal flip
+mosaic: 1.0         # mosaic augmentation
+
+# ---- Output ------------------------------------------------
+project: "../models"
+name: "fall_detection"
+exist_ok: true
+save: true
+save_period: 10     # save checkpoint setiap N epochs
