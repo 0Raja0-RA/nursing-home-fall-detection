@@ -1,0 +1,53 @@
+# ============================================================
+# Fall Detection Monorepo - .gitignore
+# ============================================================
+
+# ---- ML: Raw data, extracted frames, trained models --------
+ml/data/raw/
+ml/data/extracted_frames/
+ml/models/*.pt
+ml/models/*.onnx
+ml/models/*.engine
+
+# ---- Python ------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+*.egg
+.venv/
+venv/
+env/
+*.so
+
+# ---- Node.js / Frontend ------------------------------------
+node_modules/
+frontend/dist/
+frontend/build/
+.next/
+
+# ---- Environment & secrets ---------------------------------
+.env
+.env.local
+.env.*.local
+
+# ---- IDE / OS ----------------------------------------------
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ---- Docker -------------------------------------------------
+*.log
+
+# ---- Database -----------------------------------------------
+*.db
+*.sqlite3
+
+# ---- Jupyter Notebooks checkpoints --------------------------
+.ipynb_checkpoints/
