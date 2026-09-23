@@ -1,6 +1,6 @@
 # Fall Detection System — Nursing Home Monitoring
 
-Sistem deteksi jatuh real-time untuk panti jompo menggunakan YOLOv8 computer vision, FastAPI backend, dan React dashboard.
+Sistem deteksi jatuh real-time untuk panti jompo menggunakan YOLO11 computer vision, FastAPI backend, dan React dashboard.
 
 ---
 
@@ -10,7 +10,7 @@ Sistem deteksi jatuh real-time untuk panti jompo menggunakan YOLOv8 computer vis
 Kamera (RTSP/Webcam)
     │
     ▼
-Camera Service ──▶ Inference Service (YOLOv8) ──▶ State Machine
+Camera Service ──▶ Inference Service (YOLO11) ──▶ State Machine
                                                        │
                               ┌─────────────────────────┤
                               ▼                         ▼
@@ -20,7 +20,7 @@ Camera Service ──▶ Inference Service (YOLOv8) ──▶ State Machine
                         📱 Penjaga               🖥️ Dashboard
 ```
 
-**Flow:** Kamera menangkap video → YOLOv8 mendeteksi postur (walking/sitting/falling) per frame → State machine menghitung durasi "falling" → Jika melebihi threshold → Kirim alert Telegram + tampilkan di dashboard.
+**Flow:** Kamera menangkap video → YOLO11 mendeteksi postur (normal/transitional/lying_on_ground) per frame → State machine menghitung durasi "lying_on_ground" → Jika melebihi threshold → Kirim alert Telegram + tampilkan di dashboard.
 
 Lihat detail lengkap di [docs/architecture.md](docs/architecture.md).
 
@@ -42,7 +42,7 @@ fall-detection/
 │   ├── models/                  # File .pt hasil training (gitignored)
 │   └── training/
 │       ├── config.yaml          # Hyperparameter training
-│       └── train.py             # Script training YOLOv8
+│       └── train.py             # Script training YOLO11
 │
 ├── backend/                     # FastAPI backend
 │   ├── app/
@@ -54,7 +54,7 @@ fall-detection/
 │   │   ├── core/
 │   │   │   └── config.py        # Settings (env variables)
 │   │   ├── services/
-│   │   │   ├── inference_service.py    # Load & run YOLOv8
+│   │   │   ├── inference_service.py    # Load & run YOLO11
 │   │   │   ├── state_machine.py        # FSM fall detection
 │   │   │   ├── notification_service.py # Telegram alerts
 │   │   │   └── camera_service.py       # Video capture
@@ -234,14 +234,14 @@ Dokumentasi lengkap: [docs/api.md](docs/api.md)
 ## State Machine
 
 ```
-MONITORING ──[falling]──▶ POSSIBLE_FALL ──[duration ≥ threshold]──▶ CONFIRMED_FALL
-     ▲                         │                                         │
-     └──[posture ≠ falling]────┘                                         │
+MONITORING ──[lying_on_ground]──▶ POSSIBLE_FALL ──[duration ≥ threshold]──▶ CONFIRMED_FALL
+     ▲                              │                                         │
+     └──[posture = normal/trans.]──┘                                         │
      └──[acknowledged/reset]─────────────────────────────────────────────┘
 ```
 
 - **MONITORING**: Normal — tidak ada indikasi jatuh.
-- **POSSIBLE_FALL**: Postur "falling" terdeteksi, timer berjalan.
+- **POSSIBLE_FALL**: Postur "lying_on_ground" terdeteksi, timer berjalan.
 - **CONFIRMED_FALL**: Durasi melebihi threshold → kirim Telegram + alert dashboard.
 
 ---
