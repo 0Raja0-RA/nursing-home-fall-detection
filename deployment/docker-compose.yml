@@ -1,0 +1,46 @@
+# ============================================================
+# Fall Detection — Docker Compose
+# ============================================================
+# Jalankan seluruh stack (backend + frontend) dengan:
+#   docker compose up --build
+# ============================================================
+
+services:
+  # ---- Backend (FastAPI) ------------------------------------
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: fall-detection-backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env.example   # Ganti ke .env di production
+    volumes:
+      # Mount model files dari host
+      - ../ml/models:/app/ml/models:ro
+      # Mount database file (persist di luar container)
+      - fall-detection-db:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ---- Frontend (React + Vite) ------------------------------
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    container_name: fall-detection-frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  fall-detection-db:
+    driver: local
