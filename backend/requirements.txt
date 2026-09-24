@@ -1,0 +1,30 @@
+# ============================================================
+# Fall Detection Backend — Python Dependencies
+# ============================================================
+
+# ---- Web Framework -----------------------------------------
+fastapi>=0.110.0
+uvicorn[standard]>=0.29.0
+
+# ---- Database ----------------------------------------------
+sqlalchemy>=2.0.0
+aiosqlite>=0.20.0
+
+# ---- Settings & Validation ---------------------------------
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+
+# ---- HTTP Client (Telegram notifications) ------------------
+httpx>=0.27.0
+
+# ---- ML / Computer Vision ---------------------------------
+ultralytics>=8.2.0
+opencv-python-headless>=4.9.0
+numpy>=1.26.0
+
+# ---- Testing -----------------------------------------------
+pytest>=8.0.0
+pytest-asyncio>=0.23.0
+
+# ---- Dev Tools ---------------------------------------------
+python-dotenv>=1.0.0
