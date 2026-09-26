@@ -55,10 +55,9 @@ def load_model(model_path: Optional[str] = None):
     path = model_path or settings.MODEL_PATH
 
     if not Path(path).exists():
-        raise FileNotFoundError(
-            f"Model tidak ditemukan: {path}. "
-            "Pastikan sudah menjalankan training terlebih dahulu."
-        )
+        print(f"⚠️ Model custom belum ditemukan di '{path}'.")
+        print("   Menggunakan base model 'yolo11n.pt' sebagai fallback sementara (mode demo).")
+        path = "yolo11n.pt"
 
     _model = YOLO(path)
     print(f"✅ Model loaded: {path}")

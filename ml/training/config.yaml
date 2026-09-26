@@ -19,13 +19,13 @@ data: "../data/processed/data.yaml"
 #   yolo11s.pt  (small  - balance speed & accuracy)
 #   yolo11m.pt  (medium - akurasi lebih baik)
 #   yolo11l.pt  (large  - akurasi tinggi, lambat)
-model: "yolo11s.pt"
-
+model: "yolo11n.pt"
+ 
 # ---- Training Hyperparameters ------------------------------
-epochs: 100
+epochs: 50
 batch: 16
 imgsz: 640
-patience: 20        # early stopping patience
+patience: 15        # early stopping patience
 lr0: 0.01           # initial learning rate
 lrf: 0.01           # final learning rate (lr0 * lrf)
 momentum: 0.937
@@ -40,8 +40,8 @@ hsv_v: 0.4          # value augmentation
 degrees: 0.0        # rotation (+/- degrees)
 translate: 0.1      # translation (+/- fraction)
 scale: 0.5          # scale (+/- gain)
-flipud: 0.5         # vertical flip (penting untuk fall detection)
-fliplr: 0.5         # horizontal flip
+flipud: 0.0         # vertical flip dimatikan (menjaga orientasi gravitasi lantai vs langit-langit)
+fliplr: 0.5         # horizontal flip (kiri-kanan)
 mosaic: 1.0         # mosaic augmentation
 
 # ---- Output ------------------------------------------------

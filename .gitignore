@@ -5,6 +5,11 @@
 # ---- ML: Raw data, extracted frames, trained models --------
 ml/data/raw/
 ml/data/extracted_frames/
+ml/data/processed/images/
+ml/data/processed/labels/
+ml/data/*.zip
+*.zip
+*.pt
 ml/models/*.pt
 ml/models/*.onnx
 ml/models/*.engine

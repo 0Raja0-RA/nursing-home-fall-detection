@@ -19,24 +19,40 @@ import yaml
 from ultralytics import YOLO
 
 
-def load_config(config_path: str) -> dict:
+def load_config(config_path: str) -> tuple[dict, Path]:
     """Load training configuration dari file YAML."""
-    with open(config_path, "r") as f:
-        return yaml.safe_load(f)
+    p = Path(config_path)
+    if not p.exists():
+        alt = Path(__file__).parent / config_path
+        if alt.exists():
+            p = alt
+    with open(p, "r", encoding="utf-8") as f:
+        return yaml.safe_load(f), p.resolve()
 
 
-def train(config_path: str = "config.yaml", resume: bool = False) -> None:
+def train(config_path: str = "config.yaml", resume: bool = False):
     """Jalankan training YOLO11.
 
     Args:
         config_path: Path ke file konfigurasi YAML.
         resume: Lanjutkan training dari checkpoint terakhir.
     """
-    config = load_config(config_path)
+    config, cfg_path = load_config(config_path)
 
     # Load base model atau checkpoint
-    model_name = config.pop("model", "yolo11s.pt")
-    data_path = config.pop("data")
+    model_name = config.pop("model", "yolo11n.pt")
+    raw_data_path = config.pop("data")
+
+    # Resolve data path relatif terhadap config file
+    data_path = Path(raw_data_path)
+    if not data_path.is_absolute():
+        data_path = (cfg_path.parent / data_path).resolve()
+
+    # Resolve project path agar konsisten
+    if "project" in config:
+        proj_path = Path(config["project"])
+        if not proj_path.is_absolute():
+            config["project"] = str((cfg_path.parent / proj_path).resolve())
 
     print(f"{'Melanjutkan' if resume else 'Memulai'} training...")
     print(f"  Base model : {model_name}")
