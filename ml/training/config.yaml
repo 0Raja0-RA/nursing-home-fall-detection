@@ -19,7 +19,7 @@ data: "../data/processed/data.yaml"
 #   yolo11s.pt  (small  - balance speed & accuracy)
 #   yolo11m.pt  (medium - akurasi lebih baik)
 #   yolo11l.pt  (large  - akurasi tinggi, lambat)
-model: "yolo11n.pt"
+model: "yolo11s.pt"
  
 # ---- Training Hyperparameters ------------------------------
 epochs: 50
@@ -46,7 +46,7 @@ mosaic: 1.0         # mosaic augmentation
 
 # ---- Output ------------------------------------------------
 project: "../models"
-name: "fall_detection"
+name: "exp002_yolo11s"
 exist_ok: true
 save: true
 save_period: 10     # save checkpoint setiap N epochs
