@@ -19,15 +19,17 @@ data: "../data/processed/data.yaml"
 #   yolo11s.pt  (small  - balance speed & accuracy)
 #   yolo11m.pt  (medium - akurasi lebih baik)
 #   yolo11l.pt  (large  - akurasi tinggi, lambat)
-model: "yolo11s.pt"
+model: "yolo11n.pt"
  
 # ---- Training Hyperparameters ------------------------------
-epochs: 50
+epochs: 60
 batch: 16
 imgsz: 640
-patience: 15        # early stopping patience
-lr0: 0.01           # initial learning rate
+patience: 25        # early stopping patience dinaikkan
+optimizer: "AdamW"  # ganti ke optimizer AdamW
+lr0: 0.001          # initial learning rate lebih halus
 lrf: 0.01           # final learning rate (lr0 * lrf)
+cos_lr: true        # cosine learning rate schedule untuk konvergensi halus
 momentum: 0.937
 weight_decay: 0.0005
 warmup_epochs: 3
@@ -46,7 +48,7 @@ mosaic: 1.0         # mosaic augmentation
 
 # ---- Output ------------------------------------------------
 project: "../models"
-name: "exp002_yolo11s"
+name: "exp003_nano_adamw"
 exist_ok: true
 save: true
 save_period: 10     # save checkpoint setiap N epochs
