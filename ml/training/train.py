@@ -30,12 +30,14 @@ def load_config(config_path: str) -> tuple[dict, Path]:
         return yaml.safe_load(f), p.resolve()
 
 
-def train(config_path: str = "config.yaml", resume: bool = False):
+def train(config_path: str = "config.yaml", resume: bool = False, run_id: str = "", notes: str = ""):
     """Jalankan training YOLO11.
 
     Args:
         config_path: Path ke file konfigurasi YAML.
         resume: Lanjutkan training dari checkpoint terakhir.
+        run_id: ID eksperimen untuk logging otomatis ke experiments.csv.
+        notes: Catatan ringkas tentang perubahan eksperimen.
     """
     config, cfg_path = load_config(config_path)
 
@@ -94,6 +96,7 @@ def train(config_path: str = "config.yaml", resume: bool = False):
     print(f"• Grafik & Kurva Evaluasi  : {results.save_dir}")
 
     # Otomatis evaluasi pada test set jika tersedia
+    test_metrics = None
     try:
         print("\n📊 Menjalankan Evaluasi Akhir pada Test Set...")
         test_metrics = model.val(data=str(data_path), split="test", verbose=False)
@@ -105,6 +108,51 @@ def train(config_path: str = "config.yaml", resume: bool = False):
         print("-" * 65)
     except Exception as e:
         print(f"[NOTE] Evaluasi test set opsional dilewati: {e}")
+
+    # Catat ke experiments.csv jika run_id diberikan
+    if run_id:
+        try:
+            import datetime
+            csv_path = cfg_path.parent / "experiments.csv"
+            date_str = datetime.date.today().isoformat()
+            
+            # Ekstrak data epoch run dari results secara aman
+            epochs_set = config.get("epochs", 50)
+            epochs_run = epochs_set
+            if hasattr(results, "epoch") and results.epoch is not None:
+                epochs_run = results.epoch + 1
+            else:
+                csv_results = Path(results.save_dir) / "results.csv"
+                if csv_results.exists():
+                    try:
+                        with open(csv_results, "r", encoding="utf-8") as f_res:
+                            epochs_run = max(1, len(f_res.readlines()) - 1)
+                    except Exception:
+                        pass
+            
+            val_map50 = getattr(results, "results_dict", {}).get("metrics/mAP50(B)", 0.0) * 100
+            t_map50 = (test_metrics.box.map50 * 100) if test_metrics and hasattr(test_metrics, "box") else 0.0
+            t_map = (test_metrics.box.map * 100) if test_metrics and hasattr(test_metrics, "box") else 0.0
+            t_mp = (test_metrics.box.mp * 100) if test_metrics and hasattr(test_metrics, "box") else 0.0
+            t_mr = (test_metrics.box.mr * 100) if test_metrics and hasattr(test_metrics, "box") else 0.0
+            
+            speed_info = getattr(results, "speed", {}) if hasattr(results, "speed") else {}
+            inf_ms = speed_info.get("inference", 0.0)
+            fps = round(1000.0 / inf_ms, 1) if inf_ms > 0 else 0.0
+
+            log_line = (
+                f"{run_id},{date_str},{model_name},{epochs_set},{epochs_run},"
+                f"{config.get('batch', 16)},{config.get('imgsz', 640)},"
+                f"{config.get('optimizer', 'auto')},{config.get('lr0', 0.01)},"
+                f"{config.get('patience', 15)},{val_map50:.2f},{t_map50:.2f},"
+                f"{t_map:.2f},{t_mp:.2f},{t_mr:.2f},{inf_ms:.1f},{fps:.1f},"
+                f"COMPLETED,\"{notes}\"\n"
+            )
+            with open(csv_path, "a", encoding="utf-8") as f_csv:
+                f_csv.write(log_line)
+            print(f"📝 Hasil run berhasil dicatat ke: {csv_path.name}")
+        except Exception as e_log:
+            print(f"[WARN] Gagal mencatat otomatis ke CSV: {e_log}")
 
     return results
 
@@ -121,8 +169,20 @@ def main() -> None:
         action="store_true",
         help="Lanjutkan training dari checkpoint terakhir",
     )
+    parser.add_argument(
+        "--run-id",
+        type=str,
+        default="",
+        help="Identifier eksperimen (misal: EXP-002) untuk pencatatan otomatis ke spreadsheet.",
+    )
+    parser.add_argument(
+        "--notes",
+        type=str,
+        default="",
+        help="Catatan singkat eksperimen untuk log CSV.",
+    )
     args = parser.parse_args()
-    train(args.config, args.resume)
+    train(args.config, args.resume, args.run_id, args.notes)
 
 
 if __name__ == "__main__":

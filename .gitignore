@@ -13,6 +13,7 @@ ml/data/*.zip
 ml/models/*.pt
 ml/models/*.onnx
 ml/models/*.engine
+runs/
 
 # ---- Python ------------------------------------------------
 __pycache__/
