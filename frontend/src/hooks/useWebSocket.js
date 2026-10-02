@@ -1,28 +1,37 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
-export const useWebSocket = (url) => {
-    const [alertData, setAlertData] = useState(null);
-    const [isConnected, setIsConnected] = useState(false);
+export function useWebSocket(url) {
+    const [cameraData, setCameraData] = useState({});
+    const [alerts, setAlerts] = useState([]);
+    const ws = useRef(null);
 
     useEffect(() => {
-        const ws = new WebSocket(url);
+        ws.current = new WebSocket(url);
 
-        ws.onopen = () => setIsConnected(true);
-
-        ws.onmessage = (event) => {
+        ws.current.onmessage = (event) => {
             const data = JSON.parse(event.data);
-            // Menangkap trigger dari State Machine backend
-            if (data.status === 'FALLEN' || data.status === 'FALL') {
-                setAlertData(data);
+
+            if (data.type === 'camera_update') {
+                // Update status kamera (normal, transitional, lying_on_ground)
+                setCameraData(prev => ({ ...prev, [data.cameraId]: data }));
+            } else if (data.type === 'emergency_alert') {
+                // Menerima peringatan jika batas waktu jatuh (threshold) terlewati
+                setAlerts(prev => [...prev, data]);
             }
         };
 
-        ws.onclose = () => setIsConnected(false);
+        ws.current.onclose = () => console.log('WebSocket terputus. Mencoba menyambung kembali...');
 
-        return () => ws.close();
+        return () => {
+            if (ws.current) ws.current.close();
+        };
     }, [url]);
 
-    const clearAlert = () => setAlertData(null);
+    const acknowledgeAlert = (alertId) => {
+        setAlerts(prev => prev.filter(a => a.id !== alertId));
+        // Kirim konfirmasi ke backend bahwa alarm telah ditangani
+        ws.current.send(JSON.stringify({ action: 'acknowledge', alertId }));
+    };
 
-    return { alertData, isConnected, clearAlert };
-};
+    return { cameraData, alerts, acknowledgeAlert };
+}
