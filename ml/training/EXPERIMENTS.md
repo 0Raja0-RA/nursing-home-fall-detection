@@ -16,6 +16,7 @@ Dokumen ini mencatat seluruh eksperimen pemodelan Machine Learning secara sistem
 |      `EXP-004`      |      `yolo11m.pt`      |      45 / 50      |      16      |      640      |    auto (SGD, 0.01)    |      50.45%      |      82.77%      |       47.08%       |           - (Kaggle T4)       | ✅ Done | Severe Overfit (Model 20.1M params terlalu masif untuk 924 sampel) |
 | **`EXP-005`** | **`yolo11n.pt`** | **68 / 70** | **16** | **640** | **auto (SGD, 0.01)** |      51.18%      | **92.87%** 🔥 |       47.64%       |  **3.2 ms (~312 FPS)**  | ✅ Done | **👑 Highest All-Class Recall (Eksplorasi Patience 30)** |
 | **`EXP-006`** | **`yolo11n.pt`** | **70 / 70** | **16** | **640** | **AdamW (0.001)** | **70.22%** | **76.31%** (Lying: 100% 🔥) | **68.62%** 🏆 | **3.4 ms (~294 FPS)** ⚡ | ✅ Done | **👑 OVERALL CHAMPION (Record mAP50-95: 61.71%, Precision 68.62%, Lying Recall 100%)** |
+|      `EXP-007`      |      `yolo11n.pt`      |      70 / 70      |      16      |      640      | AdamW (Two-Stage) |      56.39%      | 71.15% (Lying: 100% 🔥) |       54.70%       |       7.6 ms (local RTX)       | ✅ Done | Two-Stage Freeze (Stage 1 freeze 10 ep 25, Stage 2 unfreeze ep 45) |
 
 ---
 
@@ -176,6 +177,44 @@ Dokumen ini mencatat seluruh eksperimen pemodelan Machine Learning secara sistem
     1. Kenaikan drastis `cls: 1.0` membuat model sangat disiplin dalam memisahkan postur rebahan dari postur lainnya, menghasilkan **Recall 100% dan Precision 87.9% khusus untuk kasus orang jatuh**.
     2. Optimizer AdamW + Cosine Annealing berhasil mencegah *gradient explosion*, sehingga *tightness* bounding box (mAP50-95) melonjak tinggi ke **61.71%**.
     3. Augmentasi `hsv_v: 0.6` dan `bgr: 0.2` membuktikan model mampu menggeneralisasi kondisi pencahayaan minim tanpa kehilangan akurasi deteksi.
+
+
+---
+
+### 🔹 EXP-007: Two-Stage Freeze Backbone Transfer Learning
+
+* **Tanggal:** 02 Oktober 2026
+* **Hardware:** Tesla T4 x 1 (Kaggle Cloud GPU) & NVIDIA RTX 2050 (Local Evaluation)
+* **Konfigurasi:**
+  * Base Model: `yolo11n.pt`
+  * **Stage 1 (Head Warmup):**
+    * Epochs: 25 | Batch: 16 | ImgSz: 640
+    * `freeze: 10` (Membekukan 10 layer pertama: Backbone Conv, C3k2, SPPF)
+    * Optimizer: `AdamW` (lr0: 0.001, `cos_lr: True`, `cls: 1.0`)
+  * **Stage 2 (Full Fine-Tuning):**
+    * Epochs: 45 | Patience: 25
+    * `freeze: 0` (Seluruh layer dicairkan / unfreeze)
+    * Optimizer: `AdamW` (lr0: **0.0001** — 10x lebih halus, `cos_lr: True`, `cls: 1.0`)
+  * Augmentasi: `hsv_v: 0.6`, `bgr: 0.2`, `erasing: 0.4`, `fliplr: 0.5`, `flipud: 0.0`
+  * Dataset: UR Fall Cam0 (Train: 924, Val: 254, Test: 320)
+* **Hasil Metrik Keseluruhan (Test Set):**
+  * **Test mAP50:** `56.39%` *(turun -13.83% dibanding EXP-006)*
+  * **Test mAP50-95:** `50.93%` *(turun -10.78%)*
+  * **Test Precision:** `54.70%` *(turun -13.92%)*
+  * **Test Recall:** `71.15%` *(turun -5.16%)*
+* **Hasil Metrik per Kelas pada Test Set:**
+  * **`lying_on_ground` (Lansia Jatuh):**
+    * **Recall: `100.00%` (1.0)** 🔥 *(Sempurna! Nol kejadian jatuh yang terlewat)*
+    * **Precision: `37.38%`** *(Terjadi peningkatan false positive dibanding EXP-006)*
+    * **mAP50: `49.75%`** | **mAP50-95: `49.75%`**
+  * **`transitional`:** Precision: `97.25%` | Recall: `48.46%` | mAP50: `92.99%` | mAP50-95: `85.05%`
+  * **`normal`:** Precision: `29.46%` | Recall: `64.98%` | mAP50: `26.43%`
+* **Analisis & Temuan Saintifik:**
+  * 📉 **Mengapa Two-Stage Freeze Kalah dari EXP-006?**
+    1. Di arsitektur YOLO (Object Detection), Backbone dan Neck (PAN-FPN) terhubung secara multi-skala (stride 8, 16, 32). Membekukan Backbone selama 25 epoch memaksa Neck beradaptasi pada representasi COCO generik yang belum terspesialisasi pada sudut kamera CCTV dan orientasi lantai.
+    2. Saat memasuki Stage 2 dengan learning rate sangat halus (`lr0: 0.0001`), pembaruan bobot backbone berjalan terlalu lambat untuk menyelaraskan kembali geometri postur jatuh, sehingga memicu lebih banyak *false positive* pada kelas rebahan.
+  * 🛡️ **Sisi Positif:** Metrik keselamatan lansia tetap solid karena **Recall kasus jatuh berada di angka 100%**.
+  * 🏆 **Keputusan:** **EXP-006 tetap dipertahankan sebagai model champion produksi.**
 
 ---
 
