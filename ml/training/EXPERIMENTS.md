@@ -10,9 +10,11 @@ Dokumen ini mencatat seluruh eksperimen pemodelan Machine Learning secara sistem
 
 |        Run ID        |          Model          | Epochs (Run/Set) |    Batch    |     ImgSz     |     Optimizer (lr0)     |    Test mAP50    |   Test Recall   |   Test Precision   |          Latency (ms)          | Status |                                Keputusan                                |
 | :-------------------: | :----------------------: | :---------------: | :----------: | :-----------: | :---------------------: | :--------------: | :--------------: | :-----------------: | :----------------------------: | :-----: | :----------------------------------------------------------------------: |
-| **`EXP-001`** | **`yolo11n.pt`** | **32 / 50** | **16** | **640** |  **SGD (0.01)**  | **70.40%** | **87.43%** |       49.97%       |  **6.1 ms (~164 FPS)**  | ✅ Done |                   **👑 Highest mAP50 & Recall**                   |
+| **`EXP-001`** | **`yolo11n.pt`** | **32 / 50** | **16** | **640** |  **SGD (0.01)**  | **70.40%** | **87.43%** |       49.97%       |  **6.1 ms (~164 FPS)**  | ✅ Done |                   **👑 Highest mAP50 (General Benchmark)**                   |
 |      `EXP-002`      |      `yolo11s.pt`      |      50 / 50      |      16      |      640      |      AdamW (auto)      |      49.72%      |      77.36%      |       46.92%       |       6.3 ms (~158 FPS)       | ✅ Done | Overfit pada data latih (Kapasitas model terlalu besar untuk 924 gambar) |
 | **`EXP-003`** | **`yolo11n.pt`** | **49 / 60** | **16** | **640** | **AdamW (0.001)** |      56.91%      | **82.61%** | **56.40%** 📈 | **2.9 ms (~347 FPS)** ⚡ | ✅ Done |    **👑 Highest Precision & Speed (Anti-False Alarm Terbaik)**    |
+|      `EXP-004`      |      `yolo11m.pt`      |      45 / 50      |      16      |      640      |    auto (SGD, 0.01)    |      50.45%      |      82.77%      |       47.08%       |           - (Kaggle T4)       | ✅ Done | Severe Overfit (Model 20.1M params terlalu masif untuk 924 sampel) |
+| **`EXP-005`** | **`yolo11n.pt`** | **68 / 70** | **16** | **640** | **auto (SGD, 0.01)** |      51.18%      | **92.87%** 🔥 |       47.64%       |  **3.2 ms (~312 FPS)**  | ✅ Done | **👑 Highest Safety Recall (Rekor Deteksi Jatuh Tertinggi - Safety First)** |
 
 ---
 
@@ -91,6 +93,51 @@ Dokumen ini mencatat seluruh eksperimen pemodelan Machine Learning secara sistem
   * 🎯 **Precision Terbaik:** AdamW dengan learning rate halus (0.001) berhasil memangkas false positives, menaikkan Precision ke **56.40%**.
   * ⚡ **Efisiensi Ekstrem:** Latensi 2.9 ms sangat mengagumkan untuk deployment CCTV live feed.
   * 🛡️ **mAP50-95:** Skor 50.68% menunjukkan ketepatan bounding box yang sangat rapat (tight fit IoU).
+
+
+---
+
+### 🔹 EXP-004: Model Scaling Limit (YOLO11 Medium on Kaggle T4)
+
+* **Tanggal:** 30 September 2026
+* **Hardware:** Tesla T4 x 1 (Kaggle Cloud GPU)
+* **Konfigurasi:**
+  * Base Model: `yolo11m.pt` (20.1M parameters — ~8x lebih besar dari nano)
+  * Epochs: 50 (Early stopped pada Epoch 45 karena patience 15; best epoch: 30)
+  * Batch: 16 | ImgSz: 640 | Optimizer: Auto (SGD, lr0: 0.01)
+  * Dataset: UR Fall Cam0 (Train: 924, Val: 254, Test: 320)
+* **Hasil Metrik (Test Set):**
+  * **val_mAP50:** `58.80%`
+  * **Test mAP50:** `50.45%`
+  * **Test mAP50-95:** `36.76%`
+  * **Test Recall:** `82.77%`
+  * **Test Precision:** `47.08%`
+* **Analisis & Temuan:**
+  * 📉 **Konfirmasi Overfitting Parah (Over-parameterization):** Eksperimen ini memvalidasi hipotesis bahwa memperbesar ukuran model (`nano` $\rightarrow$ `small` $\rightarrow$ `medium`) pada dataset berukuran 924 gambar justru menurunkan performa generalisasi. Model 20.1 juta parameter ini terlalu mudah menghafal latar belakang ruangan pada video latih.
+  * 🛑 **Kesimpulan Arsitektur:** YOLO11 Nano (`yolo11n`) terbukti secara definitif sebagai arsitektur paling seimbang dan optimal untuk skala dataset ini.
+
+---
+
+### 🔹 EXP-005: Extended Training & Patience (YOLO11 Nano + Patience 30)
+
+* **Tanggal:** 01-02 Oktober 2026
+* **Hardware:** Kaggle Cloud GPU
+* **Konfigurasi:**
+  * Base Model: `yolo11n.pt` (2.58M parameters)
+  * Epochs: 70 (Early stopped pada Epoch 68 karena patience 30; best epoch: 38)
+  * Batch: 16 | ImgSz: 640 | Optimizer: Auto (SGD, lr0: 0.01)
+  * Dataset: UR Fall Cam0 (Train: 924, Val: 254, Test: 320)
+* **Hasil Metrik (Test Set):**
+  * **val_mAP50 Peak:** `64.84%` (Epoch 38)
+  * **Test mAP50:** `51.18%`
+  * **Test mAP50-95:** `36.37%`
+  * **Test Recall:** **`92.87%`** 🔥 *(Rekor Tertinggi Sepanjang Eksperimen! Melebihi target ideal klinis $\ge 92\%$)*
+  * **Test Precision:** `47.64%`
+  * **Inference Speed:** **`3.2 ms` (~312.5 FPS)** ⚡
+* **Analisis & Temuan (Insight Klinis & Operasional):**
+  * 🛡️ **Prioritas Keselamatan Lansia Terpenuhi (Safety-First):** Test Recall sebesar **92.87%** adalah capaian paling krusial untuk domain panti jompo. Nyaris tidak ada kejadian jatuh atau lansia terkapar di lantai yang luput dari deteksi model ini.
+  * ⚖️ **Kompensasi Presisi dengan State Machine:** Presisi 47.64% berarti model cenderung agresif memprediksi postur berbaring. Namun, dalam sistem monorepo kita, *false positive* sesaat akan disaring oleh **Temporal State Machine (10-second confirmation window)** di backend. Lansia yang hanya membungkuk mengambil barang (<10 detik) tidak akan memicu alarm.
+  * ⚡ **Kecepatan Inferensi:** 3.2 ms (~312 FPS) memastikan throughput video stream lancar tanpa beban komputasi berat.
 
 ---
 

@@ -57,3 +57,7 @@ Thumbs.db
 
 # ---- Jupyter Notebooks checkpoints --------------------------
 .ipynb_checkpoints/
+
+# ---- Internal Team Notes & Roomchat Exports -----------------
+docs/*EXPORT*.md
+docs/ROOMCHAT_EXPORT.md
