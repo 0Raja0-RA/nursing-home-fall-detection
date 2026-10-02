@@ -4,3 +4,4 @@ EXP-002,2026-09-29,yolo11s.pt,50,50,16,640,auto,0.01,15,63.78,49.72,42.37,46.92,
 EXP-003,2026-10-01,yolo11n.pt,60,49,16,640,AdamW,0.001,25,65.92,56.91,50.68,56.40,82.61,2.9,347.7,COMPLETED,Nano with AdamW lr0=0.001 and Cosine LR
 EXP-004,2026-09-30,yolo11m.pt,50,45,16,640,auto(SGD),0.01,15,58.80,50.45,36.76,47.08,82.77,,,COMPLETED,YOLO11m architecture scaling. Severe overfit. Early stop at epoch 45 (best epoch 30).
 EXP-005,2026-10-01,yolo11n.pt,70,68,16,640,auto(SGD),0.01,30,64.84,51.18,36.37,47.64,92.87,3.2,312.5,COMPLETED,Nano with extended patience 30 and 70 epochs. Record highest Recall 92.87%. Early stop at epoch 68 (best epoch 38).
+EXP-006,2026-10-02,yolo11n.pt,70,70,16,640,AdamW,0.001,30,58.74,70.22,61.71,68.62,76.31,3.4,294.1,COMPLETED,The Hybrid: AdamW cos_lr patience 30 night augmentations cls 1.0. Record mAP50-95 61.71% precision 68.62% and 100% lying recall.
