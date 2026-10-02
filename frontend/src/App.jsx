@@ -53,7 +53,7 @@ function DashboardLayout({ historyItems, onClearHistory }) {
       `}>
         <div className="mb-8 px-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold">
+            <span className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center text-white font-bold">
               FD
             </span>
             <span className="font-bold tracking-tight text-lg">FallDetect</span>
@@ -76,7 +76,7 @@ function DashboardLayout({ historyItems, onClearHistory }) {
               onClick={() => setSidebarOpen(false)} // Otomatis tutup sidebar saat menu diklik di HP
               className={({ isActive }) =>
                 `flex items-center gap-3 px-4 py-3 rounded-xl transition-colors font-medium text-sm ${isActive
-                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20'
+                  ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20'
                   : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
                 }`
               }

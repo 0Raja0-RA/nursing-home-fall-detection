@@ -89,7 +89,7 @@ export default function SimulationDashboard({ addHistoryItem }) {
                 {/* Kamera 1: Normal */}
                 <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
                     <div className="p-3 bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
-                        <span className="font-semibold text-sm flex items-center gap-2"><Video className="w-4 h-4 text-blue-500" /> Kamar 01 (Normal)</span>
+                        <span className="font-semibold text-sm flex items-center gap-2"><Video className="w-4 h-4 text-emerald-500" /> Kamar 01 (Normal)</span>
                         <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-500">Normal</span>
                     </div>
                     <div className="aspect-video bg-slate-950 relative flex items-center justify-center text-slate-600">
@@ -103,7 +103,7 @@ export default function SimulationDashboard({ addHistoryItem }) {
                 {/* Kamera 2: Simulasi Jatuh */}
                 <div className={`bg-white dark:bg-slate-900 rounded-2xl border overflow-hidden shadow-sm transition-all ${simulationState !== 'normal' ? 'border-red-500 ring-2 ring-red-500/20' : 'border-slate-200 dark:border-slate-800'}`}>
                     <div className="p-3 bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
-                        <span className="font-semibold text-sm flex items-center gap-2"><Video className="w-4 h-4 text-blue-500" /> Kamar 02 (Simulasi Jatuh)</span>
+                        <span className="font-semibold text-sm flex items-center gap-2"><Video className="w-4 h-4 text-emerald-500" /> Kamar 02 (Simulasi Jatuh)</span>
                         <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${simulationState === 'normal' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500 animate-pulse'}`}>
                             {simulationState === 'normal' ? 'Normal' : `JATUH TERDETEKSI (${countdown}s)`}
                         </span>
