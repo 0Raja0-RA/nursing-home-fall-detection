@@ -3,10 +3,13 @@ import { createContext, useContext, useState, useEffect } from 'react';
 const ThemeContext = createContext();
 
 export function ThemeProvider({ children }) {
-    // Cek preferensi awal dari localStorage atau default ke true (dark mode)
+    // 1. Baca dari localStorage, jika kosong default ke true (dark mode)
     const [darkMode, setDarkMode] = useState(() => {
         const saved = localStorage.getItem('theme');
-        return saved ? JSON.parse(saved) : true;
+        if (saved !== null) {
+            return JSON.parse(saved);
+        }
+        return true; // Default awal gelap
     });
 
     useEffect(() => {
@@ -20,8 +23,13 @@ export function ThemeProvider({ children }) {
         }
     }, [darkMode]);
 
+    // Fungsi toggle yang aman untuk mengubah status secara manual
+    const toggleTheme = () => {
+        setDarkMode(prev => !prev);
+    };
+
     return (
-        <ThemeContext.Provider value={{ darkMode, setDarkMode }}>
+        <ThemeContext.Provider value={{ darkMode, setDarkMode, toggleTheme }}>
             {children}
         </ThemeContext.Provider>
     );
