@@ -69,25 +69,28 @@ fall-detection/
 │   ├── requirements.txt
 │   └── Dockerfile
 │
+
 ├── frontend/                    # React + Vite dashboard
-│   ├── src/
-│   │   ├── pages/
-│   │   │   ├── Dashboard.jsx    # Live monitoring semua kamera
-│   │   │   ├── AlertHistory.jsx # Riwayat notifikasi jatuh
-│   │   │   └── Settings.jsx     # Atur threshold durasi
+│   │   ├── src/
+│   │   │   ├── context/
+│   │   │   │   └── ThemeContext.jsx      # Pengelola mode gelap/terang (Dark/Light Mode)
+│   │   │   ├── pages/
+│   │   │   │   ├── LandingPage.jsx       # Halaman sambutan utama (Landing Page)
+│   │   │   │   ├── Login.jsx             # Halaman login caregiver
+│   │   │   │   ├── SimulationDashboard.jsx # Dasbor simulasi live monitoring CCTV & YOLO11
+│   │   │   ├── LiveCamera.jsx        # Pengujian kamera perangkat (HP/Laptop) via WebRTC
+│   │   │   ├── Cameras.jsx           # Halaman manajemen daftar kamera CCTV
+│   │   │   ├── AlertHistory.jsx      # Riwayat notifikasi insiden jatuh
+│   │   │   └── Settings.jsx          # Pengaturan sistem dan threshold durasi
 │   │   ├── components/
-│   │   │   ├── CameraFeedCard.jsx  # Kartu status per kamera
-│   │   │   ├── AlertBanner.jsx     # Banner notifikasi darurat
-│   │   │   ├── StatusBadge.jsx     # Badge safe/warning/danger
-│   │   │   └── ThresholdSlider.jsx # Slider threshold durasi
-│   │   ├── services/
-│   │   │   ├── api.js           # Axios API client
-│   │   │   └── websocket.js     # WebSocket client
-│   │   └── hooks/
-│   │       └── useWebSocket.js  # React hook WebSocket
-│   ├── package.json
-│   ├── vite.config.js
-│   └── Dockerfile
+│   │   │   └── DashboardLayout.jsx   # Tata letak responsif dengan sidebar collapsible
+│   │   ├── App.jsx                   # Pusat navigasi & rute aplikasi (React Router)
+│   │   ├── main.jsx                  # Entry point React
+│   │   └── index.css                 # Konfigurasi Tailwind CSS
+│   ├── public/                       # Aset publik, favicon, dan ikon
+│   ├── package.json                  # Dependensi dan skrip npm
+│   ├── vite.config.js                # Konfigurasi build Vite
+│   └── Dockerfile                    # Konfigurasi Docker frontend
 │
 ├── docs/
 │   ├── architecture.md          # Diagram arsitektur sistem
@@ -164,7 +167,7 @@ cd frontend
 npm install
 
 # Jalankan dev server
-npm run dev
+npm run dev -- --host
 ```
 
 Frontend akan berjalan di **http://localhost:5173**
