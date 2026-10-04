@@ -1,17 +1,8 @@
-# ============================================================
-# Dataset YOLO11: UR Fall Detection
-# Diproses secara otomatis via ml/scripts/prepare_urfall.py
-# ============================================================
-
-path: C:/Project_2026/Falling Detection/ml/data/processed
+# Dataset YOLO11: UR Fall (cam0). Dibuat oleh ml/scripts/prepare_urfall.py
 train: images/train
 val: images/val
 test: images/test
-
-# Jumlah kelas
 nc: 3
-
-# Nama kelas (sesuai ground-truth UR Fall)
 names:
   0: normal
   1: transitional

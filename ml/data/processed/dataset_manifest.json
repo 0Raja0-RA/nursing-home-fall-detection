@@ -1,0 +1,78 @@
+{
+  "source": "urfall-cam0",
+  "params": {
+    "raw_dir": "D:\\PENS\\Semester 5\\projek sistem cerdas\\Dataset\\raw",
+    "output_dir": "D:\\PENS\\Semester 5\\projek sistem cerdas\\nursing-home-fall-detection\\ml\\data\\processed",
+    "normal_stride": 5,
+    "lying_stride": 3,
+    "detector": "yolo11n.pt",
+    "conf": 0.25,
+    "conf_hard": 0.15,
+    "zip_output": false,
+    "allow_partial": false
+  },
+  "frames_seen": 11936,
+  "skipped": {
+    "no_label": 0,
+    "unknown_label": 0,
+    "unreadable": 0
+  },
+  "dropped_by_stride": {
+    "normal": 6261,
+    "lying_on_ground": 1566
+  },
+  "no_person_by_class": {
+    "lying_on_ground": 397,
+    "transitional": 406,
+    "normal": 241
+  },
+  "counts": {
+    "train": {
+      "normal": {
+        "frames": 1016,
+        "videos": 49
+      },
+      "transitional": {
+        "frames": 743,
+        "videos": 26
+      },
+      "lying_on_ground": {
+        "frames": 256,
+        "videos": 24
+      }
+    },
+    "val": {
+      "normal": {
+        "frames": 129,
+        "videos": 10
+      },
+      "transitional": {
+        "frames": 255,
+        "videos": 9
+      },
+      "lying_on_ground": {
+        "frames": 91,
+        "videos": 7
+      }
+    },
+    "test": {
+      "normal": {
+        "frames": 197,
+        "videos": 11
+      },
+      "transitional": {
+        "frames": 315,
+        "videos": 11
+      },
+      "lying_on_ground": {
+        "frames": 63,
+        "videos": 8
+      }
+    }
+  },
+  "totals": {
+    "normal": 1342,
+    "transitional": 1313,
+    "lying_on_ground": 410
+  }
+}
