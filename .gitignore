@@ -8,6 +8,7 @@ ml/data/extracted_frames/
 ml/data/processed/images/
 ml/data/processed/labels/
 ml/data/*.zip
+ml/data/mcf/dataset
 *.zip
 *.pt
 ml/models/*.pt
