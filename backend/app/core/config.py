@@ -37,6 +37,10 @@ class Settings(BaseSettings):
     # ---- Fall Detection State Machine ----------------------
     FALL_DURATION_THRESHOLD: float = 10.0  # detik
     POSSIBLE_FALL_THRESHOLD: float = 2.0   # detik sebelum mulai hitung
+    DEBOUNCE_FRAMES: int = 5
+    GRACE_PERIOD_SEC: float = 3.0
+    TRIGGER_CLASSES: list[str] = ["lying_on_ground"]
+    ALERT_COOLDOWN_SEC: float = 60.0
 
     # ---- Camera --------------------------------------------
     CAMERA_SOURCE: str = "0"  # "0" = webcam, atau URL RTSP

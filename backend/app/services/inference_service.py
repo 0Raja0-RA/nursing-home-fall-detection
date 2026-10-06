@@ -57,7 +57,15 @@ def load_model(model_path: Optional[str] = None):
     if not Path(path).exists():
         print(f"⚠️ Model custom belum ditemukan di '{path}'.")
         print("   Menggunakan base model 'yolo11n.pt' sebagai fallback sementara (mode demo).")
+        print("   [DEMO MODE] Untuk mensimulasikan JATUH, tunjukkan 'cell phone' ke kamera!")
         path = "yolo11n.pt"
+        
+        # Override _CLASS_MAP untuk demo dengan yolo11n.pt
+        global _CLASS_MAP
+        _CLASS_MAP = {
+            0: PostureClass.NORMAL,             # Person -> Normal
+            67: PostureClass.LYING_ON_GROUND,   # Cell phone -> Jatuh
+        }
 
     _model = YOLO(path)
     print(f"✅ Model loaded: {path}")

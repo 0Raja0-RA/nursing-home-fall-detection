@@ -9,6 +9,12 @@ Jalankan dengan:
 """
 
 from contextlib import asynccontextmanager
+import asyncio
+import sys
+
+# Fix Windows emoji print error
+if sys.stdout.encoding != 'utf-8':
+    sys.stdout.reconfigure(encoding='utf-8')
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -26,9 +32,58 @@ async def lifespan(app: FastAPI):
     settings = get_settings()
     print(f"🚀 Starting Fall Detection Backend (env={settings.ENVIRONMENT})")
     await init_db()
+
+    # Import saat runtime untuk menghindari circular dependency
+    from app.runtime.registry import registry
+    from app.services.camera_service import CameraService
+    from app.services.state_machine import FallStateMachine
+    from app.runtime.detection_pipeline import camera_pipeline
+    from app.services.alert_service import alert_service
+
+    # Setup kamera tunggal (untuk MVP)
+    cam_id = "cam-01"
+    camera = CameraService(camera_id=cam_id)
+    if camera.start():
+        registry.cameras[cam_id] = camera
+        
+        def trigger_alert(c_id: str, duration: float):
+            # Jalankan async alert process tanpa memblokir callback
+            asyncio.create_task(alert_service.process_confirmed_fall(c_id, duration))
+            
+        fsm = FallStateMachine(
+            camera_id=cam_id,
+            fall_duration_threshold=settings.FALL_DURATION_THRESHOLD,
+            possible_fall_threshold=settings.POSSIBLE_FALL_THRESHOLD,
+            debounce_frames=settings.DEBOUNCE_FRAMES,
+            grace_period_sec=settings.GRACE_PERIOD_SEC,
+            on_confirmed_fall=trigger_alert
+        )
+        registry.state_machines[cam_id] = fsm
+        
+        # Jalankan loop pipeline secara asynchronous
+        task = asyncio.create_task(camera_pipeline(camera, fsm))
+        registry.pipeline_tasks[cam_id] = task
+
     yield
     # --- Shutdown ---
     print("🛑 Shutting down Fall Detection Backend")
+    
+    from app.runtime.registry import registry
+    
+    # Matikan loop pipeline
+    for task in registry.pipeline_tasks.values():
+        task.cancel()
+        
+    if registry.pipeline_tasks:
+        await asyncio.gather(*registry.pipeline_tasks.values(), return_exceptions=True)
+
+    # Matikan capture kamera
+    for camera in registry.cameras.values():
+        camera.stop()
+
+    # Bebaskan memori GPU / RAM dari model YOLO
+    from app.services.inference_service import unload_model
+    unload_model()
 
 
 app = FastAPI(

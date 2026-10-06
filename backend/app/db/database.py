@@ -10,31 +10,11 @@ DATABASE_URL di .env.
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, Column, DateTime, Float, Integer, String
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy.orm import DeclarativeBase, sessionmaker
+from sqlalchemy.orm import sessionmaker
 
 from app.core.config import get_settings
-
-
-class Base(DeclarativeBase):
-    """SQLAlchemy declarative base."""
-    pass
-
-
-class AlertRecord(Base):
-    """Tabel riwayat alert fall detection."""
-
-    __tablename__ = "alerts"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    camera_id = Column(String, nullable=False, index=True)
-    severity = Column(String, nullable=False, default="critical")
-    message = Column(String, nullable=False)
-    fall_duration = Column(Float, nullable=False)
-    acknowledged = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    acknowledged_at = Column(DateTime, nullable=True)
+from app.db.models import Base, AlertRecord
 
 
 # ---- Engine & Session Factory ------------------------------

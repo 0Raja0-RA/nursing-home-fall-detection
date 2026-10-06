@@ -32,6 +32,16 @@ class FallState(str, Enum):
     MONITORING = "monitoring"
     POSSIBLE_FALL = "possible_fall"
     CONFIRMED_FALL = "confirmed_fall"
+    UNKNOWN = "unknown"
+
+
+class Observation(str, Enum):
+    """Observasi hasil pemrosesan model untuk FSM."""
+    TRIGGER_POSTURE = "trigger_posture"
+    NON_TRIGGER_POSTURE = "non_trigger_posture"
+    UNCERTAIN = "uncertain"
+    PERSON_LOST = "person_lost"
+    OFFLINE = "offline"
 
 
 class AlertSeverity(str, Enum):

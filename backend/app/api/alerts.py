@@ -16,7 +16,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.database import AlertRecord, get_db
+from app.db.database import get_db
+from app.db.models import AlertRecord
 from app.models.schemas import AlertResponse
 
 router = APIRouter()

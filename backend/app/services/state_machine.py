@@ -1,31 +1,25 @@
 """
 state_machine.py
 ================
-Finite State Machine (FSM) untuk fall detection.
+Finite State Machine (FSM) untuk fall detection dengan time-tracking berbasis akumulasi.
 
 States:
     MONITORING     → Kondisi normal, tidak ada indikasi jatuh.
-    POSSIBLE_FALL  → Postur "lying_on_ground" terdeteksi, mulai hitung durasi.
+    POSSIBLE_FALL  → Postur pemicu terdeteksi, mulai hitung durasi.
     CONFIRMED_FALL → Durasi melebihi threshold, trigger alert.
+    UNKNOWN        → Kamera offline.
 
-Transisi:
-    MONITORING     --[lying_on_ground detected]--> POSSIBLE_FALL
-    POSSIBLE_FALL  --[still lying, duration >= threshold]--> CONFIRMED_FALL
-    POSSIBLE_FALL  --[postur berubah (normal/transitional)]--> MONITORING (reset)
-    CONFIRMED_FALL --[acknowledged / timeout]--> MONITORING (reset)
-
-Note: "transitional" (sedang jatuh) TIDAK trigger timer.
-      Hanya "lying_on_ground" (sudah terbaring) yang dihitung.
-      Ini mengurangi false positive dari gerakan membungkuk/transisi.
-
-Setiap kamera memiliki instance FallStateMachine tersendiri.
+Transisi baru mengakomodasi:
+- Anti-flicker: frame non-pemicu tidak langsung mereset (debounce).
+- Uncertain: waktu dihentikan sementara (pause).
+- Person lost: waktu dihentikan, reset jika melebihi grace period.
 """
 
 import time
 from dataclasses import dataclass, field
 from typing import Callable, Optional
 
-from app.models.schemas import FallState, PostureClass
+from app.models.schemas import FallState, Observation
 
 
 @dataclass
@@ -36,89 +30,114 @@ class FallStateMachine:
         camera_id: ID kamera yang dipantau.
         fall_duration_threshold: Detik postur falling sebelum CONFIRMED.
         possible_fall_threshold: Detik sebelum transisi ke POSSIBLE_FALL.
+        debounce_frames: Jumlah frame non-pemicu sebelum mereset hitungan.
+        grace_period_sec: Detik batas person lost sebelum mereset hitungan.
         on_confirmed_fall: Callback yang dipanggil saat fall dikonfirmasi.
     """
 
     camera_id: str
     fall_duration_threshold: float = 10.0
     possible_fall_threshold: float = 2.0
+    debounce_frames: int = 5
+    grace_period_sec: float = 3.0
     on_confirmed_fall: Optional[Callable] = None
 
     # Internal state
     state: FallState = field(default=FallState.MONITORING, init=False)
-    _fall_start_time: Optional[float] = field(default=None, init=False)
-    _last_posture: Optional[PostureClass] = field(default=None, init=False)
+    
+    _accumulated_fall_time: float = field(default=0.0, init=False)
+    _last_update_time: float = field(default_factory=time.time, init=False)
+    
+    _debounce_counter: int = field(default=0, init=False)
+    _person_lost_start: Optional[float] = field(default=None, init=False)
+    _has_triggered_alert: bool = field(default=False, init=False)
 
     @property
     def fall_duration(self) -> float:
-        """Durasi postur falling saat ini (detik)."""
-        if self._fall_start_time is None:
-            return 0.0
-        return time.time() - self._fall_start_time
+        """Durasi akumulatif postur falling (detik)."""
+        return self._accumulated_fall_time
 
-    def update(self, posture: PostureClass) -> FallState:
-        """Update state berdasarkan postur terdeteksi.
+    def update(self, observation: Observation) -> FallState:
+        """Update state berdasarkan observasi terbaru.
 
         Args:
-            posture: Postur yang terdeteksi pada frame saat ini.
+            observation: Hasil agregasi deteksi dari inference.
 
         Returns:
             State terbaru setelah update.
         """
-        self._last_posture = posture
+        now = time.time()
+        dt = now - self._last_update_time
+        self._last_update_time = now
 
-        if posture == PostureClass.LYING_ON_GROUND:
-            self._handle_lying()
-        else:
-            self._handle_not_lying()
+        if observation == Observation.OFFLINE:
+            self._reset_internal(FallState.UNKNOWN)
+            return self.state
+
+        if self.state == FallState.UNKNOWN:
+            self.state = FallState.MONITORING
+
+        if observation == Observation.TRIGGER_POSTURE:
+            self._debounce_counter = 0
+            self._person_lost_start = None
+            self._accumulated_fall_time += dt
+            self._check_thresholds()
+
+        elif observation == Observation.NON_TRIGGER_POSTURE:
+            self._person_lost_start = None
+            if self._accumulated_fall_time > 0:
+                self._debounce_counter += 1
+                if self._debounce_counter >= self.debounce_frames:
+                    self._reset_internal(FallState.MONITORING)
+
+        elif observation == Observation.UNCERTAIN:
+            # Pause perhitungan, debounce dan grace period batal
+            self._person_lost_start = None
+
+        elif observation == Observation.PERSON_LOST:
+            if self._accumulated_fall_time > 0:
+                if self._person_lost_start is None:
+                    self._person_lost_start = now
+                elif now - self._person_lost_start >= self.grace_period_sec:
+                    self._reset_internal(FallState.MONITORING)
 
         return self.state
 
-    def _handle_lying(self) -> None:
-        """Logic saat postur = LYING_ON_GROUND (terbaring di lantai)."""
-        if self.state == FallState.MONITORING:
-            # Mulai catat waktu falling
-            self._fall_start_time = time.time()
-            self.state = FallState.POSSIBLE_FALL
-            print(f"[{self.camera_id}] ⚠️  POSSIBLE_FALL detected")
+    def _check_thresholds(self) -> None:
+        if self.state == FallState.CONFIRMED_FALL:
+            return
 
-        elif self.state == FallState.POSSIBLE_FALL:
-            duration = self.fall_duration
-            if duration >= self.fall_duration_threshold:
-                self.state = FallState.CONFIRMED_FALL
-                print(
-                    f"[{self.camera_id}] 🚨 CONFIRMED_FALL! "
-                    f"Duration: {duration:.1f}s"
-                )
-                if self.on_confirmed_fall:
-                    self.on_confirmed_fall(self.camera_id, duration)
+        if self._accumulated_fall_time >= self.fall_duration_threshold:
+            self.state = FallState.CONFIRMED_FALL
+            print(f"[{self.camera_id}] 🚨 CONFIRMED_FALL! Duration: {self._accumulated_fall_time:.1f}s")
+            if not self._has_triggered_alert and self.on_confirmed_fall:
+                self._has_triggered_alert = True
+                self.on_confirmed_fall(self.camera_id, self._accumulated_fall_time)
+                
+        elif self._accumulated_fall_time >= self.possible_fall_threshold:
+            if self.state != FallState.POSSIBLE_FALL:
+                self.state = FallState.POSSIBLE_FALL
+                print(f"[{self.camera_id}] ⚠️  POSSIBLE_FALL detected")
 
-        # Jika sudah CONFIRMED, tetap di state itu sampai di-reset
-
-    def _handle_not_lying(self) -> None:
-        """Logic saat postur bukan LYING_ON_GROUND — reset ke MONITORING."""
+    def _reset_internal(self, new_state: FallState) -> None:
         if self.state in (FallState.POSSIBLE_FALL, FallState.CONFIRMED_FALL):
-            prev_state = self.state
-            self.reset()
-            if prev_state == FallState.POSSIBLE_FALL:
-                print(f"[{self.camera_id}] ✅ Orang bangkit/bergerak, reset to MONITORING")
+            print(f"[{self.camera_id}] ✅ Reset to {new_state.value}")
+        self.state = new_state
+        self._accumulated_fall_time = 0.0
+        self._debounce_counter = 0
+        self._person_lost_start = None
+        self._has_triggered_alert = False
 
     def reset(self) -> None:
         """Reset state machine ke MONITORING."""
-        self.state = FallState.MONITORING
-        self._fall_start_time = None
+        self._reset_internal(FallState.MONITORING)
 
     def update_thresholds(
         self,
         fall_duration: Optional[float] = None,
         possible_fall: Optional[float] = None,
     ) -> None:
-        """Update threshold tanpa reset state.
-
-        Args:
-            fall_duration: Threshold baru untuk confirmed fall (detik).
-            possible_fall: Threshold baru untuk possible fall (detik).
-        """
+        """Update threshold tanpa reset state."""
         if fall_duration is not None:
             self.fall_duration_threshold = fall_duration
         if possible_fall is not None:
