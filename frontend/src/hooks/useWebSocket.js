@@ -1,45 +1,37 @@
-/**
- * useWebSocket.js
- * ===============
- * React hook untuk mengelola koneksi WebSocket.
- *
- * Auto-connect saat component mount, auto-disconnect saat unmount.
- * Provides connection status dan handlers untuk event types.
- */
+import { useState, useEffect, useRef } from 'react';
 
-import { useEffect, useRef, useState } from "react";
-import { createWebSocket } from "../services/websocket";
+export function useWebSocket(url) {
+    const [cameraData, setCameraData] = useState({});
+    const [alerts, setAlerts] = useState([]);
+    const ws = useRef(null);
 
-/**
- * Hook untuk koneksi WebSocket real-time.
- *
- * @param {Object} params
- * @param {Function} params.onStatusUpdate - Handler untuk status_update event.
- * @param {Function} params.onAlert - Handler untuk alert event.
- * @returns {{ isConnected: boolean }}
- */
-export function useWebSocket({ onStatusUpdate, onAlert } = {}) {
-  const [isConnected, setIsConnected] = useState(false);
-  const wsRef = useRef(null);
-  const handlersRef = useRef({ onStatusUpdate, onAlert });
+    useEffect(() => {
+        ws.current = new WebSocket(url);
 
-  // Update handler refs tanpa re-create koneksi
-  useEffect(() => {
-    handlersRef.current = { onStatusUpdate, onAlert };
-  }, [onStatusUpdate, onAlert]);
+        ws.current.onmessage = (event) => {
+            const data = JSON.parse(event.data);
 
-  useEffect(() => {
-    wsRef.current = createWebSocket({
-      onStatusUpdate: (data) => handlersRef.current.onStatusUpdate?.(data),
-      onAlert: (data) => handlersRef.current.onAlert?.(data),
-      onOpen: () => setIsConnected(true),
-      onClose: () => setIsConnected(false),
-    });
+            if (data.type === 'camera_update') {
+                // Update status kamera (normal, transitional, lying_on_ground)
+                setCameraData(prev => ({ ...prev, [data.cameraId]: data }));
+            } else if (data.type === 'emergency_alert') {
+                // Menerima peringatan jika batas waktu jatuh (threshold) terlewati
+                setAlerts(prev => [...prev, data]);
+            }
+        };
 
-    return () => {
-      wsRef.current?.close();
+        ws.current.onclose = () => console.log('WebSocket terputus. Mencoba menyambung kembali...');
+
+        return () => {
+            if (ws.current) ws.current.close();
+        };
+    }, [url]);
+
+    const acknowledgeAlert = (alertId) => {
+        setAlerts(prev => prev.filter(a => a.id !== alertId));
+        // Kirim konfirmasi ke backend bahwa alarm telah ditangani
+        ws.current.send(JSON.stringify({ action: 'acknowledge', alertId }));
     };
-  }, []);
 
-  return { isConnected };
+    return { cameraData, alerts, acknowledgeAlert };
 }

@@ -1,129 +1,35 @@
-/**
- * CameraFeedCard.jsx
- * ==================
- * Kartu status per kamera di dashboard.
- *
- * Menampilkan: camera ID, postur terdeteksi, fall state,
- * durasi falling (jika ada), confidence, dan FPS.
- *
- * Kartu berubah style saat ada danger state (glow merah + animasi).
- */
+import { Activity, UserCheck, AlertOctagon } from 'lucide-react';
 
-import StatusBadge from "./StatusBadge";
-
-/** Mapping posture class ke style variant (UR Fall labels) */
-const POSTURE_STYLE = {
-  normal: { badge: "safe", icon: "🚶", label: "Normal" },
-  transitional: { badge: "warning", icon: "⚡", label: "Transitional" },
-  lying_on_ground: { badge: "danger", icon: "🚨", label: "Lying on Ground" },
+const statusConfig = {
+    normal: { color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500', icon: UserCheck, label: 'Normal' },
+    transitional: { color: 'bg-amber-500/20 text-amber-400 border-amber-500', icon: Activity, label: 'Transisi (Waspada)' },
+    lying_on_ground: { color: 'bg-red-500/20 text-red-400 border-red-500 animate-pulse', icon: AlertOctagon, label: 'Terjatuh' }
 };
 
-/** Mapping fall state ke style variant */
-const STATE_STYLE = {
-  monitoring: { badge: "safe", label: "Monitoring" },
-  possible_fall: { badge: "warning", label: "Possible Fall" },
-  confirmed_fall: { badge: "danger", label: "CONFIRMED FALL" },
-};
+export default function CameraFeedCard({ id, name, status = 'normal', streamUrl }) {
+    const config = statusConfig[status] || statusConfig.normal;
+    const Icon = config.icon;
 
-export default function CameraFeedCard({ camera }) {
-  const {
-    camera_id,
-    current_posture,
-    fall_state = "monitoring",
-    fall_duration = 0,
-    confidence = 0,
-    fps = 0,
-    is_active = true,
-  } = camera;
+    return (
+        <div className={`relative bg-slate-800 rounded-xl overflow-hidden border ${status === 'lying_on_ground' ? 'border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.3)]' : 'border-slate-700'}`}>
+            {/* Container Video Placeholder */}
+            <div className="aspect-video bg-slate-900 relative">
+                <img src={streamUrl} alt={`Kamera ${name}`} className="w-full h-full object-cover opacity-80" />
 
-  const isDanger = fall_state === "confirmed_fall";
-  const postureInfo = POSTURE_STYLE[current_posture] || { badge: "safe", icon: "❓" };
-  const stateInfo = STATE_STYLE[fall_state] || STATE_STYLE.monitoring;
+                {/* Simulasi Bounding Box YOLO jika terdeteksi jatuh */}
+                {status === 'lying_on_ground' && (
+                    <div className="absolute top-[40%] left-[30%] w-[40%] h-[30%] border-2 border-red-500 bg-red-500/10" />
+                )}
+            </div>
 
-  return (
-    <div className={`card ${isDanger ? "card--danger" : ""}`}>
-      {/* Header */}
-      <div style={{
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        marginBottom: "var(--space-md)",
-      }}>
-        <h3 style={{ fontSize: "var(--font-size-base)", fontWeight: 600 }}>
-          📷 {camera_id}
-        </h3>
-        <StatusBadge
-          status={is_active ? "safe" : "danger"}
-          label={is_active ? "Active" : "Offline"}
-        />
-      </div>
-
-      {/* Posture Display */}
-      <div style={{
-        textAlign: "center",
-        padding: "var(--space-lg) 0",
-        borderRadius: "var(--radius-md)",
-        background: "var(--color-surface-1)",
-        marginBottom: "var(--space-md)",
-      }}>
-        <div style={{ fontSize: "2.5rem", marginBottom: "var(--space-sm)" }}>
-          {postureInfo.icon}
+            {/* Header & Status Badge */}
+            <div className="absolute top-0 left-0 right-0 p-3 flex justify-between items-start bg-gradient-to-b from-black/80 to-transparent">
+                <h3 className="text-slate-200 font-semibold drop-shadow-md">{name}</h3>
+                <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-medium backdrop-blur-sm ${config.color}`}>
+                    <Icon className="w-3.5 h-3.5" />
+                    {config.label}
+                </div>
+            </div>
         </div>
-        <StatusBadge
-          status={postureInfo.badge}
-          label={current_posture || "No detection"}
-        />
-      </div>
-
-      {/* Fall State */}
-      <div style={{
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        marginBottom: "var(--space-sm)",
-      }}>
-        <span style={{ color: "var(--color-text-muted)", fontSize: "var(--font-size-sm)" }}>
-          Fall State
-        </span>
-        <StatusBadge status={stateInfo.badge} label={stateInfo.label} />
-      </div>
-
-      {/* Fall Duration (hanya tampilkan jika ada falling) */}
-      {fall_state !== "monitoring" && (
-        <div style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: "var(--space-sm)",
-        }}>
-          <span style={{ color: "var(--color-text-muted)", fontSize: "var(--font-size-sm)" }}>
-            Duration
-          </span>
-          <span style={{
-            fontWeight: 700,
-            fontSize: "var(--font-size-lg)",
-            color: isDanger ? "var(--color-danger)" : "var(--color-warning)",
-          }}>
-            {fall_duration.toFixed(1)}s
-          </span>
-        </div>
-      )}
-
-      {/* Stats Row */}
-      <div style={{
-        display: "flex",
-        justifyContent: "space-between",
-        paddingTop: "var(--space-sm)",
-        borderTop: "1px solid rgba(203, 166, 247, 0.05)",
-        marginTop: "var(--space-sm)",
-      }}>
-        <span style={{ color: "var(--color-text-subtle)", fontSize: "var(--font-size-xs)" }}>
-          Confidence: {(confidence * 100).toFixed(0)}%
-        </span>
-        <span style={{ color: "var(--color-text-subtle)", fontSize: "var(--font-size-xs)" }}>
-          {fps.toFixed(1)} FPS
-        </span>
-      </div>
-    </div>
-  );
+    );
 }

@@ -1,109 +1,56 @@
-/**
- * Settings.jsx
- * ============
- * Halaman pengaturan: atur threshold durasi falling,
- * confidence threshold, dan konfigurasi lainnya.
- */
-
-import { useState, useEffect } from "react";
-import ThresholdSlider from "../components/ThresholdSlider";
-import { getSettings, updateThreshold } from "../services/api";
-import toast from "react-hot-toast";
+import { useState } from 'react';
 
 export default function Settings() {
-  const [settings, setSettings] = useState(null);
-  const [threshold, setThreshold] = useState(10);
-  const [saving, setSaving] = useState(false);
+    const [threshold, setThreshold] = useState(10);
+    const [telegramId, setTelegramId] = useState('');
 
-  useEffect(() => {
-    getSettings()
-      .then((data) => {
-        setSettings(data);
-        setThreshold(data.fall_duration_threshold);
-      })
-      .catch((err) => console.error("Failed to fetch settings:", err));
-  }, []);
+    const handleSave = (e) => {
+        e.preventDefault();
+        // Logic untuk mengirim update settings via REST API (axios/fetch) ke backend[cite: 1]
+        console.log('Tersimpan:', { threshold, telegramId });
+    };
 
-  const handleSave = async () => {
-    setSaving(true);
-    try {
-      const updated = await updateThreshold(threshold);
-      setSettings(updated);
-      toast.success(`Threshold updated: ${threshold}s`);
-    } catch (err) {
-      toast.error("Gagal menyimpan threshold");
-      console.error(err);
-    } finally {
-      setSaving(false);
-    }
-  };
+    return (
+        <div className="min-h-screen bg-slate-950 p-6 text-slate-300">
+            <h1 className="text-2xl font-bold text-slate-100 mb-6">Pengaturan Sistem</h1>
 
-  if (!settings) {
-    return <p style={{ color: "var(--color-text-muted)" }}>Loading settings...</p>;
-  }
+            <form onSubmit={handleSave} className="max-w-xl bg-slate-900 p-6 rounded-xl border border-slate-800 space-y-6">
+                <div>
+                    <label className="block text-sm font-medium text-slate-400 mb-2">
+                        Threshold Durasi Jatuh (Detik)
+                    </label>
+                    <div className="flex items-center gap-4">
+                        <input
+                            type="range"
+                            min="3" max="30"
+                            value={threshold}
+                            onChange={(e) => setThreshold(e.target.value)}
+                            className="w-full accent-blue-500"
+                        />
+                        <span className="text-lg font-bold text-slate-200 w-12">{threshold}s</span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1">
+                        Waktu tunggu sebelum model mengirim notifikasi darurat saat mendeteksi status "lying_on_ground".
+                    </p>
+                </div>
 
-  return (
-    <>
-      <h2 className="page-title">Settings</h2>
-      <p className="page-subtitle">Konfigurasi sistem fall detection</p>
+                <div>
+                    <label className="block text-sm font-medium text-slate-400 mb-2">
+                        ID Bot Telegram
+                    </label>
+                    <input
+                        type="text"
+                        value={telegramId}
+                        onChange={(e) => setTelegramId(e.target.value)}
+                        placeholder="Masukkan Chat ID Telegram"
+                        className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-blue-500"
+                    />
+                </div>
 
-      <div style={{ display: "grid", gap: "var(--space-xl)", maxWidth: 600 }}>
-        {/* Threshold Slider */}
-        <div className="card">
-          <h3 style={{ marginBottom: "var(--space-md)", fontSize: "var(--font-size-lg)" }}>
-            Fall Duration Threshold
-          </h3>
-          <p style={{ color: "var(--color-text-muted)", fontSize: "var(--font-size-sm)", marginBottom: "var(--space-lg)" }}>
-            Berapa lama (detik) postur "falling" harus berlangsung
-            sebelum sistem mengirim notifikasi alert.
-          </p>
-
-          <ThresholdSlider
-            value={threshold}
-            onChange={setThreshold}
-            min={1}
-            max={60}
-            unit="detik"
-          />
-
-          <button
-            className="btn btn-primary"
-            onClick={handleSave}
-            disabled={saving}
-            style={{ marginTop: "var(--space-lg)" }}
-          >
-            {saving ? "Menyimpan..." : "Simpan Perubahan"}
-          </button>
+                <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 rounded-lg transition-colors">
+                    Simpan Pengaturan
+                </button>
+            </form>
         </div>
-
-        {/* Info cards */}
-        <div className="card">
-          <h3 style={{ marginBottom: "var(--space-md)", fontSize: "var(--font-size-lg)" }}>
-            Konfigurasi Aktif
-          </h3>
-          <div style={{ display: "grid", gap: "var(--space-sm)" }}>
-            <InfoRow label="Fall Duration Threshold" value={`${settings.fall_duration_threshold}s`} />
-            <InfoRow label="Possible Fall Threshold" value={`${settings.possible_fall_threshold}s`} />
-            <InfoRow label="Confidence Threshold" value={`${(settings.confidence_threshold * 100).toFixed(0)}%`} />
-            <InfoRow label="Camera Source" value={settings.camera_source} />
-          </div>
-        </div>
-      </div>
-    </>
-  );
-}
-
-/** Row komponen kecil untuk info display. */
-function InfoRow({ label, value }) {
-  return (
-    <div style={{
-      display: "flex",
-      justifyContent: "space-between",
-      padding: "var(--space-sm) 0",
-      borderBottom: "1px solid rgba(203, 166, 247, 0.05)",
-    }}>
-      <span style={{ color: "var(--color-text-muted)", fontSize: "var(--font-size-sm)" }}>{label}</span>
-      <span style={{ fontWeight: 600, fontSize: "var(--font-size-sm)" }}>{value}</span>
-    </div>
-  );
+    );
 }

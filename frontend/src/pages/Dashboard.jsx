@@ -1,73 +1,39 @@
-/**
- * Dashboard.jsx
- * =============
- * Halaman utama: menampilkan live status semua kamera.
- *
- * Menerima data real-time via WebSocket dan menampilkan
- * CameraFeedCard per kamera dengan status postur & fall state.
- */
-
-import { useState, useEffect } from "react";
-import CameraFeedCard from "../components/CameraFeedCard";
-import AlertBanner from "../components/AlertBanner";
-import { useWebSocket } from "../hooks/useWebSocket";
-import { getCameras } from "../services/api";
+import { useWebSocket } from '../hooks/useWebSocket';
+import CameraFeedCard from '../components/CameraFeedCard';
+import AlertBanner from '../components/AlertBanner';
 
 export default function Dashboard() {
-  const [cameras, setCameras] = useState([]);
-  const [activeAlert, setActiveAlert] = useState(null);
+    const { cameraData, alerts, acknowledgeAlert } = useWebSocket('ws://localhost:8000/ws');
 
-  // Fetch initial camera list
-  useEffect(() => {
-    getCameras()
-      .then(setCameras)
-      .catch((err) => console.error("Failed to fetch cameras:", err));
-  }, []);
+    // Mock data untuk kamera jika belum ada data dari backend
+    const cameras = [
+        { id: 'cam1', name: 'Kamar 01', status: cameraData['cam1']?.status || 'normal', url: '/mock-stream-1.jpg' },
+        { id: 'cam2', name: 'Kamar 02', status: cameraData['cam2']?.status || 'lying_on_ground', url: '/mock-stream-2.jpg' },
+        { id: 'cam3', name: 'Ruang Makan', status: cameraData['cam3']?.status || 'normal', url: '/mock-stream-3.jpg' },
+        { id: 'cam4', name: 'Lorong Timur', status: cameraData['cam4']?.status || 'transitional', url: '/mock-stream-4.jpg' },
+    ];
 
-  // Listen to WebSocket updates
-  useWebSocket({
-    onStatusUpdate: (data) => {
-      setCameras((prev) =>
-        prev.map((cam) =>
-          cam.camera_id === data.camera_id ? { ...cam, ...data } : cam
-        )
-      );
-    },
-    onAlert: (data) => {
-      setActiveAlert(data);
-      // Auto-dismiss setelah 15 detik
-      setTimeout(() => setActiveAlert(null), 15000);
-    },
-  });
+    return (
+        <div className="min-h-screen bg-slate-950 text-slate-300 p-6">
+            <AlertBanner alerts={alerts} onAcknowledge={acknowledgeAlert} />
 
-  return (
-    <>
-      {/* Alert Banner — muncul saat ada fall confirmed */}
-      {activeAlert && (
-        <AlertBanner
-          alert={activeAlert}
-          onDismiss={() => setActiveAlert(null)}
-        />
-      )}
+            <header className="mb-8">
+                <h1 className="text-2xl font-bold text-slate-100">Live Monitoring Panti Jompo</h1>
+                <p className="text-slate-400">Sistem Deteksi Jatuh Real-time</p>
+            </header>
 
-      <h2 className="page-title">Live Monitoring</h2>
-      <p className="page-subtitle">
-        Status real-time semua kamera yang terhubung
-      </p>
-
-      {cameras.length === 0 ? (
-        <div className="card" style={{ textAlign: "center", padding: "3rem" }}>
-          <p style={{ color: "var(--color-text-muted)" }}>
-            Belum ada kamera yang terhubung. Pastikan backend sudah berjalan.
-          </p>
+            {/* Grid 2x2 untuk kamera */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {cameras.map(cam => (
+                    <CameraFeedCard
+                        key={cam.id}
+                        id={cam.id}
+                        name={cam.name}
+                        status={cam.status}
+                        streamUrl={cam.url}
+                    />
+                ))}
+            </div>
         </div>
-      ) : (
-        <div className="grid-cameras">
-          {cameras.map((cam) => (
-            <CameraFeedCard key={cam.camera_id} camera={cam} />
-          ))}
-        </div>
-      )}
-    </>
-  );
+    );
 }
