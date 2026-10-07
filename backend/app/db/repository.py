@@ -11,6 +11,7 @@ from typing import Sequence
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.logging import utc_now_naive
 from app.db.models import AlertRecord
 from app.models.schemas import AlertCreate
 
@@ -48,7 +49,7 @@ class AlertRepository:
             .where(AlertRecord.acknowledged == False)
             .values(
                 acknowledged=True,
-                acknowledged_at=datetime.utcnow(),
+                acknowledged_at=utc_now_naive(),
             )
         )
         result = await self.session.execute(stmt)

@@ -24,13 +24,16 @@ from app.core.config import get_settings
 from app.db.database import init_db
 from app.websocket.ws_manager import router as ws_router
 
+from app.core.logging import get_logger
+log = get_logger("app.main")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifecycle: jalankan saat startup & cleanup saat shutdown."""
     # --- Startup ---
     settings = get_settings()
-    print(f"🚀 Starting Fall Detection Backend (env={settings.ENVIRONMENT})")
+    log.info(f"🚀 Starting Fall Detection Backend (env={settings.ENVIRONMENT})")
     await init_db()
 
     # Import saat runtime untuk menghindari circular dependency
@@ -66,7 +69,7 @@ async def lifespan(app: FastAPI):
 
     yield
     # --- Shutdown ---
-    print("🛑 Shutting down Fall Detection Backend")
+    log.info("🛑 Shutting down Fall Detection Backend")
     
     from app.runtime.registry import registry
     

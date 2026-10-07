@@ -16,6 +16,9 @@ from sqlalchemy.orm import sessionmaker
 from app.core.config import get_settings
 from app.db.models import Base, AlertRecord
 
+from app.core.logging import get_logger
+log = get_logger("app.db.database")
+
 
 # ---- Engine & Session Factory ------------------------------
 
@@ -57,4 +60,4 @@ async def init_db() -> None:
     engine = _get_engine()
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    print("✅ Database initialized")
+    log.info("✅ Database initialized")

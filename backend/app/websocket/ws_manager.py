@@ -20,6 +20,9 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from app.models.schemas import WSMessage
 
+from app.core.logging import get_logger
+log = get_logger("app.websocket.ws_manager")
+
 router = APIRouter()
 
 
@@ -35,14 +38,14 @@ class ConnectionManager:
         await websocket.accept()
         async with self._lock:
             self._connections.append(websocket)
-        print(f"🔌 WebSocket connected (total: {len(self._connections)})")
+        log.info(f"🔌 WebSocket connected (total: {len(self._connections)})")
 
     async def disconnect(self, websocket: WebSocket) -> None:
         """Hapus koneksi WebSocket."""
         async with self._lock:
             if websocket in self._connections:
                 self._connections.remove(websocket)
-        print(f"🔌 WebSocket disconnected (total: {len(self._connections)})")
+        log.info(f"🔌 WebSocket disconnected (total: {len(self._connections)})")
 
     async def broadcast(self, message: WSMessage) -> None:
         """Kirim pesan ke semua client yang terhubung."""
