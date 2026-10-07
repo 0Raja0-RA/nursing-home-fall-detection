@@ -9,6 +9,8 @@ from datetime import datetime
 from sqlalchemy import Boolean, Column, DateTime, Float, Integer, String
 from sqlalchemy.orm import DeclarativeBase
 
+from app.core.logging import utc_now_naive
+
 
 class Base(DeclarativeBase):
     """SQLAlchemy declarative base."""
@@ -27,5 +29,5 @@ class AlertRecord(Base):
     fall_duration = Column(Float, nullable=False)
     acknowledged = Column(Boolean, default=False)
     notified = Column(Boolean, default=False)  # Baru ditambahkan untuk status Telegram
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now_naive)
     acknowledged_at = Column(DateTime, nullable=True)

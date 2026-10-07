@@ -16,6 +16,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.logging import utc_now_naive
 from app.db.database import get_db
 from app.db.models import AlertRecord
 from app.models.schemas import AlertResponse
@@ -83,7 +84,7 @@ async def acknowledge_alert(
         raise HTTPException(status_code=404, detail="Alert not found")
 
     alert.acknowledged = True
-    alert.acknowledged_at = datetime.utcnow()
+    alert.acknowledged_at = utc_now_naive()
     await db.commit()
     await db.refresh(alert)
     return alert

@@ -16,6 +16,9 @@ import httpx
 
 from app.core.config import get_settings
 
+from app.core.logging import get_logger
+log = get_logger("app.services.notification_service")
+
 TELEGRAM_API_URL = "https://api.telegram.org/bot{token}/sendMessage"
 
 
@@ -37,7 +40,7 @@ async def send_telegram_alert(
     settings = get_settings()
 
     if not settings.TELEGRAM_BOT_TOKEN or not settings.TELEGRAM_CHAT_ID:
-        print("⚠️  Telegram not configured, skipping notification")
+        log.info("⚠️  Telegram not configured, skipping notification")
         return False
 
     text = message or (
@@ -58,10 +61,10 @@ async def send_telegram_alert(
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.post(url, json=payload)
             response.raise_for_status()
-            print(f"✅ Telegram alert sent for camera {camera_id}")
+            log.info(f"✅ Telegram alert sent for camera {camera_id}")
             return True
     except httpx.HTTPError as e:
-        print(f"❌ Failed to send Telegram alert: {e}")
+        log.info(f"❌ Failed to send Telegram alert: {e}")
         return False
 
 

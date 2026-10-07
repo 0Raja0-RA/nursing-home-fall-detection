@@ -21,6 +21,9 @@ from typing import Callable, Optional
 
 from app.models.schemas import FallState, Observation
 
+from app.core.logging import get_logger
+log = get_logger("app.services.state_machine")
+
 
 @dataclass
 class FallStateMachine:
@@ -109,7 +112,7 @@ class FallStateMachine:
 
         if self._accumulated_fall_time >= self.fall_duration_threshold:
             self.state = FallState.CONFIRMED_FALL
-            print(f"[{self.camera_id}] 🚨 CONFIRMED_FALL! Duration: {self._accumulated_fall_time:.1f}s")
+            log.info(f"[{self.camera_id}] 🚨 CONFIRMED_FALL! Duration: {self._accumulated_fall_time:.1f}s")
             if not self._has_triggered_alert and self.on_confirmed_fall:
                 self._has_triggered_alert = True
                 self.on_confirmed_fall(self.camera_id, self._accumulated_fall_time)
@@ -117,11 +120,11 @@ class FallStateMachine:
         elif self._accumulated_fall_time >= self.possible_fall_threshold:
             if self.state != FallState.POSSIBLE_FALL:
                 self.state = FallState.POSSIBLE_FALL
-                print(f"[{self.camera_id}] ⚠️  POSSIBLE_FALL detected")
+                log.info(f"[{self.camera_id}] ⚠️  POSSIBLE_FALL detected")
 
     def _reset_internal(self, new_state: FallState) -> None:
         if self.state in (FallState.POSSIBLE_FALL, FallState.CONFIRMED_FALL):
-            print(f"[{self.camera_id}] ✅ Reset to {new_state.value}")
+            log.info(f"[{self.camera_id}] ✅ Reset to {new_state.value}")
         self.state = new_state
         self._accumulated_fall_time = 0.0
         self._debounce_counter = 0

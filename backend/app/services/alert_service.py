@@ -20,6 +20,9 @@ from app.db.repository import AlertRepository
 from app.models.schemas import AlertCreate, AlertSeverity, WSMessage
 from app.websocket.ws_manager import manager
 
+from app.core.logging import get_logger
+log = get_logger("app.services.alert_service")
+
 
 class AlertService:
     def __init__(self):
@@ -34,12 +37,12 @@ class AlertService:
         
         # 1. Cek Cooldown
         if (now - last_time) < self.settings.ALERT_COOLDOWN_SEC:
-            print(f"[{camera_id}] Alert ditekan (cooldown aktif).")
+            log.info(f"[{camera_id}] Alert ditekan (cooldown aktif).")
             return
             
         self._last_alert_time[camera_id] = now
         
-        print(f"[{camera_id}] 🚨 Memicu AlertService untuk jatuh berdurasi {duration:.1f}s")
+        log.info(f"[{camera_id}] 🚨 Memicu AlertService untuk jatuh berdurasi {duration:.1f}s")
         
         # Siapkan payload
         message_text = f"Peringatan: Terdeteksi jatuh pada {camera_id} selama {duration:.1f} detik."
