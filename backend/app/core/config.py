@@ -33,6 +33,9 @@ class Settings(BaseSettings):
         Path(__file__).resolve().parents[3] / "ml" / "models" / "fall_detection" / "weights" / "best.pt"
     )
     CONFIDENCE_THRESHOLD: float = 0.5
+    # Batas bawah agar deteksi lemah tetap dikembalikan model (untuk digambar & didiagnosa).
+    # Keputusan dipercaya atau tidak tetap memakai CONFIDENCE_THRESHOLD di pipeline.
+    DETECTION_MIN_CONF: float = 0.05
 
     # ---- Fall Detection State Machine ----------------------
     FALL_DURATION_THRESHOLD: float = 10.0  # detik
@@ -45,6 +48,10 @@ class Settings(BaseSettings):
     # ---- Camera --------------------------------------------
     CAMERA_SOURCE: str = "0"  # "0" = webcam, atau URL RTSP
     CAMERA_FPS: int = 15
+    # Rotasi searah jarum jam: 0, 90, 180, 270. Kamera HP sering mengirim gambar miring (90 atau 270).
+    CAMERA_ROTATE: int = 0
+    # Frame yang lebih tua dari ini dianggap basi, dan kamera dilaporkan OFFLINE.
+    CAMERA_STALE_SEC: float = 3.0
 
     # ---- Telegram Notification -----------------------------
     TELEGRAM_BOT_TOKEN: str = ""
