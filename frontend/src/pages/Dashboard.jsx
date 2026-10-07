@@ -5,12 +5,12 @@ import AlertBanner from '../components/AlertBanner';
 export default function Dashboard() {
     const { cameraData, alerts, acknowledgeAlert } = useWebSocket('ws://localhost:8000/ws');
 
-    // Mock data untuk kamera jika belum ada data dari backend
+    // Sinkronisasi ID dengan backend (cam-01)
     const cameras = [
-        { id: 'cam1', name: 'Kamar 01', status: cameraData['cam1']?.status || 'normal', url: '/mock-stream-1.jpg' },
-        { id: 'cam2', name: 'Kamar 02', status: cameraData['cam2']?.status || 'lying_on_ground', url: '/mock-stream-2.jpg' },
-        { id: 'cam3', name: 'Ruang Makan', status: cameraData['cam3']?.status || 'normal', url: '/mock-stream-3.jpg' },
-        { id: 'cam4', name: 'Lorong Timur', status: cameraData['cam4']?.status || 'transitional', url: '/mock-stream-4.jpg' },
+        { id: 'cam-01', name: 'Kamera Utama (Laptop)', status: cameraData['cam-01']?.fall_state || 'monitoring', url: 'http://localhost:8000/api/cameras/cam-01/stream' },
+        { id: 'cam-02', name: 'Kamar 02', status: cameraData['cam-02']?.fall_state || 'monitoring', url: '' },
+        { id: 'cam-03', name: 'Ruang Makan', status: cameraData['cam-03']?.fall_state || 'monitoring', url: '' },
+        { id: 'cam-04', name: 'Lorong Timur', status: cameraData['cam-04']?.fall_state || 'monitoring', url: '' },
     ];
 
     return (

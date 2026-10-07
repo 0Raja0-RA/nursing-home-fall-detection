@@ -1,10 +1,14 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Camera, RefreshCw, AlertTriangle, Video, CheckCircle2 } from 'lucide-react';
 
+// Alamat video dari backend. Yang tampil di sini adalah hasil olahan backend:
+// gambar kamera (webcam laptop ATAU kamera HP, sesuai CAMERA_SOURCE di run-backend.bat)
+// yang sudah digambari bounding box oleh YOLO.
+const BACKEND = 'http://localhost:8000';
+const STREAM_URL = `${BACKEND}/api/cameras/cam-01/stream`;
+
 export default function LiveCamera({ addHistoryItem }) {
-    const videoRef = useRef(null);
-    const [isStreaming, setIsStreaming] = useState(false);
-    const [facingMode, setFacingMode] = useState('user'); // 'user' (depan) atau 'environment' (belakang)
+    const [rotasi, setRotasi] = useState(0); // derajat tampilan, untuk tombol "Putar Kamera"
     const [errorMsg, setErrorMsg] = useState('');
 
     // Status deteksi model simulasi
@@ -13,60 +17,9 @@ export default function LiveCamera({ addHistoryItem }) {
     const [activeAlert, setActiveAlert] = useState(false);
     const [note, setNote] = useState('');
 
-    // Fungsi untuk memulai dan memindahkan stream kamera
-    const startCamera = async (mode) => {
-        try {
-            setErrorMsg('');
-
-            // Matikan stream yang sedang berjalan sebelumnya agar tidak bentrok
-            if (videoRef.current && videoRef.current.srcObject) {
-                const stream = videoRef.current.srcObject;
-                stream.getTracks().forEach(track => track.stop());
-                videoRef.current.srcObject = null;
-            }
-
-            // Coba minta akses kamera berdasarkan facingMode
-            const constraints = {
-                video: { facingMode: mode, width: { ideal: 1280 }, height: { ideal: 720 } },
-                audio: false
-            };
-
-            let newStream;
-            try {
-                newStream = await navigator.mediaDevices.getUserMedia(constraints);
-            } catch (err) {
-                // Fallback: Jika kamera belakang/depan spesifik gagal, minta kamera default apa saja yang ada
-                console.warn('Gagal memuat facingMode spesifik, mencoba kamera default...');
-                newStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-            }
-
-            if (videoRef.current) {
-                videoRef.current.srcObject = newStream;
-                setIsStreaming(true);
-            }
-        } catch (err) {
-            console.error('Gagal total mengakses kamera:', err);
-            setErrorMsg('Kamera tidak dapat diakses atau sedang digunakan oleh aplikasi lain.');
-            setIsStreaming(false);
-        }
-    };
-
-    // Jalankan kamera saat pertama kali komponen dibuka atau saat facingMode berubah
-    useEffect(() => {
-        startCamera(facingMode);
-
-        // Cleanup saat halaman ditutup/pindah menu
-        return () => {
-            if (videoRef.current && videoRef.current.srcObject) {
-                const stream = videoRef.current.srcObject;
-                stream.getTracks().forEach(track => track.stop());
-            }
-        };
-    }, [facingMode]);
-
-    const switchCamera = () => {
-        setFacingMode(prev => (prev === 'user' ? 'environment' : 'user'));
-    };
+    // Memutar tampilan 90 derajat setiap kali ditekan. Ini hanya memutar gambar di layar;
+    // rotasi yang dipakai model diatur lewat CAMERA_ROTATE di run-backend.bat.
+    const switchCamera = () => setRotasi(prev => (prev + 90) % 360);
 
     // State Machine Timer Hitung Mundur Simulasi Jatuh
     useEffect(() => {
@@ -156,12 +109,13 @@ export default function LiveCamera({ addHistoryItem }) {
 
             {/* Tampilan Stream Kamera Utama */}
             <div className="relative bg-slate-950 rounded-3xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-2xl aspect-video flex items-center justify-center">
-                <video
-                    ref={videoRef}
-                    autoPlay
-                    playsInline
-                    muted
-                    className="w-full h-full object-cover"
+                <img
+                    src={STREAM_URL}
+                    alt="Video dari backend"
+                    onLoad={() => setErrorMsg('')}
+                    onError={() => setErrorMsg('Video backend tidak dapat dimuat. Pastikan run-backend.bat sedang berjalan dan kameranya terbaca.')}
+                    style={{ transform: `rotate(${rotasi}deg)` }}
+                    className="w-full h-full object-contain transition-transform"
                 />
 
                 {/* Status Overlay */}

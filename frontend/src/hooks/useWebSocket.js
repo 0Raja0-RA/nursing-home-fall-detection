@@ -9,12 +9,14 @@ export function useWebSocket(url) {
         ws.current = new WebSocket(url);
 
         ws.current.onmessage = (event) => {
-            const data = JSON.parse(event.data);
+            const message = JSON.parse(event.data);
+            const { event: eventType, data } = message;
 
-            if (data.type === 'camera_update') {
+            if (eventType === 'status_update') {
                 // Update status kamera (normal, transitional, lying_on_ground)
-                setCameraData(prev => ({ ...prev, [data.cameraId]: data }));
-            } else if (data.type === 'emergency_alert') {
+                // Backend mengirimkan: camera_id, is_active, fall_state, dll
+                setCameraData(prev => ({ ...prev, [data.camera_id]: data }));
+            } else if (eventType === 'alert') {
                 // Menerima peringatan jika batas waktu jatuh (threshold) terlewati
                 setAlerts(prev => [...prev, data]);
             }
