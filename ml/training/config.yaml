@@ -19,18 +19,19 @@ data: "../data/processed/data.yaml"
 #   yolo11s.pt  (small  - balance speed & accuracy)
 #   yolo11m.pt  (medium - akurasi lebih baik)
 #   yolo11l.pt  (large  - akurasi tinggi, lambat)
-model: "yolo11n.pt"
+model: "yolo11s.pt"
  
 # ---- Training Hyperparameters ------------------------------
 epochs: 70
-batch: 16
-imgsz: 640
-patience: 30        # extended patience untuk memaksimalkan recall
-optimizer: "AdamW"  # optimizer AdamW untuk presisi tinggi
-lr0: 0.001          # initial learning rate lebih halus
-lrf: 0.01           # final learning rate (lr0 * lrf)
-cos_lr: true        # cosine learning rate schedule untuk konvergensi halus
-cls: 1.0            # bobot loss klasifikasi dinaikkan (ketegasan deteksi kelas)
+batch: 8              # batch 8 untuk aman di VRAM 4GB RTX 2050 (atau 16 di Kaggle)
+imgsz: 800            # resolusi tinggi untuk menangkap detail postur tubuh
+patience: 25          # early stopping patience
+optimizer: "AdamW"    # optimizer AdamW untuk presisi tinggi
+lr0: 0.001            # initial learning rate
+lrf: 0.01             # final learning rate (lr0 * lrf)
+cos_lr: true          # cosine learning rate schedule
+cls: 1.2              # bobot loss klasifikasi ditingkatkan untuk ketegasan kelas
+label_smoothing: 0.05 # meredam ambiguitas transitional vs normal/lying
 momentum: 0.937
 weight_decay: 0.0005
 warmup_epochs: 3
@@ -51,7 +52,7 @@ mosaic: 1.0         # mosaic augmentation
 
 # ---- Output ------------------------------------------------
 project: "../models"
-name: "exp006_hybrid_adamw"
+name: "exp008_yolo11s_imgsz800"
 exist_ok: true
 save: true
 save_period: 10     # save checkpoint setiap N epochs

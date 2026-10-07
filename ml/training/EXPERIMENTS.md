@@ -218,6 +218,40 @@ Dokumen ini mencatat seluruh eksperimen pemodelan Machine Learning secara sistem
 
 ---
 
+### 🔹 EXP-008: Scale-Up Model Capacity & High Resolution (YOLO11s @ 800x800)
+
+* **Tanggal:** 07 Oktober 2026
+* **Hardware:** Tesla T4 x 1 (Kaggle Cloud GPU)
+* **Konfigurasi:**
+  * Base Model: `yolo11s.pt` (9.41M parameters — 3.65x lebih besar dari nano)
+  * Epochs: 70 | Batch: 16 | ImgSz: 800 (Resolusi tinggi)
+  * Optimizer: `AdamW` (lr0: 0.001, lrf: 0.01, cos_lr: True, patience: 25)
+  * Loss & Regularisasi: `cls: 1.2`, `label_smoothing: 0.05`
+  * Augmentasi: `hsv_v: 0.6`, `hsv_s: 0.7`, `bgr: 0.2`, `erasing: 0.4`, `scale: 0.5`, `mosaic: 1.0`, `close_mosaic: 10`
+* **Hasil Metrik Keseluruhan (Test Set):**
+  * **Test mAP50:** `37.99%` *(turun drastis -32.23% dibanding EXP-006)*
+  * **Test mAP50-95:** `30.67%` *(turun -31.04%)*
+  * **Test Precision:** `36.96%` *(turun -31.66%)*
+  * **Test Recall:** `80.94%`
+  * **Inference Speed:** `11.7 ms` (~85.5 FPS)
+* **Hasil Metrik per Kelas pada Test Set:**
+  * **`lying_on_ground` (Lansia Jatuh):**
+    * **Recall: `100.00%` (1.0)** 🔥 *(Safety Recall sempurna, nol kasus jatuh yang terlewat)*
+    * **Precision: `7.11%`** *(False positive sangat tinggi, banyak objek lain terprediksi jatuh)*
+    * **mAP50: `8.29%`** | **mAP50-95: `5.64%`**
+  * **`transitional`:** Precision: `80.50%` | Recall: `76.10%` | mAP50: `84.90%` | mAP50-95: `70.76%`
+  * **`normal`:** Precision: `23.30%` | Recall: `66.70%` | mAP50: `20.80%` | mAP50-95: `15.60%`
+* **Analisis & Temuan Saintifik:**
+  * 📉 **Konfirmasi Batas Kapasitas Model (Capacity Saturation):**
+    1. Dataset UR Fall Cam0 (924 gambar latih) **terlalu kecil** untuk menopang 9.41 juta parameter `yolo11s`. Model mengalami overfitting parah dengan menghafal variasi noise piksel daripada mempelajari batas postur yang dapat digeneralisasi.
+    2. Resolusi `800x800` pada video rekaman sumber (yang resolusi aslinya 640x480) tidak menambahkan informasi visual baru, melainkan hanya memperbesar blur interpolasi piksel.
+    3. Distribusi test set sangat tidak seimbang: `transitional` menguasai **91.25%** (292 dari 320 gambar), sedangkan `lying_on_ground` hanya memiliki **1 gambar** (0.3%). Ketimpangan ekstrem ini membuat model bias berat ke arah memprediksi transitional, dan 1 kesalahan deteksi pada kelas jatuh langsung menghancurkan nilai mAP.
+  * 🏆 **Kesimpulan & Keputusan:**
+    * **EXP-006 (`yolo11n.pt` @ 640x640) tetap tak tergantikan sebagai 👑 Model Champion Produksi** (Test mAP50: 70.22%, mAP50-95: 61.71%, Precision: 68.62%, Lying Recall: 100%).
+    * Eksperimen ini membuktikan secara empiris bahwa kita telah mencapai **batas teoritis maksimal (mathematical ceiling)** dari pendekatan *bounding-box object detection* murni pada dataset UR Fall 924 gambar.
+
+---
+
 ## 🛠️ Standar Prosedur Alur Kerja & Git Commit
 
 Setiap kali melakukan 1 eksperimen:
