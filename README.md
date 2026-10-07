@@ -105,9 +105,16 @@ fall-detection/
 
 ## Quick Start (Development Lokal)
 
+> **Mau langsung menguji sistemnya?** Jalankan `run-backend.bat` dan `run-frontend.bat`,
+> lalu ikuti **[TESTING.md](TESTING.md)**. Dokumen itu memuat cara menghubungkan kamera HP,
+> cara memastikan bounding box muncul, dan daftar masalah yang sering terjadi.
+>
+> Catatan: butuh **Python 3.12** (bukan 3.13/3.14, karena `ultralytics` belum mendukungnya),
+> dan virtual environment dibuat di **root repo** (`.venv`), bukan di dalam `backend/`.
+
 ### Prerequisites
 
-- **Python** 3.10+
+- **Python** 3.12
 - **Node.js** 18+
 - **Git**
 
