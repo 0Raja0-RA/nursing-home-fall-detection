@@ -11,8 +11,10 @@ from datetime import datetime
 from typing import Optional
 
 from app.core.config import get_settings
+from app.core.logging import utc_now_naive
 from app.models.schemas import Observation, CameraStatus, WSMessage
 from app.services.camera_service import CameraService
+from app.runtime.registry import registry
 from app.services.inference_service import run_inference
 from app.services.state_machine import FallStateMachine
 from app.websocket.ws_manager import manager
@@ -39,10 +41,12 @@ async def camera_pipeline(camera: CameraService, fsm: FallStateMachine):
                 is_active=False,
                 fall_state=fsm.state,
                 fall_duration=0.0,
-                last_frame_at=datetime.utcnow()
+                last_frame_at=utc_now_naive()
             )
+            registry.latest_detection[camera.camera_id] = None
+            registry.latest_status[camera.camera_id] = status
             await manager.broadcast(WSMessage(event="status_update", data=status.model_dump()))
-            
+
             await asyncio.sleep(0.1)
             continue
             
@@ -72,8 +76,11 @@ async def camera_pipeline(camera: CameraService, fsm: FallStateMachine):
             fall_duration=fsm.fall_duration,
             confidence=result.confidence if result else 0.0,
             fps=camera.fps,
-            last_frame_at=datetime.utcnow()
+            last_frame_at=utc_now_naive()
         )
+        # Simpan untuk dipakai endpoint stream (menggambar kotak) dan GET /api/cameras/.
+        registry.latest_detection[camera.camera_id] = result
+        registry.latest_status[camera.camera_id] = status
         await manager.broadcast(WSMessage(event="status_update", data=status.model_dump()))
         
         # Pastikan tidak melahap 100% CPU, tidur sisa waktunya

@@ -21,6 +21,9 @@ import numpy as np
 from app.core.config import get_settings
 from app.models.schemas import DetectionResult, PostureClass
 
+from app.core.logging import get_logger
+log = get_logger("app.services.inference_service")
+
 # Label mapping — harus sesuai dengan data.yaml di ml/
 _CLASS_MAP = {
     0: PostureClass.NORMAL,
@@ -55,9 +58,9 @@ def load_model(model_path: Optional[str] = None):
     path = model_path or settings.MODEL_PATH
 
     if not Path(path).exists():
-        print(f"⚠️ Model custom belum ditemukan di '{path}'.")
-        print("   Menggunakan base model 'yolo11n.pt' sebagai fallback sementara (mode demo).")
-        print("   [DEMO MODE] Untuk mensimulasikan JATUH, tunjukkan 'cell phone' ke kamera!")
+        log.info(f"⚠️ Model custom belum ditemukan di '{path}'.")
+        log.info("   Menggunakan base model 'yolo11n.pt' sebagai fallback sementara (mode demo).")
+        log.info("   [DEMO MODE] Untuk mensimulasikan JATUH, tunjukkan 'cell phone' ke kamera!")
         path = "yolo11n.pt"
         
         # Override _CLASS_MAP untuk demo dengan yolo11n.pt
@@ -68,7 +71,7 @@ def load_model(model_path: Optional[str] = None):
         }
 
     _model = YOLO(path)
-    print(f"✅ Model loaded: {path}")
+    log.info(f"✅ Model loaded: {path}")
     return _model
 
 
@@ -80,12 +83,17 @@ def run_inference(frame: np.ndarray) -> Optional[DetectionResult]:
 
     Returns:
         DetectionResult dengan postur terdeteksi, confidence, dan bounding box.
-        None jika tidak ada deteksi.
+        None jika model benar-benar tidak menemukan apa pun.
+
+    Catatan: penyaringan memakai DETECTION_MIN_CONF (sangat rendah), BUKAN
+    CONFIDENCE_THRESHOLD. Keputusan "cukup yakin atau tidak" dibuat di
+    detection_pipeline supaya cabang UNCERTAIN benar-benar berfungsi, dan supaya
+    deteksi berkeyakinan rendah tetap bisa digambar di stream untuk diagnosa.
     """
     model = load_model()
     settings = get_settings()
 
-    results = model(frame, verbose=False, conf=settings.CONFIDENCE_THRESHOLD)
+    results = model(frame, verbose=False, conf=settings.DETECTION_MIN_CONF)
 
     if not results or len(results[0].boxes) == 0:
         return None
