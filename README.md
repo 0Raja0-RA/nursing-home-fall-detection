@@ -83,24 +83,26 @@ fall-detection/
 │   └── Dockerfile
 │
 ├── frontend/                    # React + Vite dashboard
-│   ├── src/
-│   │   ├── pages/
-│   │   │   ├── Dashboard.jsx    # Live monitoring semua kamera
-│   │   │   ├── AlertHistory.jsx # Riwayat notifikasi jatuh
-│   │   │   └── Settings.jsx     # Atur threshold durasi
+│   │   ├── src/
+│   │   │   ├── context/
+│   │   │   │   └── ThemeContext.jsx      # Pengelola mode gelap/terang (Dark/Light Mode)
+│   │   │   ├── pages/
+│   │   │   │   ├── LandingPage.jsx       # Halaman sambutan utama (Landing Page)
+│   │   │   │   ├── Login.jsx             # Halaman login caregiver
+│   │   │   │   ├── SimulationDashboard.jsx # Dasbor simulasi live monitoring CCTV & YOLO11
+│   │   │   ├── LiveCamera.jsx        # Pengujian kamera perangkat (HP/Laptop) via WebRTC
+│   │   │   ├── Cameras.jsx           # Halaman manajemen daftar kamera CCTV
+│   │   │   ├── AlertHistory.jsx      # Riwayat notifikasi insiden jatuh
+│   │   │   └── Settings.jsx          # Pengaturan sistem dan threshold durasi
 │   │   ├── components/
-│   │   │   ├── CameraFeedCard.jsx  # Kartu status per kamera
-│   │   │   ├── AlertBanner.jsx     # Banner notifikasi darurat
-│   │   │   ├── StatusBadge.jsx     # Badge safe/warning/danger
-│   │   │   └── ThresholdSlider.jsx # Slider threshold durasi
-│   │   ├── services/
-│   │   │   ├── api.js           # Axios API client
-│   │   │   └── websocket.js     # WebSocket client
-│   │   └── hooks/
-│   │       └── useWebSocket.js  # React hook WebSocket
-│   ├── package.json
-│   ├── vite.config.js
-│   └── Dockerfile
+│   │   │   └── DashboardLayout.jsx   # Tata letak responsif dengan sidebar collapsible
+│   │   ├── App.jsx                   # Pusat navigasi & rute aplikasi (React Router)
+│   │   ├── main.jsx                  # Entry point React
+│   │   └── index.css                 # Konfigurasi Tailwind CSS
+│   ├── public/                       # Aset publik, favicon, dan ikon
+│   ├── package.json                  # Dependensi dan skrip npm
+│   ├── vite.config.js                # Konfigurasi build Vite
+│   └── Dockerfile                    # Konfigurasi Docker frontend
 │
 ├── docs/
 │   ├── architecture.md          # Diagram arsitektur sistem
@@ -148,6 +150,7 @@ Seluruh perintah di bawah ditulis untuk **Windows PowerShell** dan dijalankan da
 | Python | **3.12** | `py -0p` — harus ada baris `-3.12` |
 | Node.js | 18+ | `node --version` |
 | Git | — | `git --version` |
+| File model `best.pt` | EXP-006 | **tidak ada di repo** — minta ke anggota ML, lihat [langkah 3](#3-taruh-file-model) |
 
 > **Harus 3.12, bukan 3.13 atau 3.14.** `ultralytics` belum menyediakan wheel untuk
 > versi yang lebih baru, dan pemasangannya akan gagal di tengah jalan.
@@ -185,21 +188,40 @@ Semua uji harus lulus. Tahap ini belum butuh model, kamera, maupun internet.
 
 ### 3. Taruh file model
 
-File bobot `.pt` **tidak ikut di repo** (lihat `.gitignore`). Minta `best.pt` hasil
-EXP-006 ke anggota ML, lalu taruh tepat di:
+> ### ⚠️ File model tidak ada di repo — harus diminta
+>
+> `git clone` **tidak** memberimu file modelnya. Bobot `.pt` dikecualikan lewat
+> `.gitignore` karena ukurannya puluhan MB dan git tidak cocok menyimpan berkas biner
+> yang berubah setiap kali training diulang.
+>
+> **Minta `best.pt` hasil EXP-006 ke anggota ML**, lalu taruh tepat di:
+>
+> ```
+> ml\models\fall_detection\weights\best.pt
+> ```
+>
+> Tanpa file itu, backend tetap menyala tapi **tidak akan mendeteksi apa pun**, dan
+> `run-backend.bat` akan berhenti dengan pesan "File model tidak ditemukan".
 
-```
-ml\models\fall_detection\weights\best.pt
-```
+Model yang benar adalah **EXP-006** (`exp006_hybrid_adamw`): YOLO11n, 70 epoch, AdamW,
+dengan augmentasi untuk kondisi minim cahaya dan tubuh yang tertutup sebagian.
 
-Pastikan file yang benar — bobot COCO bawaan YOLO berukuran mirip dan mudah tertukar:
+**Pastikan file yang kamu terima benar.** Bobot COCO bawaan YOLO (`yolo11n.pt`) berukuran
+mirip dan sangat mudah tertukar — ini pernah terjadi di proyek ini, dan akibatnya
+pemetaan kelas jadi kacau tanpa pesan error apa pun: `person` terbaca `normal`, `car`
+terbaca `lying_on_ground`.
 
 ```powershell
 .venv\Scripts\python.exe -c "from ultralytics import YOLO; print(YOLO('ml/models/fall_detection/weights/best.pt').names)"
 ```
 
-Harus muncul tepat `{0: 'normal', 1: 'transitional', 2: 'lying_on_ground'}`. Kalau yang
-muncul 80 kelas, itu bobot COCO, bukan model tim.
+| Yang muncul | Artinya |
+|---|---|
+| `{0: 'normal', 1: 'transitional', 2: 'lying_on_ground'}` | Benar, model tim |
+| 80 kelas berisi `person`, `car`, dan seterusnya | **Salah** — itu bobot COCO, minta ulang |
+| `FileNotFoundError` | File belum ada di lokasi di atas |
+
+Kalau mau melatih sendiri alih-alih meminta, lihat [langkah 6](#6-opsional-training-ulang-model).
 
 ### 4. Jalankan
 
@@ -266,7 +288,17 @@ dengan `notified: false`, supaya kegagalan terlihat alih-alih hilang diam-diam.
 ```
 
 Perlu dataset format YOLO di `ml/data/processed/`. Model hasilnya tersimpan di
-`ml/models/fall_detection/weights/`.
+`ml/models/fall_detection/weights/best.pt` — lokasi yang sama dengan yang dicari backend,
+jadi tidak perlu menyalin apa pun.
+
+File itu **tidak akan ikut ter-commit** (`.gitignore` mengecualikan `*.pt`). Kalau ingin
+dipakai anggota tim lain, kirimkan filenya langsung lewat Drive atau WhatsApp, bukan lewat
+git.
+
+`ml/data/processed/data.yaml` sengaja memakai `path:` kosong supaya berfungsi di komputer
+siapa pun; Ultralytics akan memakai folder tempat berkas itu berada sebagai akar dataset.
+**Jangan mengisinya dengan path absolut** — berkas itu akan rusak untuk semua orang
+selain pengisinya.
 
 ---
 
