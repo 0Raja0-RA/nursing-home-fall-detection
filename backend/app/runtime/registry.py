@@ -35,4 +35,19 @@ class AppRegistry:
         # ada frame baru tanpa perlu membandingkan isi byte-nya.
         self.frame_seq: Dict[str, int] = {}
 
+        # Batas waktu (time.monotonic) simulasi jatuh per kamera.
+        #
+        # Selama belum terlewati, pipeline memperlakukan kamera itu seolah model
+        # melaporkan postur pemicu. Yang disimulasikan HANYA keluaran detektor:
+        # state machine, timer, debounce, cooldown, penyimpanan alert, dan
+        # notifikasi tetap berjalan apa adanya. Modelnya sendiri belum andal di
+        # luar ruangan dataset, jadi berbaring di depan kamera sering terbaca
+        # "transitional" dan tidak pernah memicu alarm.
+        self.simulasi_sampai: Dict[str, float] = {}
+
+    def sedang_disimulasikan(self, camera_id: str) -> bool:
+        """True kalau kamera ini sedang dalam masa simulasi jatuh."""
+        import time
+        return self.simulasi_sampai.get(camera_id, 0.0) > time.monotonic()
+
 registry = AppRegistry()

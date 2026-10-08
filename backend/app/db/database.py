@@ -55,9 +55,38 @@ async def get_db() -> AsyncSession:
         yield session
 
 
+# Kolom yang ditambahkan setelah tabelnya pernah dibuat di komputer orang lain.
+# create_all() hanya membuat tabel yang belum ada; ia TIDAK menambahkan kolom ke
+# tabel yang sudah terlanjur ada. Tanpa penambalan ini, satu-satunya cara memakai
+# kolom baru adalah menghapus fall_detection.db -- berikut seluruh riwayat alert
+# yang sudah terkumpul.
+_KOLOM_SUSULAN: dict[str, list[tuple[str, str]]] = {
+    "alerts": [
+        ("notified", "BOOLEAN DEFAULT 0"),
+        ("simulated", "BOOLEAN NOT NULL DEFAULT 0"),
+    ],
+}
+
+
+async def _tambal_kolom(conn) -> None:
+    """Tambahkan kolom yang belum ada pada database lama."""
+    from sqlalchemy import text
+
+    for tabel, kolom in _KOLOM_SUSULAN.items():
+        hasil = await conn.execute(text(f"PRAGMA table_info({tabel})"))
+        ada = {baris[1] for baris in hasil.fetchall()}
+        if not ada:
+            continue    # tabelnya memang belum ada; create_all sudah membuatnya lengkap
+        for nama, tipe in kolom:
+            if nama not in ada:
+                await conn.execute(text(f"ALTER TABLE {tabel} ADD COLUMN {nama} {tipe}"))
+                log.info(f"🔧 Kolom {tabel}.{nama} ditambahkan ke database yang sudah ada")
+
+
 async def init_db() -> None:
-    """Buat semua tabel jika belum ada."""
+    """Buat semua tabel jika belum ada, lalu tambal kolom yang menyusul."""
     engine = _get_engine()
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        await _tambal_kolom(conn)
     log.info("✅ Database initialized")
