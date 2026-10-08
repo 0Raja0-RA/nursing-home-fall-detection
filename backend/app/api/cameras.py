@@ -10,6 +10,7 @@ Endpoints:
     GET    /api/cameras/{id}          — Satu kamera
     PATCH  /api/cameras/{id}          — Ubah nama/sumber/rotasi/enabled
     DELETE /api/cameras/{id}          — Hapus kamera
+    POST   /api/cameras/{id}/simulate-fall — Paksa simulasi jatuh (untuk demo)
     GET    /api/cameras/{id}/stream   — Video MJPEG dengan bounding box tergambar
 
 Daftar kamera disimpan di database, bukan environment variable, supaya alamat IP
@@ -35,6 +36,7 @@ from app.models.schemas import (
     CameraUpdate,
     LocalDevice,
     ScanResponse,
+    SimulationResponse,
 )
 from app.runtime import camera_manager
 from app.runtime.registry import registry
@@ -229,6 +231,41 @@ async def generate_frames(camera_id: str):
             yield (b"--frame\r\n"
                    b"Content-Type: image/jpeg\r\n\r\n" + jpeg + b"\r\n")
         await asyncio.sleep(0.02)
+
+
+@router.post("/{camera_id}/simulate-fall", response_model=SimulationResponse)
+async def simulasi_jatuh(camera_id: str):
+    """Paksa kamera ini dianggap melaporkan postur pemicu selama beberapa detik.
+
+    Dipakai untuk demo, karena model masih sering membaca orang yang berbaring
+    sebagai `transitional` di luar ruangan dataset, sehingga alarm sungguhan sulit
+    dipicu dengan tubuh.
+
+    Yang disimulasikan HANYA keluaran detektor. State machine tetap menghitung
+    durasinya sendiri, debounce tetap berlaku, cooldown tetap dihormati, dan
+    alertnya melewati jalur yang sama persis dengan deteksi sungguhan -- termasuk
+    foto frame kamera saat itu juga. Alert yang dihasilkan ditandai `simulated`
+    dan diberi awalan [SIMULASI] supaya tidak bisa tertukar dengan kejadian nyata.
+    """
+    import time
+
+    if camera_id not in registry.cameras:
+        raise HTTPException(status_code=404, detail="Camera not found")
+
+    settings = get_settings()
+    # Cukup lama untuk melewati ambang, plus margin supaya tidak terpotong oleh
+    # satu-dua frame yang meleset.
+    durasi = settings.FALL_DURATION_THRESHOLD + 3.0
+    registry.simulasi_sampai[camera_id] = time.monotonic() + durasi
+
+    log.info(f"[{camera_id}] 🧪 Simulasi jatuh dimulai selama {durasi:.1f} detik")
+    return SimulationResponse(
+        camera_id=camera_id,
+        durasi_simulasi=durasi,
+        ambang_konfirmasi=settings.FALL_DURATION_THRESHOLD,
+        pesan=f"Simulasi berjalan {durasi:.0f} detik. Alert muncul setelah "
+              f"{settings.FALL_DURATION_THRESHOLD:.0f} detik.",
+    )
 
 
 @router.get("/{camera_id}/stream")

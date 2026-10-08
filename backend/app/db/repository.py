@@ -29,6 +29,7 @@ class AlertRepository:
             severity=data.severity.value,
             message=data.message,
             fall_duration=data.fall_duration,
+            simulated=data.simulated,
         )
         self.session.add(db_obj)
         await self.session.commit()

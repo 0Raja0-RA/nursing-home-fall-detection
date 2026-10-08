@@ -52,6 +52,7 @@ def susun_pesan(
     camera_name: str,
     fall_duration: float,
     waktu: Optional[datetime] = None,
+    simulasi: bool = False,
 ) -> str:
     """Susun isi notifikasi dalam HTML.
 
@@ -60,12 +61,23 @@ def susun_pesan(
     pesannya ditolak, bukan sekadar tampil aneh.
     """
     waktu = waktu or datetime.now()
+
+    # Penanda simulasi diletakkan paling atas, sebelum isi pesannya. Perawat
+    # membaca notifikasi dalam hitungan detik; kalau penandanya ada di bawah,
+    # mereka sudah terlanjur bereaksi pada alarm yang bukan kejadian sungguhan.
+    if simulasi:
+        kepala = "🧪 <b>SIMULASI — BUKAN KEJADIAN SUNGGUHAN</b>\n\n"
+        penutup = "Pesan ini dipicu tombol simulasi di dashboard."
+    else:
+        kepala = "🚨 <b>TERDETEKSI JATUH</b>\n\n"
+        penutup = "Segera periksa kondisi penghuni."
+
     return (
-        "🚨 <b>TERDETEKSI JATUH</b>\n\n"
+        kepala +
         f"📷 Lokasi : <b>{html.escape(camera_name)}</b>\n"
         f"⏱️ Durasi : {fall_duration:.1f} detik tidak bergerak\n"
         f"🕐 Waktu  : {waktu.strftime('%H:%M:%S, %d %b %Y')}\n\n"
-        "Segera periksa kondisi penghuni."
+        + penutup
     )
 
 
@@ -106,6 +118,7 @@ async def send_telegram_alert(
     foto: Optional[bytes] = None,
     waktu: Optional[datetime] = None,
     message: Optional[str] = None,
+    simulasi: bool = False,
 ) -> bool:
     """Kirim alert ke Telegram, dengan percobaan ulang bila gagal.
 
@@ -123,7 +136,7 @@ async def send_telegram_alert(
         log.info("⚠️  Telegram belum dikonfigurasi (TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID kosong)")
         return False
 
-    teks = message or susun_pesan(camera_name, fall_duration, waktu)
+    teks = message or susun_pesan(camera_name, fall_duration, waktu, simulasi)
 
     for percobaan, jeda in enumerate(JEDA_RETRY, start=1):
         if jeda:

@@ -50,6 +50,13 @@ class AlertRecord(Base):
     message = Column(String, nullable=False)
     fall_duration = Column(Float, nullable=False)
     acknowledged = Column(Boolean, default=False)
-    notified = Column(Boolean, default=False)  # Baru ditambahkan untuk status Telegram
+    notified = Column(Boolean, default=False)  # Status pengiriman Telegram
+    # Alert ini dipicu tombol simulasi, bukan deteksi sungguhan.
+    #
+    # Dicatat supaya riwayat insiden tetap bisa dipercaya: sistem deteksi jatuh
+    # yang bisa memunculkan alarm tanpa meninggalkan jejak membuat seluruh
+    # riwayatnya kehilangan nilai sebagai bukti. Penanda ini juga muncul sebagai
+    # teks di pesan Telegram dan di dashboard, supaya tidak ada yang salah baca.
+    simulated = Column(Boolean, default=False, nullable=False, server_default="0")
     created_at = Column(DateTime, default=utc_now_naive)
     acknowledged_at = Column(DateTime, nullable=True)

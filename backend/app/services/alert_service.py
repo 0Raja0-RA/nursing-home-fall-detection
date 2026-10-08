@@ -46,13 +46,21 @@ class AlertService:
 
         nama_kamera = await self._nama_kamera(camera_id)
 
+        # Apakah alert ini berasal dari tombol simulasi? Ditentukan di sini, saat
+        # alertnya dipicu, bukan belakangan -- masa simulasinya bisa saja sudah
+        # lewat ketika baris ini tersimpan.
+        from app.runtime.registry import registry
+        disimulasikan = registry.sedang_disimulasikan(camera_id)
+        awalan = "[SIMULASI] " if disimulasikan else ""
+
         # Siapkan payload
-        message_text = f"Terdeteksi jatuh pada {nama_kamera} selama {duration:.1f} detik."
+        message_text = f"{awalan}Terdeteksi jatuh pada {nama_kamera} selama {duration:.1f} detik."
         alert_data = AlertCreate(
             camera_id=camera_id,
             severity=AlertSeverity.CRITICAL,
             message=message_text,
             fall_duration=duration,
+            simulated=disimulasikan,
         )
         
         # 2. Simpan ke Database
@@ -78,13 +86,13 @@ class AlertService:
                 "severity": db_alert.severity,
                 "created_at": db_alert.created_at.isoformat(),
                 "fall_duration": db_alert.fall_duration,
+                "simulated": db_alert.simulated,
             }
         ))
 
         # 4. Telegram, lengkap dengan potret kejadiannya.
         # Frame terakhir sudah digambari kotak dan dikemas jadi JPEG oleh pipeline,
         # jadi melampirkannya tidak menambah pekerjaan sama sekali.
-        from app.runtime.registry import registry
         from app.services.notification_service import send_telegram_alert
 
         foto = registry.latest_jpeg.get(camera_id)
@@ -93,6 +101,7 @@ class AlertService:
             fall_duration=duration,
             foto=foto,
             waktu=db_alert.created_at,
+            simulasi=disimulasikan,
         )
 
         # 5. Catat hasilnya. Kolom ini yang membuat kegagalan terlihat di Riwayat

@@ -65,6 +65,7 @@ class AlertBase(BaseModel):
 class AlertCreate(AlertBase):
     """Schema untuk membuat alert baru (internal use)."""
     fall_duration: float = Field(..., description="Durasi falling dalam detik")
+    simulated: bool = Field(False, description="Dipicu tombol simulasi, bukan deteksi sungguhan")
 
 
 class AlertResponse(AlertBase):
@@ -76,6 +77,9 @@ class AlertResponse(AlertBase):
     # kegagalan terlihat di Riwayat Insiden -- notifikasi yang gagal diam-diam
     # meninggalkan keyakinan palsu bahwa perawat sudah diberi tahu.
     notified: bool = False
+    # Dipicu tombol simulasi, bukan deteksi sungguhan. Ikut dikembalikan supaya
+    # riwayat insiden bisa dipercaya sebagai bukti.
+    simulated: bool = False
     created_at: datetime
     acknowledged_at: Optional[datetime] = None
 
@@ -173,6 +177,14 @@ class CameraInfo(CameraStatus):
     rotate: int = 0
     enabled: bool = True
     stream_url: str = Field(..., description="Path endpoint MJPEG untuk kamera ini")
+
+
+class SimulationResponse(BaseModel):
+    """Hasil memulai simulasi jatuh pada satu kamera."""
+    camera_id: str
+    durasi_simulasi: float = Field(..., description="Berapa lama observasi ditimpa, dalam detik")
+    ambang_konfirmasi: float = Field(..., description="Detik sebelum state machine mengonfirmasi")
+    pesan: str
 
 
 class ScanCandidate(BaseModel):

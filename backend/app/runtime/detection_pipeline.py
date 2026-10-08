@@ -65,6 +65,15 @@ async def camera_pipeline(camera: CameraService, fsm: FallStateMachine):
                 observation = Observation.TRIGGER_POSTURE
             else:
                 observation = Observation.NON_TRIGGER_POSTURE
+
+        # Simulasi jatuh: timpa observasi, jangan timpa apa pun yang lain.
+        #
+        # Hanya baris inilah yang berpura-pura. State machine di bawah tetap
+        # menghitung durasi, menerapkan debounce, menghormati cooldown, dan
+        # memicu alert lewat jalur yang sama persis dengan deteksi sungguhan.
+        if registry.sedang_disimulasikan(camera.camera_id):
+            observation = Observation.TRIGGER_POSTURE
+
                 
         # Update FSM dengan observasi terbaru
         new_state = fsm.update(observation)
