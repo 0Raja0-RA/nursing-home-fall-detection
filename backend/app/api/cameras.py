@@ -34,6 +34,7 @@ from app.models.schemas import (
     CameraInfo,
     CameraStatus,
     CameraUpdate,
+    LocalDevice,
     PostureClass,
     ScanResponse,
 )
@@ -103,6 +104,22 @@ async def scan_jaringan():
 
     subnets, kandidat, durasi = await asyncio.to_thread(network_scan.pindai)
     return ScanResponse(subnets=subnets, duration_sec=round(durasi, 2), candidates=kandidat)
+
+
+@router.get("/devices", response_model=list[LocalDevice])
+async def perangkat_lokal(db: AsyncSession = Depends(get_db)):
+    """Kamera yang terpasang langsung di komputer ini, beserta namanya.
+
+    OpenCV hanya menerima kamera lokal sebagai angka indeks dan tidak bisa
+    menyebutkan namanya. Dengan Iriun yang memasang empat perangkat virtual
+    sekaligus, menebak indeks jadi tidak mungkin -- endpoint ini memetakan angka
+    itu ke nama yang terlihat di aplikasinya (Camera #1 sampai Camera #4).
+    """
+    from app.services import local_devices
+
+    repo = CameraRepository(db)
+    terpakai = {r.source for r in await repo.list_cameras()}
+    return await asyncio.to_thread(local_devices.daftar_perangkat, terpakai)
 
 
 @router.post("/", response_model=CameraInfo, status_code=status.HTTP_201_CREATED)
