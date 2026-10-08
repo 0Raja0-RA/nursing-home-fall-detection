@@ -18,7 +18,14 @@ export default function LiveCamera({ addHistoryItem }) {
     const imgRef = useRef(null);
     useEffect(() => {
         const el = imgRef.current;
-        return () => { if (el) el.src = ''; };
+        if (!el) return;
+        // src dipasang di sini, bukan lewat atribut JSX. React.StrictMode menjalankan
+        // efek dua kali di mode dev (pasang -> bersihkan -> pasang lagi); kalau src
+        // ditulis di JSX, pembersihan pertama membatalkan permintaan dan React tidak
+        // pernah memasangnya kembali karena prop-nya dianggap tidak berubah. Akibatnya
+        // gambar kosong selamanya dengan net::ERR_ABORTED.
+        el.src = STREAM_URL;
+        return () => { el.src = ''; };
     }, []);
 
     // Status deteksi model simulasi
@@ -121,7 +128,6 @@ export default function LiveCamera({ addHistoryItem }) {
             <div className="relative bg-slate-950 rounded-3xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-2xl aspect-video flex items-center justify-center">
                 <img
                     ref={imgRef}
-                    src={STREAM_URL}
                     alt="Video dari backend"
                     onLoad={() => setErrorMsg('')}
                     onError={() => setErrorMsg('Video backend tidak dapat dimuat. Pastikan run-backend.bat sedang berjalan dan kameranya terbaca.')}

@@ -25,9 +25,16 @@ function StreamImg({ src, alt }) {
     const ref = useRef(null);
     useEffect(() => {
         const el = ref.current;
-        return () => { if (el) el.src = ''; };
-    }, []);
-    return <img ref={ref} src={src} alt={alt} className="absolute inset-0 w-full h-full object-contain" />;
+        if (!el) return;
+        // src dipasang di sini, bukan lewat atribut JSX. React.StrictMode menjalankan
+        // efek dua kali di mode dev (pasang -> bersihkan -> pasang lagi); kalau src
+        // ditulis di JSX, pembersihan pertama membatalkan permintaan dan React tidak
+        // pernah memasangnya kembali karena prop-nya dianggap tidak berubah. Akibatnya
+        // gambar kosong selamanya dengan net::ERR_ABORTED.
+        el.src = src;
+        return () => { el.src = ''; };
+    }, [src]);
+    return <img ref={ref} alt={alt} className="absolute inset-0 w-full h-full object-contain" />;
 }
 
 export default function SimulationDashboard({ addHistoryItem }) {
