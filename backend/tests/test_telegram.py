@@ -113,6 +113,23 @@ def test_pesan_memuat_nama_kamar_durasi_dan_waktu():
     assert "22:15:30" in teks
 
 
+def test_pesan_simulasi_ditandai_di_baris_pertama():
+    """Perawat membaca notifikasi dalam hitungan detik.
+
+    Kalau penandanya ada di bawah, mereka sudah terlanjur bereaksi pada alarm
+    yang bukan kejadian sungguhan.
+    """
+    teks = ns.susun_pesan("Kamar 01", 5.0, simulasi=True)
+    baris_pertama = teks.splitlines()[0]
+    assert "SIMULASI" in baris_pertama
+    assert "BUKAN KEJADIAN SUNGGUHAN" in baris_pertama
+    assert "Segera periksa" not in teks
+
+    biasa = ns.susun_pesan("Kamar 01", 5.0, simulasi=False)
+    assert "SIMULASI" not in biasa
+    assert "Segera periksa" in biasa
+
+
 def test_nama_kamar_dengan_karakter_html_di_escape():
     """Nama kamar diisi bebas oleh perawat.
 

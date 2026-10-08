@@ -44,10 +44,12 @@ async def lingkungan(monkeypatch):
         urutan.append("websocket")
         ws_pesan.append(msg)
 
-    async def telegram_palsu(camera_name, fall_duration, foto=None, waktu=None, message=None):
+    async def telegram_palsu(camera_name, fall_duration, foto=None, waktu=None,
+                             message=None, simulasi=False):
         urutan.append("telegram")
         tg_panggilan.append({
-            "camera_name": camera_name, "fall_duration": fall_duration, "foto": foto,
+            "camera_name": camera_name, "fall_duration": fall_duration,
+            "foto": foto, "simulasi": simulasi,
         })
         return hasil_telegram["ok"]
 
@@ -163,3 +165,65 @@ async def test_kamera_tak_dikenal_tetap_mengirim_alert(lingkungan):
     assert "cam-99" in alerts[0].message
     assert lingkungan["telegram"][0]["camera_name"] == "cam-99"
     assert lingkungan["telegram"][0]["foto"] is None
+
+
+# ---- Simulasi jatuh ----------------------------------------
+
+@pytest.mark.asyncio
+async def test_alert_simulasi_ditandai_dan_diberi_awalan(lingkungan):
+    """Alert dari tombol simulasi tidak boleh tertukar dengan kejadian nyata.
+
+    Sistem deteksi jatuh yang bisa memunculkan alarm tanpa meninggalkan jejak
+    membuat seluruh riwayat insidennya kehilangan nilai sebagai bukti.
+    """
+    import time
+
+    from app.runtime.registry import registry
+
+    registry.simulasi_sampai["cam-01"] = time.monotonic() + 30
+    try:
+        await _service().process_confirmed_fall("cam-01", 10.0)
+    finally:
+        registry.simulasi_sampai.pop("cam-01", None)
+
+    async with lingkungan["factory"]() as s:
+        alerts = await AlertRepository(s).get_recent_alerts()
+
+    assert alerts[0].simulated is True
+    assert alerts[0].message.startswith("[SIMULASI]")
+    assert lingkungan["telegram"][0]["simulasi"] is True
+    assert lingkungan["ws"][0].data["simulated"] is True
+
+
+@pytest.mark.asyncio
+async def test_alert_biasa_tidak_tertandai_simulasi(lingkungan):
+    await _service().process_confirmed_fall("cam-01", 10.0)
+
+    async with lingkungan["factory"]() as s:
+        alerts = await AlertRepository(s).get_recent_alerts()
+
+    assert alerts[0].simulated is False
+    assert not alerts[0].message.startswith("[SIMULASI]")
+    assert lingkungan["telegram"][0]["simulasi"] is False
+
+
+def test_masa_simulasi_berakhir_sendiri():
+    """Simulasi dibatasi waktu, bukan tombol mati/hidup.
+
+    Kalau tidak, satu kali tekan bisa membuat kamera berbohong selamanya saat
+    seseorang lupa mematikannya.
+    """
+    import time
+
+    from app.runtime.registry import registry
+
+    registry.simulasi_sampai["cam-uji"] = time.monotonic() + 0.3
+    assert registry.sedang_disimulasikan("cam-uji") is True
+    time.sleep(0.4)
+    assert registry.sedang_disimulasikan("cam-uji") is False
+    registry.simulasi_sampai.pop("cam-uji", None)
+
+
+def test_kamera_tanpa_simulasi_tidak_pernah_dianggap_disimulasikan():
+    from app.runtime.registry import registry
+    assert registry.sedang_disimulasikan("cam-entah") is False
