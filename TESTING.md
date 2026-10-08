@@ -75,8 +75,44 @@ jadi tidak perlu mengubah pengaturan apa pun.
 
 ## 2. Atur sumber kamera
 
-Semua pengaturan ada di blok **PENGATURAN** di bagian atas `run-backend.bat`.
-Tidak perlu lagi mengetik `$env:` di terminal.
+Ada dua jalur, dan untuk pemakaian sehari-hari **jalur dashboard yang dipakai**:
+
+| Jalur | Kapan dipakai |
+|---|---|
+| **Dashboard → Kelola Kamera** | Mengganti alamat kamera, menambah kamera, memutar gambar. Tidak perlu me-restart server. |
+| `run-backend.bat` | Hanya menentukan kamera **bawaan** saat database masih kosong. |
+
+Daftar kamera disimpan di database (`backend/fall_detection.db`), jadi tetap ada setelah
+server dimatikan. `CAMERA_SOURCE` di `run-backend.bat` hanya terpakai sekali, yaitu saat
+tabel kameranya masih kosong.
+
+### Mengelola kamera dari dashboard
+
+Buka **Kelola Kamera** di sidebar.
+
+- **Tambah** — isi nama dan sumber, tekan **Tambah Kamera**. Backend mencoba menghubungi
+  sumbernya lebih dulu (maksimal 3 detik). Kalau tidak terjangkau, kamera **tidak jadi
+  ditambahkan** dan alasannya ditampilkan, jadi salah ketik alamat langsung ketahuan.
+- **Pindai** — tombol di sebelah Tambah Kamera memindai jaringan lokal untuk mencari
+  perangkat yang menyiarkan kamera (port 8080, 4747, 8081, 554). Satu subnet /24 selesai
+  dalam 1–3 detik, dan hasilnya tinggal diklik untuk mengisi kolom alamat. Ini
+  menghilangkan keharusan membaca alamat IP dari layar HP setiap kali berpindah WiFi.
+- **Rotasi** — dropdown di tiap baris (0/90/180/270, searah jarum jam). Nilainya **per
+  kamera**, jadi kamera HP bisa 90° sementara webcam laptop tetap 0°.
+- **Hapus** — ikon tempat sampah. Kamera langsung dimatikan.
+
+Kamera yang terdaftar otomatis muncul di halaman **Simulasi Live**, lengkap dengan stream
+dan bounding box-nya.
+
+**Batas 4 kamera.** Inference berjalan di CPU, jadi setiap kamera menambah beban secara
+linear. Batasnya bisa dinaikkan lewat `MAX_CAMERAS`, tapi ukur dulu FPS-nya. Catatan
+tambahan: browser hanya mengizinkan sekitar 6 koneksi serentak ke satu host, dan setiap
+stream yang terbuka memakai satu koneksi.
+
+### Kamera bawaan lewat run-backend.bat
+
+Blok **PENGATURAN** di bagian atas `run-backend.bat` hanya menentukan kamera pertama,
+dan hanya saat database masih kosong.
 
 ```bat
 set "CAMERA_SOURCE=http://10.252.129.120:8080/video"
@@ -87,7 +123,9 @@ set "CONFIDENCE_THRESHOLD=0.25"
 
 ### Pilihan sumber kamera
 
-| Sumber | Nilai `CAMERA_SOURCE` | `CAMERA_ROTATE` |
+Nilai yang sama berlaku baik di form **Kelola Kamera** maupun di `run-backend.bat`.
+
+| Sumber | Nilai sumber | Rotasi |
 |---|---|---|
 | Webcam laptop | `0` | `0` |
 | Kamera HP (Android) | `http://IP-HP:8080/video` | biasanya `90` |
@@ -99,8 +137,15 @@ HP bertindak sebagai **server kamera**, dan backend di laptop menariknya sebagai
 Keduanya harus berada di WiFi yang sama.
 
 1. Pasang aplikasi **IP Webcam** (Android), lalu tekan **Start server**.
-2. Catat alamat yang muncul di layar HP, misalnya `http://10.252.129.120:8080`.
-3. Isi `CAMERA_SOURCE` dengan alamat itu **ditambah `/video`**.
+2. Catat alamat yang muncul di layar HP, misalnya `http://10.252.129.120:8080` — atau
+   lewati langkah ini dan tekan **Pindai** di halaman Kelola Kamera.
+3. Isi kolom alamat dengan alamat itu **ditambah `/video`**.
+
+> **Supaya alamatnya berhenti berubah-ubah.** Alamat IP HP berganti setiap kali pindah
+> WiFi (kos, kampus, rumah). Kalau laptop disambungkan ke **hotspot HP** — bukan
+> sebaliknya — HP selalu menjadi gateway dan alamatnya sama di mana pun; di Android
+> umumnya `192.168.43.1`. Cara ini sekaligus menghindari pemblokiran antar-perangkat
+> di WiFi kampus. Cukup periksa sekali, simpan di dashboard, lalu tidak perlu diubah lagi.
 4. Di pengaturan IP Webcam, turunkan resolusi ke **640×480**. Resolusi 1080p membuat
    inference di CPU melambat drastis.
 
