@@ -45,7 +45,7 @@ def baca_env() -> dict[str, str]:
     """Baca pasangan KEY=VALUE dari backend/.env."""
     if not ENV.exists():
         print(f"[GAGAL] {ENV} tidak ada.")
-        print("        Salin templatnya dulu: cp deployment/.env.example backend/.env")
+        print(r"        Salin templatnya dulu:  copy backend\.env.example backend\.env")
         sys.exit(1)
 
     hasil: dict[str, str] = {}
@@ -194,11 +194,17 @@ def main() -> None:
     token = env.get("TELEGRAM_BOT_TOKEN", "")
 
     if not token:
-        print("[GAGAL] TELEGRAM_BOT_TOKEN belum ada di backend/.env.")
-        lain = [k for k in env if "TELE" in k.upper()]
-        if lain:
-            print(f"        Yang ada di sana: {', '.join(lain)}")
-            print("        Namanya harus persis TELEGRAM_BOT_TOKEN agar terbaca backend.")
+        if "TELEGRAM_BOT_TOKEN" in env:
+            # Variabelnya ada tapi nilainya kosong -- kasus paling sering saat
+            # templat baru disalin dan belum diisi.
+            print("[GAGAL] TELEGRAM_BOT_TOKEN ada di backend/.env tapi masih kosong.")
+            print("        Isi dengan token dari @BotFather, lalu jalankan lagi.")
+        else:
+            print("[GAGAL] TELEGRAM_BOT_TOKEN tidak ada di backend/.env.")
+            lain = [k for k in env if "TELE" in k.upper()]
+            if lain:
+                print(f"        Yang ada di sana: {', '.join(lain)}")
+                print("        Namanya harus persis TELEGRAM_BOT_TOKEN agar terbaca backend.")
         sys.exit(1)
 
     if args.simpan:
