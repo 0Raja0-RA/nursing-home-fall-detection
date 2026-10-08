@@ -43,6 +43,15 @@ REM Ambang state machine (detik).
 set "POSSIBLE_FALL_THRESHOLD=0.5"
 set "FALL_DURATION_THRESHOLD=3"
 
+REM Jeda minimal antar alert untuk satu kamera. Bawaannya 60 detik supaya grup
+REM perawat tidak dibanjiri saat seseorang tergeletak lama.
+REM
+REM Diturunkan ke 10 detik di sini karena saat demo wajar diminta mengulang
+REM simulasi beberapa kali berturut-turut; dengan 60 detik, tekanan tombol kedua
+REM tidak mengirim apa pun dan sistemnya terlihat seperti rusak.
+REM Naikkan kembali ke 60 untuk pemakaian sungguhan.
+set "ALERT_COOLDOWN_SEC=10"
+
 REM Alamat server backend.
 set "HOST=127.0.0.1"
 set "PORT=8000"
