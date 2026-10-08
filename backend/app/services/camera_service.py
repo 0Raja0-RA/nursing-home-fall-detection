@@ -38,6 +38,84 @@ _ROTATE_CODES = {
 }
 
 
+# ---- Helper sumber kamera (dipakai juga oleh endpoint sebelum menyimpan) ----
+
+def sumber_adalah_file(source: str) -> bool:
+    """True kalau sumber menunjuk file video yang ada di disk."""
+    return (not source.isdigit()) and "://" not in source and Path(source).exists()
+
+
+def host_terjangkau(source: str, batas: float = 3.0) -> bool:
+    """Cek cepat apakah host pada URL sumber bisa disambungi lewat TCP.
+
+    Tanpa ini, cv2.VideoCapture ke alamat yang tidak terjangkau menggantung sekitar
+    90 detik sebelum menyerah -- startup backend ikut tertahan selama itu, dan setiap
+    percobaan sambung ulang juga. Sumber non-URL selalu dianggap terjangkau.
+    """
+    u = urlparse(source)
+    if not u.hostname:
+        return True
+    port = u.port or (554 if u.scheme == "rtsp" else 80)
+    try:
+        with socket.create_connection((u.hostname, port), timeout=batas):
+            return True
+    except OSError:
+        return False
+
+
+def validasi_sumber(source: str, batas: float = 3.0) -> tuple[bool, str]:
+    """Periksa apakah sumber kamera benar-benar bisa dipakai.
+
+    Dipanggil sebelum kamera disimpan ke database, supaya salah ketik alamat
+    ketahuan saat itu juga dan bukan muncul belakangan sebagai kamera OFFLINE
+    tanpa penjelasan.
+
+    Catatan: pemeriksaan ini memblokir (membuka socket / perangkat), jadi dari
+    kode async panggil lewat asyncio.to_thread.
+
+    Returns:
+        (True, "") kalau sumber bisa dipakai, atau (False, alasan).
+    """
+    source = source.strip()
+    if not source:
+        return False, "Sumber kamera kosong."
+
+    # Webcam lokal: satu-satunya cara memastikan adalah mencoba membukanya.
+    if source.isdigit():
+        cap = cv2.VideoCapture(int(source))
+        try:
+            if not cap.isOpened():
+                return False, (
+                    f"Webcam indeks {source} tidak bisa dibuka. "
+                    "Kemungkinan tidak ada, atau sedang dipakai aplikasi lain "
+                    "(browser, Zoom, aplikasi kamera)."
+                )
+            return True, ""
+        finally:
+            cap.release()
+
+    if "://" in source:
+        u = urlparse(source)
+        if u.scheme not in ("http", "https", "rtsp", "rtmp"):
+            return False, f"Skema URL '{u.scheme}' tidak didukung. Pakai http, https, atau rtsp."
+        if not u.hostname:
+            return False, "URL tidak memuat alamat host."
+        if not host_terjangkau(source, batas):
+            port = u.port or (554 if u.scheme == "rtsp" else 80)
+            return False, (
+                f"Host {u.hostname}:{port} tidak merespons dalam {batas:.0f} detik. "
+                "Pastikan aplikasi kamera di HP sedang menyala, alamat IP-nya masih sama, "
+                "dan laptop berada di jaringan yang sama. WiFi kampus/publik sering "
+                "memblokir koneksi antar-perangkat (client isolation) -- pakai hotspot HP "
+                "atau USB tethering."
+            )
+        return True, ""
+
+    if Path(source).exists():
+        return True, ""
+    return False, f"File video tidak ditemukan: {source}"
+
+
 class CameraService:
     """Manage video capture dari satu sumber kamera.
 
@@ -47,16 +125,20 @@ class CameraService:
         is_active: Apakah kamera sedang aktif menangkap frame.
     """
 
-    def __init__(self, camera_id: str, source: Optional[str] = None):
+    def __init__(self, camera_id: str, source: Optional[str] = None, rotate: Optional[int] = None):
         self.camera_id = camera_id
         settings = get_settings()
         self.source = source or settings.CAMERA_SOURCE
         self.target_fps = settings.CAMERA_FPS
 
         # Rotasi diterapkan di capture loop, jadi stream dan model sama-sama menerima gambar tegak.
-        if settings.CAMERA_ROTATE not in _ROTATE_CODES:
-            raise ValueError(f"CAMERA_ROTATE harus salah satu dari {sorted(_ROTATE_CODES)}, dapat {settings.CAMERA_ROTATE}")
-        self._rotate_code = _ROTATE_CODES[settings.CAMERA_ROTATE]
+        # Nilainya per kamera: kamera HP biasanya butuh 90 derajat sementara webcam laptop tidak,
+        # dan keduanya bisa aktif bersamaan. CAMERA_ROTATE di env hanya jadi nilai bawaan.
+        putaran = settings.CAMERA_ROTATE if rotate is None else rotate
+        if putaran not in _ROTATE_CODES:
+            raise ValueError(f"rotate harus salah satu dari {sorted(_ROTATE_CODES)}, dapat {putaran}")
+        self.rotate = putaran
+        self._rotate_code = _ROTATE_CODES[putaran]
 
         self.is_active = False
         self._capture: Optional[cv2.VideoCapture] = None
@@ -73,7 +155,7 @@ class CameraService:
 
         # File video berperilaku beda dari siaran langsung saat read() gagal:
         # file perlu diulang dari awal, siaran langsung perlu disambungkan ulang.
-        self._is_file = (not self.source.isdigit()) and Path(self.source).exists()
+        self._is_file = sumber_adalah_file(self.source)
 
     def start(self) -> bool:
         """Mulai capture video di background thread.
@@ -108,21 +190,8 @@ class CameraService:
         log.info(f"📷 Camera {self.camera_id} stopped")
 
     def _host_terjangkau(self, batas: float = 2.0) -> bool:
-        """Cek cepat apakah host sumber bisa disambungi lewat TCP.
-
-        Tanpa ini, cv2.VideoCapture ke alamat yang tidak terjangkau menggantung sekitar
-        90 detik sebelum menyerah -- startup backend ikut tertahan selama itu, dan setiap
-        percobaan sambung ulang juga.
-        """
-        u = urlparse(self.source)
-        if not u.hostname:
-            return True
-        port = u.port or (554 if u.scheme == "rtsp" else 80)
-        try:
-            with socket.create_connection((u.hostname, port), timeout=batas):
-                return True
-        except OSError:
-            return False
+        """Cek cepat apakah host sumber bisa disambungi lewat TCP."""
+        return host_terjangkau(self.source, batas)
 
     def _buka_capture(self) -> cv2.VideoCapture:
         """Buka koneksi ke sumber video.
@@ -166,6 +235,36 @@ class CameraService:
         """FPS aktual dari capture loop."""
         return self._actual_fps
 
+    def tunggu_frame_pertama(self, batas: float = 2.0) -> bool:
+        """Tunggu sampai frame pertama masuk, maksimal `batas` detik.
+
+        Dipanggil setelah start() supaya status yang dilaporkan ke dashboard sudah
+        benar begitu kamera didaftarkan. Tanpa ini, kamera yang baru ditambahkan
+        sempat terlihat "Terputus" selama satu-dua putaran loop meski sebenarnya
+        baik-baik saja.
+        """
+        tenggat = time.monotonic() + batas
+        while time.monotonic() < tenggat:
+            if self.sedang_mengalir:
+                return True
+            if self._stop_event.wait(0.05):
+                break
+        return self.sedang_mengalir
+
+    @property
+    def sedang_mengalir(self) -> bool:
+        """True kalau kamera ini sedang menghasilkan frame yang belum basi.
+
+        Dipakai endpoint daftar kamera untuk menampilkan status Terhubung/Terputus.
+        Berbeda dari is_active, yang hanya berarti "thread capture sudah dijalankan"
+        dan tetap True walau koneksinya sudah putus.
+        """
+        with self._lock:
+            return (
+                self._latest_frame is not None
+                and (time.monotonic() - self._last_frame_at) <= self._stale_after
+            )
+
     def _capture_loop(self) -> None:
         """Background thread: baca frame secara kontinu."""
         frame_interval = 1.0 / self.target_fps
@@ -182,8 +281,11 @@ class CameraService:
                 self._actual_fps = 0.0
 
                 if self._is_file:
-                    # File video sudah habis: ulang dari awal.
+                    # File video sudah habis: ulang dari awal. Ini kejadian normal,
+                    # bukan gangguan koneksi, jadi hitungannya di-nol-kan supaya tidak
+                    # muncul pesan "menyambung ulang" setiap kali video selesai diputar.
                     self._capture.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                    gagal_beruntun = 0
                     continue
 
                 # Siaran langsung (webcam / kamera HP / RTSP). read() yang gagal di sini

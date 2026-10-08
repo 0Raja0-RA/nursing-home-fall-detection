@@ -9,7 +9,10 @@ from datetime import datetime
 from enum import Enum
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+# Pilihan rotasi yang didukung (derajat, searah jarum jam).
+ROTATE_CHOICES = (0, 90, 180, 270)
 
 
 # ---- Enums -------------------------------------------------
@@ -87,6 +90,93 @@ class CameraStatus(BaseModel):
     confidence: float = 0.0
     fps: float = 0.0
     last_frame_at: Optional[datetime] = None
+
+
+# ---- Camera Registry ---------------------------------------
+
+class CameraBase(BaseModel):
+    """Field yang bisa diatur pengguna untuk sebuah kamera."""
+    name: str = Field(..., min_length=1, max_length=100, description="Nama lokasi/kamar")
+    source: str = Field(
+        ..., min_length=1,
+        description='Sumber kamera: "0" untuk webcam laptop, http://IP:8080/video untuk '
+                    'kamera HP (IP Webcam), rtsp://IP:554/... untuk CCTV, atau path file video',
+    )
+    rotate: int = Field(0, description="Rotasi searah jarum jam: 0, 90, 180, atau 270")
+    enabled: bool = Field(True, description="Kamera dinyalakan saat backend start")
+
+    @field_validator("name", "source")
+    @classmethod
+    def _tidak_boleh_kosong(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("tidak boleh kosong")
+        return v
+
+    @field_validator("rotate")
+    @classmethod
+    def _rotate_valid(cls, v: int) -> int:
+        if v not in ROTATE_CHOICES:
+            raise ValueError(f"harus salah satu dari {list(ROTATE_CHOICES)}")
+        return v
+
+
+class CameraCreate(CameraBase):
+    """Payload untuk mendaftarkan kamera baru."""
+    pass
+
+
+class CameraUpdate(BaseModel):
+    """Payload untuk mengubah kamera. Field yang tidak dikirim dibiarkan apa adanya."""
+    name: Optional[str] = Field(None, min_length=1, max_length=100)
+    source: Optional[str] = Field(None, min_length=1)
+    rotate: Optional[int] = None
+    enabled: Optional[bool] = None
+
+    @field_validator("name", "source")
+    @classmethod
+    def _tidak_boleh_kosong(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        v = v.strip()
+        if not v:
+            raise ValueError("tidak boleh kosong")
+        return v
+
+    @field_validator("rotate")
+    @classmethod
+    def _rotate_valid(cls, v: Optional[int]) -> Optional[int]:
+        if v is not None and v not in ROTATE_CHOICES:
+            raise ValueError(f"harus salah satu dari {list(ROTATE_CHOICES)}")
+        return v
+
+
+class CameraInfo(CameraStatus):
+    """Kamera terdaftar beserta status runtime-nya.
+
+    Sengaja merupakan superset dari CameraStatus supaya konsumen lama yang hanya
+    membaca camera_id / is_active / fall_state tetap bekerja tanpa perubahan.
+    """
+    name: str
+    source: str
+    rotate: int = 0
+    enabled: bool = True
+    stream_url: str = Field(..., description="Path endpoint MJPEG untuk kamera ini")
+
+
+class ScanCandidate(BaseModel):
+    """Satu kandidat kamera hasil pemindaian jaringan."""
+    ip: str
+    port: int
+    source: str = Field(..., description="URL siap pakai untuk diisikan ke field source")
+    label: str = Field(..., description="Dugaan jenis perangkat berdasarkan nomor port")
+
+
+class ScanResponse(BaseModel):
+    """Hasil pemindaian jaringan lokal."""
+    subnets: list[str] = Field(..., description="Subnet yang dipindai, mis. 192.168.1.0/24")
+    duration_sec: float
+    candidates: list[ScanCandidate]
 
 
 # ---- Settings ----------------------------------------------
