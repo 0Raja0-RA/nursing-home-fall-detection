@@ -26,4 +26,13 @@ class AppRegistry:
         # menampilkan daftar kamera tanpa harus menunggu pesan WebSocket.
         self.latest_status: Dict[str, CameraStatus] = {}
 
+        # Frame terakhir yang sudah digambari kotak dan dikemas jadi JPEG, siap kirim.
+        # Diisi sekali per frame oleh detection_pipeline, lalu dibagikan ke semua
+        # penonton -- sebelumnya tiap penonton menggambar dan meng-encode sendiri di
+        # event loop, sehingga dua halaman yang terbuka bersamaan saling berebut.
+        self.latest_jpeg: Dict[str, Optional[bytes]] = {}
+        # Dinaikkan setiap kali latest_jpeg diperbarui, supaya generator stream tahu
+        # ada frame baru tanpa perlu membandingkan isi byte-nya.
+        self.frame_seq: Dict[str, int] = {}
+
 registry = AppRegistry()

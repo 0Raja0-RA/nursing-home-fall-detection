@@ -5,6 +5,8 @@ Unit tests untuk detection pipeline.
 """
 
 import asyncio
+
+import numpy as np
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -56,7 +58,9 @@ async def test_camera_pipeline_offline():
 async def test_camera_pipeline_trigger(mock_run_inference):
     """Test saat mendeteksi postur pemicu."""
     mock_camera = _make_camera()
-    mock_camera.get_latest_frame.return_value = "dummy_frame"
+    # Frame harus array sungguhan: pipeline menggambar kotak lalu meng-encode JPEG
+    # dari frame ini, jadi string dummy tidak lagi cukup.
+    mock_camera.get_latest_frame.return_value = np.zeros((48, 64, 3), dtype=np.uint8)
     
     # Mock inference result
     mock_run_inference.return_value = DetectionResult(

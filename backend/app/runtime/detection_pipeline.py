@@ -16,6 +16,7 @@ from app.models.schemas import Observation, CameraStatus, WSMessage
 from app.services.camera_service import CameraService
 from app.runtime.registry import registry
 from app.services.inference_service import run_inference
+from app.services.overlay import jadikan_jpeg
 from app.services.state_machine import FallStateMachine
 from app.websocket.ws_manager import manager
 
@@ -45,6 +46,7 @@ async def camera_pipeline(camera: CameraService, fsm: FallStateMachine):
             )
             registry.latest_detection[camera.camera_id] = None
             registry.latest_status[camera.camera_id] = status
+            registry.latest_jpeg[camera.camera_id] = None
             await manager.broadcast(WSMessage(event="status_update", data=status.model_dump()))
 
             await asyncio.sleep(0.1)
@@ -81,6 +83,15 @@ async def camera_pipeline(camera: CameraService, fsm: FallStateMachine):
         # Simpan untuk dipakai endpoint stream (menggambar kotak) dan GET /api/cameras/.
         registry.latest_detection[camera.camera_id] = result
         registry.latest_status[camera.camera_id] = status
+
+        # Gambar kotak dan encode JPEG sekali di sini, bukan sekali per penonton di
+        # endpoint stream. cv2.imencode itu kerja CPU yang memblokir, jadi dijalankan
+        # di thread supaya event loop tetap bisa melayani REST dan WebSocket.
+        jpeg = await asyncio.to_thread(
+            jadikan_jpeg, frame, result, settings.CONFIDENCE_THRESHOLD
+        )
+        registry.latest_jpeg[camera.camera_id] = jpeg
+        registry.frame_seq[camera.camera_id] = registry.frame_seq.get(camera.camera_id, 0) + 1
         await manager.broadcast(WSMessage(event="status_update", data=status.model_dump()))
         
         # Pastikan tidak melahap 100% CPU, tidur sisa waktunya
