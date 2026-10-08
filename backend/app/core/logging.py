@@ -14,9 +14,36 @@ Pakai:
 """
 
 import logging
+import re
 import sys
 
 _CONFIGURED = False
+
+# Token bot Telegram berbentuk <angka>:<rahasia>.
+_POLA_RAHASIA = re.compile(r"\d{6,}:[A-Za-z0-9_\-]{20,}")
+
+
+class SensorRahasia(logging.Filter):
+    """Hapus token dari setiap catatan log, apa pun sumbernya.
+
+    Bukan kehati-hatian berlebihan: URL Bot API memuat token di dalam path-nya,
+    dan httpx mencatat URL permintaan secara lengkap di level INFO. Tanpa
+    penyaring ini, setiap panggilan ke Telegram meninggalkan token utuh di log
+    backend -- log yang rutin ditempel ke chat atau issue saat minta bantuan.
+
+    Dipasang di tingkat handler supaya mencakup library mana pun, bukan hanya
+    kode kita sendiri.
+    """
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        try:
+            pesan = record.getMessage()
+        except Exception:
+            return True
+        if _POLA_RAHASIA.search(pesan):
+            record.msg = _POLA_RAHASIA.sub("<TOKEN-DISENSOR>", pesan)
+            record.args = ()
+        return True
 
 
 def _configure() -> None:
@@ -35,10 +62,26 @@ def _configure() -> None:
     handler.setFormatter(
         logging.Formatter("%(asctime)s %(levelname)-7s %(name)s: %(message)s", datefmt="%H:%M:%S")
     )
+    handler.addFilter(SensorRahasia())
+
     root = logging.getLogger("app")
     root.addHandler(handler)
     root.setLevel(logging.INFO)
     root.propagate = False
+
+    # Pasang penyaring yang sama di root logger, supaya catatan dari library lain
+    # (httpx, uvicorn, sqlalchemy) ikut tersensor meski tidak lewat logger "app".
+    penyaring = SensorRahasia()
+    for h in logging.getLogger().handlers:
+        h.addFilter(penyaring)
+    logging.getLogger().addFilter(penyaring)
+
+    # httpx mencatat URL permintaan secara utuh di level INFO. Untuk panggilan ke
+    # Bot API, URL itu memuat token. Penyaring di atas sudah menanganinya, tapi
+    # barisnya juga tidak memberi informasi berguna, jadi sekalian diredam.
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
+
     _CONFIGURED = True
 
 
