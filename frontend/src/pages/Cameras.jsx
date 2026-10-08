@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Camera, Plus, Trash2, CheckCircle2, Video, AlertCircle, Loader2, Radar } from 'lucide-react';
+import { Camera, Plus, Trash2, CheckCircle2, Video, AlertCircle, Loader2, Radar, Usb } from 'lucide-react';
 import { API_BASE } from '../config';
 
 const ROTASI = [0, 90, 180, 270];
@@ -96,27 +96,35 @@ export default function Cameras() {
         }
     };
 
-    // Alamat IP kamera HP berubah setiap pindah WiFi. Pemindaian ini mencari sendiri
-    // perangkat yang menyiarkan kamera di jaringan lokal, jadi alamatnya tidak perlu
-    // dibaca manual dari layar HP.
+    // Dua sumber kamera dicari sekaligus:
+    //  - perangkat lokal (webcam laptop, Iriun lewat USB/WiFi) yang muncul sebagai indeks
+    //  - perangkat di jaringan (IP Webcam di HP), yang alamatnya berubah tiap pindah WiFi
+    // Keduanya digabung di satu tombol supaya tidak perlu menebak harus menekan yang mana.
     const pindaiJaringan = async () => {
         setMemindai(true);
         setPesan(null);
         setKandidat(null);
         try {
-            const r = await fetch(`${API_BASE}/api/cameras/scan`, { method: 'POST' });
-            if (!r.ok) {
-                setPesan({ tipe: 'error', teks: await bacaError(r) });
+            const [rLokal, rJaringan] = await Promise.all([
+                fetch(`${API_BASE}/api/cameras/devices`),
+                fetch(`${API_BASE}/api/cameras/scan`, { method: 'POST' }),
+            ]);
+            if (!rJaringan.ok) {
+                setPesan({ tipe: 'error', teks: await bacaError(rJaringan) });
                 return;
             }
-            const hasil = await r.json();
-            setKandidat(hasil);
-            if (hasil.candidates.length === 0) {
+            const jaringan = await rJaringan.json();
+            const lokal = rLokal.ok ? await rLokal.json() : [];
+            setKandidat({ lokal, jaringan });
+
+            if (lokal.length === 0 && jaringan.candidates.length === 0) {
                 setPesan({
                     tipe: 'info',
-                    teks: `Tidak ada kamera ditemukan di ${hasil.subnets.join(', ') || 'jaringan ini'}. `
-                        + 'Pastikan aplikasi kamera di HP sedang menyala dan berada di WiFi yang sama. '
-                        + 'WiFi kampus sering memblokir koneksi antar-perangkat, jadi pakai hotspot HP.',
+                    teks: `Tidak ada kamera ditemukan di ${jaringan.subnets.join(', ') || 'jaringan ini'}, `
+                        + 'dan tidak ada kamera yang terpasang di komputer ini. '
+                        + 'Pastikan aplikasi kamera di HP sedang menyala dan berada di jaringan yang sama. '
+                        + 'WiFi kampus biasanya memblokir koneksi antar-perangkat, jadi nyalakan hotspot '
+                        + 'di laptop lalu sambungkan HP ke hotspot itu.',
                 });
             }
         } catch {
@@ -186,32 +194,68 @@ export default function Cameras() {
                 </div>
             )}
 
-            {/* Kandidat hasil pemindaian jaringan */}
-            {kandidat && kandidat.candidates.length > 0 && (
+            {/* Kamera yang ditemukan: terpasang di komputer ini, dan di jaringan */}
+            {kandidat && (kandidat.lokal.length > 0 || kandidat.jaringan.candidates.length > 0) && (
                 <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 mb-8 overflow-hidden shadow-sm">
-                    <div className="p-4 border-b border-slate-200 dark:border-slate-800 font-semibold text-sm flex items-center gap-2">
-                        <Radar className="w-4 h-4 text-blue-500" />
-                        Ditemukan di jaringan
-                        <span className="font-normal text-slate-500">
-                            ({kandidat.subnets.join(', ')} · {kandidat.duration_sec}s)
-                        </span>
-                    </div>
-                    <div className="divide-y divide-slate-200 dark:divide-slate-800">
-                        {kandidat.candidates.map((k) => (
-                            <button
-                                key={`${k.ip}:${k.port}`}
-                                type="button"
-                                onClick={() => { setNewUrl(k.source); setKandidat(null); }}
-                                className="w-full p-4 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors text-left"
-                            >
-                                <div>
-                                    <h3 className="font-medium text-sm">{k.label}</h3>
-                                    <p className="text-xs text-slate-500 font-mono">{k.source}</p>
-                                </div>
-                                <span className="text-xs text-blue-500 font-medium">Pakai alamat ini</span>
-                            </button>
-                        ))}
-                    </div>
+                    {kandidat.lokal.length > 0 && (
+                        <>
+                            <div className="p-4 border-b border-slate-200 dark:border-slate-800 font-semibold text-sm flex items-center gap-2">
+                                <Usb className="w-4 h-4 text-blue-500" />
+                                Terpasang di komputer ini
+                                <span className="font-normal text-slate-500">(webcam, Iriun)</span>
+                            </div>
+                            <div className="divide-y divide-slate-200 dark:divide-slate-800">
+                                {kandidat.lokal.map((d) => (
+                                    <button
+                                        key={d.source}
+                                        type="button"
+                                        disabled={d.in_use}
+                                        onClick={() => { setNewUrl(d.source); setKandidat(null); }}
+                                        className="w-full p-4 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/40 disabled:opacity-50 disabled:hover:bg-transparent transition-colors text-left"
+                                    >
+                                        <div>
+                                            <h3 className="font-medium text-sm">
+                                                {d.label}
+                                                {d.driver && <span className="text-slate-500 font-normal"> · {d.driver}</span>}
+                                            </h3>
+                                            <p className="text-xs text-slate-500 font-mono">sumber: {d.source} — {d.name}</p>
+                                        </div>
+                                        <span className="text-xs text-blue-500 font-medium">
+                                            {d.in_use ? 'Sudah dipakai' : 'Pakai kamera ini'}
+                                        </span>
+                                    </button>
+                                ))}
+                            </div>
+                        </>
+                    )}
+
+                    {kandidat.jaringan.candidates.length > 0 && (
+                        <>
+                            <div className="p-4 border-y border-slate-200 dark:border-slate-800 font-semibold text-sm flex items-center gap-2">
+                                <Radar className="w-4 h-4 text-blue-500" />
+                                Ditemukan di jaringan
+                                <span className="font-normal text-slate-500">
+                                    ({kandidat.jaringan.subnets.join(', ')} · {kandidat.jaringan.duration_sec}s)
+                                </span>
+                            </div>
+                            <div className="divide-y divide-slate-200 dark:divide-slate-800">
+                                {kandidat.jaringan.candidates.map((k) => (
+                                    <button
+                                        key={`${k.ip}:${k.port}`}
+                                        type="button"
+                                        onClick={() => { setNewUrl(k.source); setKandidat(null); }}
+                                        className="w-full p-4 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors text-left"
+                                    >
+                                        <div>
+                                            <h3 className="font-medium text-sm">{k.label}</h3>
+                                            <p className="text-xs text-slate-500 font-mono">{k.source}</p>
+                                        </div>
+                                        <span className="text-xs text-blue-500 font-medium">Pakai alamat ini</span>
+                                    </button>
+                                ))}
+                            </div>
+                        </>
+                    )}
                 </div>
             )}
 
