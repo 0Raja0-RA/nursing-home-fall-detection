@@ -6,12 +6,13 @@ REST endpoints untuk manajemen konfigurasi runtime.
 Endpoints:
     GET  /api/settings/            — Ambil konfigurasi aktif
     PUT  /api/settings/threshold   — Update threshold durasi falling
+    POST /api/settings/test-telegram — Kirim notifikasi uji ke Telegram
 """
 
 from fastapi import APIRouter
 
 from app.core.config import get_settings
-from app.models.schemas import SettingsResponse, ThresholdUpdate
+from app.models.schemas import SettingsResponse, TestNotificationResponse, ThresholdUpdate
 
 router = APIRouter()
 
@@ -49,4 +50,36 @@ async def update_threshold(payload: ThresholdUpdate):
         possible_fall_threshold=settings.POSSIBLE_FALL_THRESHOLD,
         confidence_threshold=settings.CONFIDENCE_THRESHOLD,
         camera_source=settings.CAMERA_SOURCE,
+    )
+
+
+@router.post("/test-telegram", response_model=TestNotificationResponse)
+async def test_telegram():
+    """Kirim satu pesan uji ke Telegram.
+
+    Ada supaya konfigurasi bisa diverifikasi tanpa harus berpura-pura jatuh di
+    depan kamera, dan supaya kegagalan kirim ketahuan saat menyiapkan sistem --
+    bukan saat ada yang benar-benar jatuh.
+    """
+    from app.services.notification_service import send_test_notification
+
+    settings = get_settings()
+    dikonfigurasi = bool(settings.TELEGRAM_BOT_TOKEN and settings.TELEGRAM_CHAT_ID)
+
+    if not dikonfigurasi:
+        return TestNotificationResponse(
+            terkirim=False,
+            dikonfigurasi=False,
+            pesan="TELEGRAM_BOT_TOKEN atau TELEGRAM_CHAT_ID belum diisi di backend/.env. "
+                  "Ambil chat_id dengan: python tools/get_chat_id.py",
+        )
+
+    terkirim = await send_test_notification()
+    return TestNotificationResponse(
+        terkirim=terkirim,
+        dikonfigurasi=True,
+        pesan=("Pesan uji terkirim. Cek grup Telegram-mu."
+               if terkirim else
+               "Gagal mengirim setelah beberapa percobaan. Lihat log backend untuk alasannya; "
+               "penyebab paling sering adalah tidak ada koneksi internet."),
     )

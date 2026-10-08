@@ -72,10 +72,21 @@ class AlertResponse(AlertBase):
     id: int
     fall_duration: float
     acknowledged: bool = False
+    # Apakah notifikasi Telegram berhasil terkirim. Ikut dikembalikan supaya
+    # kegagalan terlihat di Riwayat Insiden -- notifikasi yang gagal diam-diam
+    # meninggalkan keyakinan palsu bahwa perawat sudah diberi tahu.
+    notified: bool = False
     created_at: datetime
     acknowledged_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
+
+
+class TestNotificationResponse(BaseModel):
+    """Hasil percobaan kirim notifikasi uji."""
+    terkirim: bool
+    dikonfigurasi: bool = Field(..., description="Token dan chat id sudah terisi")
+    pesan: str
 
 
 # ---- Camera Status -----------------------------------------
