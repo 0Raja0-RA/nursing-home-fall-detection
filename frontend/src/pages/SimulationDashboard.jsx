@@ -38,13 +38,18 @@ function StreamImg({ src, alt }) {
 }
 
 export default function SimulationDashboard({ addHistoryItem }) {
-    const [simulationState, setSimulationState] = useState('normal'); // 'normal', 'falling', 'alerted'
-    const [countdown, setCountdown] = useState(10);
     const [note, setNote] = useState('');
-    const [activeAlert, setActiveAlert] = useState(false);
     const [cameras, setCameras] = useState([]);
+    const [kameraSimulasiId, setKameraSimulasiId] = useState('');
+    const [memulaiSimulasi, setMemulaiSimulasi] = useState(false);
+    const [galat, setGalat] = useState('');
 
-    const { cameraData } = useWebSocket(WS_URL);
+    const { cameraData, alerts } = useWebSocket(WS_URL);
+
+    // Alert terbaru yang belum ditangani, langsung dari backend lewat WebSocket.
+    // Sebelumnya banner ini dinyalakan oleh hitungan mundur palsu di browser --
+    // angkanya tidak pernah cocok dengan FALL_DURATION_THRESHOLD yang sebenarnya.
+    const alertAktif = alerts.length > 0 ? alerts[alerts.length - 1] : null;
 
     // Daftar kamera diambil dari backend, jadi kamera yang didaftarkan di halaman
     // "Kelola Kamera" langsung muncul di sini tanpa menyunting kode.
@@ -64,40 +69,60 @@ export default function SimulationDashboard({ addHistoryItem }) {
         return () => clearInterval(t);
     }, [ambilDaftar]);
 
-    // Simulasi hitung mundur state machine saat tombol jatuh ditekan
+    // Pilihan awal: kamera pertama yang benar-benar mengalir.
     useEffect(() => {
-        let timer;
-        if (simulationState === 'falling' && countdown > 0) {
-            timer = setInterval(() => setCountdown(c => c - 1), 1000);
-        } else if (simulationState === 'falling' && countdown === 0) {
-            setSimulationState('alerted');
-            setActiveAlert(true);
+        if (!kameraSimulasiId && cameras.length) {
+            // Menyelaraskan pilihan dengan daftar yang baru tiba dari backend.
+            // eslint-disable-next-line react-hooks/set-state-in-effect
+            setKameraSimulasiId((cameras.find((c) => c.is_active) || cameras[0]).camera_id);
         }
-        return () => clearInterval(timer);
-    }, [simulationState, countdown]);
+    }, [cameras, kameraSimulasiId]);
 
-    const triggerFallSimulation = () => {
-        setSimulationState('falling');
-        setCountdown(10);
+    /**
+     * Minta backend menganggap satu kamera melaporkan postur pemicu.
+     *
+     * Yang disimulasikan hanya keluaran detektor. State machine tetap menghitung
+     * durasinya sendiri, debounce tetap berlaku, cooldown tetap dihormati, dan
+     * alertnya melewati jalur yang sama dengan deteksi sungguhan -- termasuk foto
+     * frame kamera saat itu juga. Hitungan mundur di kartu pun jadi angka asli
+     * dari state machine, bukan tiruan di browser.
+     */
+    const triggerFallSimulation = async () => {
+        if (!kameraSimulasiId || memulaiSimulasi) return;
+        setMemulaiSimulasi(true);
+        setGalat('');
+        try {
+            const r = await fetch(
+                `${API_BASE}/api/cameras/${kameraSimulasiId}/simulate-fall`,
+                { method: 'POST' },
+            );
+            if (!r.ok) {
+                const b = await r.json().catch(() => ({}));
+                setGalat(typeof b.detail === 'string' ? b.detail : `Backend menjawab ${r.status}`);
+            }
+        } catch {
+            setGalat(`Tidak bisa menghubungi backend di ${API_BASE}.`);
+        } finally {
+            setMemulaiSimulasi(false);
+        }
     };
 
-    // Kamera yang dipakai untuk overlay simulasi: yang pertama di daftar.
-    const kameraSimulasi = cameras[0];
-
-    const handleResolveAlert = (statusType) => {
-        setActiveAlert(false);
-        setSimulationState('normal');
-        setCountdown(10);
-
-        addHistoryItem({
-            id: Date.now(),
-            location: kameraSimulasi?.name || 'Kamera simulasi',
-            time: new Date().toLocaleString(),
-            status: statusType,
-            note: note || 'Dikonfirmasi oleh caregiver via dashboard.'
+    const tandaiDitangani = async () => {
+        if (!alertAktif) return;
+        try {
+            await fetch(`${API_BASE}/api/alerts/${alertAktif.id}/ack`, { method: 'PUT' });
+        } catch { /* biarkan; riwayat tetap bisa ditandai dari halaman Riwayat Insiden */ }
+        addHistoryItem?.({
+            id: alertAktif.id,
+            location: alertAktif.camera_name || alertAktif.camera_id,
+            time: new Date().toLocaleString('id-ID'),
+            status: 'confirmed',
+            note: note || 'Dikonfirmasi oleh caregiver via dashboard.',
         });
         setNote('');
     };
+
+    const kameraSimulasi = cameras.find((c) => c.camera_id === kameraSimulasiId) || cameras[0];
 
     return (
         <div className="p-4 md:p-8 w-full max-w-full min-w-0 overflow-x-hidden">
@@ -106,25 +131,50 @@ export default function SimulationDashboard({ addHistoryItem }) {
                     <h1 className="text-xl md:text-2xl font-bold">Simulasi Live Monitoring CCTV</h1>
                     <p className="text-xs md:text-sm text-slate-500">Uji coba deteksi model YOLO11</p>
                 </div>
-                <button
-                    onClick={triggerFallSimulation}
-                    disabled={simulationState !== 'normal' || !kameraSimulasi}
-                    className="bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white px-4 py-2 rounded-xl font-medium text-xs md:text-sm transition-colors flex items-center gap-2 shadow-md"
-                >
-                    <AlertTriangle className="w-4 h-4" /> Trigger Simulasi Orang Jatuh
-                </button>
+                <div className="flex items-center gap-3">
+                    <select
+                        value={kameraSimulasiId}
+                        onChange={(e) => setKameraSimulasiId(e.target.value)}
+                        title="Kamera yang akan disimulasikan"
+                        className="bg-slate-200 dark:bg-slate-800 px-3 py-2 rounded-xl text-xs md:text-sm font-medium focus:outline-none"
+                    >
+                        {cameras.length === 0 && <option value="">Belum ada kamera</option>}
+                        {cameras.map((c) => (
+                            <option key={c.camera_id} value={c.camera_id}>
+                                {c.name}{c.is_active ? '' : ' (terputus)'}
+                            </option>
+                        ))}
+                    </select>
+                    <button
+                        onClick={triggerFallSimulation}
+                        disabled={memulaiSimulasi || !kameraSimulasi?.is_active}
+                        className="bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white px-4 py-2 rounded-xl font-medium text-xs md:text-sm transition-colors flex items-center gap-2 shadow-md"
+                    >
+                        <AlertTriangle className="w-4 h-4" /> Trigger Simulasi Orang Jatuh
+                    </button>
+                </div>
             </div>
 
+            {galat && (
+                <div className="mb-6 p-4 rounded-xl border border-red-500/30 bg-red-500/10 text-red-500 text-sm">
+                    {galat}
+                </div>
+            )}
+
             {/* Banner Alert Darurat Aktif */}
-            {activeAlert && (
+            {alertAktif && (
                 <div className="mb-6 bg-red-500/10 border-2 border-red-500 p-5 rounded-2xl animate-pulse flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                     <div className="flex items-center gap-3">
                         <BellRing className="w-8 h-8 text-red-500 animate-bounce" />
                         <div>
                             <h2 className="text-red-600 dark:text-red-400 font-bold text-lg">
-                                DARURAT TERKONFIRMASI: {kameraSimulasi?.name || 'Kamera simulasi'}
+                                {alertAktif.simulated ? 'SIMULASI' : 'DARURAT TERKONFIRMASI'}
+                                : {alertAktif.camera_name || alertAktif.camera_id}
                             </h2>
-                            <p className="text-sm text-slate-600 dark:text-slate-300">Durasi jatuh melewati ambang batas. Sistem otomatis mengirim peringatan.</p>
+                            <p className="text-sm text-slate-600 dark:text-slate-300">
+                                {alertAktif.message}
+                                {alertAktif.simulated && ' — dipicu tombol simulasi, bukan kejadian sungguhan.'}
+                            </p>
                         </div>
                     </div>
                     <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
@@ -136,7 +186,7 @@ export default function SimulationDashboard({ addHistoryItem }) {
                             className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm"
                         />
                         <button
-                            onClick={() => handleResolveAlert('confirmed')}
+                            onClick={tandaiDitangani}
                             className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap"
                         >
                             Tandai Ditangani & Selesai
@@ -154,7 +204,7 @@ export default function SimulationDashboard({ addHistoryItem }) {
                     </div>
                 )}
 
-                {cameras.map((cam, i) => {
+                {cameras.map((cam) => {
                     // Status langsung dari WebSocket kalau ada, kalau tidak dari hasil polling.
                     const live = cameraData?.[cam.camera_id];
                     const state = !cam.is_active ? 'unknown' : (live?.fall_state || cam.fall_state || 'monitoring');
@@ -163,8 +213,9 @@ export default function SimulationDashboard({ addHistoryItem }) {
                     const conf = live?.confidence ?? cam.confidence ?? 0;
 
                     // Overlay simulasi hanya menempel di kamera pertama, seperti sebelumnya.
-                    const disimulasikan = i === 0 && simulationState !== 'normal';
-                    const bahaya = disimulasikan || state === 'confirmed_fall';
+                    const durasi = live?.fall_duration ?? cam.fall_duration ?? 0;
+                    const menghitung = state === 'possible_fall' || state === 'confirmed_fall';
+                    const bahaya = menghitung;
 
                     return (
                         <div
@@ -178,10 +229,8 @@ export default function SimulationDashboard({ addHistoryItem }) {
                                     <Video className={`w-4 h-4 ${cam.is_active ? 'text-emerald-500' : 'text-slate-500'}`} />
                                     {cam.name}
                                 </span>
-                                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                                    disimulasikan ? 'bg-red-500/10 text-red-500 animate-pulse' : info.kelas
-                                }`}>
-                                    {disimulasikan ? `JATUH TERDETEKSI (${countdown}s)` : info.label}
+                                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${info.kelas}`}>
+                                    {menghitung ? `${info.label} (${durasi.toFixed(1)}s)` : info.label}
                                 </span>
                             </div>
 
@@ -194,11 +243,11 @@ export default function SimulationDashboard({ addHistoryItem }) {
                                     </p>
                                 )}
 
-                                {disimulasikan && (
+                                {menghitung && (
                                     <div className="absolute inset-0 bg-red-950/40 flex flex-col items-center justify-center">
                                         <div className="border-2 border-red-500 bg-red-500/20 p-6 rounded-xl text-center animate-pulse">
-                                            <p className="text-red-400 font-bold text-lg">⚠️ STATE: LYING_ON_GROUND</p>
-                                            <p className="text-white text-2xl font-mono mt-1">Timer Alarm: {countdown} Detik</p>
+                                            <p className="text-red-400 font-bold text-lg">⚠️ STATE: {state.toUpperCase()}</p>
+                                            <p className="text-white text-2xl font-mono mt-1">Timer Alarm: {durasi.toFixed(1)} Detik</p>
                                         </div>
                                     </div>
                                 )}
