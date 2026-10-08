@@ -42,6 +42,10 @@ class Settings(BaseSettings):
     POSSIBLE_FALL_THRESHOLD: float = 2.0   # detik sebelum mulai hitung
     DEBOUNCE_FRAMES: int = 5
     GRACE_PERIOD_SEC: float = 3.0
+    # Batas waktu yang boleh dihitung dari satu observasi. Melindungi timer dari
+    # jeda pipeline (pemuatan model, inference tersendat, kamera menyambung ulang)
+    # yang kalau tidak dibatasi akan terhitung sebagai durasi tergeletak.
+    MAX_FRAME_GAP_SEC: float = 1.0
     TRIGGER_CLASSES: list[str] = ["lying_on_ground"]
     ALERT_COOLDOWN_SEC: float = 60.0
 

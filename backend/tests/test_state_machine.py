@@ -156,3 +156,42 @@ class TestFallStateMachine:
         fsm.update_thresholds(fall_duration=20.0, possible_fall=5.0)
         assert fsm.fall_duration_threshold == 20.0
         assert fsm.possible_fall_threshold == 5.0
+
+
+# ---- Jeda pipeline tidak boleh dihitung sebagai durasi tergeletak ----
+
+def test_jeda_panjang_tidak_mengarang_durasi():
+    """Satu observasi pemicu setelah jeda panjang tidak boleh memicu alarm.
+
+    Timer dihitung dari selisih waktu antar pemanggilan update(), yang
+    mengandaikan pipeline tidak pernah berhenti. Kenyataannya ia berhenti:
+    memuat model YOLO pertama kali memakan 8-10 detik. Tanpa pembatas, observasi
+    pemicu pertama sesudahnya menyumbang seluruh jeda -- terukur menghasilkan
+    CONFIRMED_FALL seketika padahal tidak ada bukti apa pun tentang jeda itu.
+    """
+    import time
+
+    fsm = FallStateMachine(camera_id="cam-uji", fall_duration_threshold=3.0, max_dt_sec=1.0)
+    fsm.update(Observation.NON_TRIGGER_POSTURE)
+
+    # Tiru jeda pipeline tanpa benar-benar menunggu: mundurkan jam internalnya.
+    fsm._last_update_time = time.time() - 30.0
+    fsm.update(Observation.TRIGGER_POSTURE)
+
+    assert fsm.fall_duration <= 1.0, "jeda tak terpantau ikut terhitung"
+    assert fsm.state == FallState.MONITORING, "alarm palsu dari jeda pipeline"
+
+
+def test_pemicu_beruntun_tetap_terhitung_normal():
+    """Pembatas tidak boleh memperlambat penghitungan yang sah."""
+    import time
+
+    fsm = FallStateMachine(camera_id="cam-uji", fall_duration_threshold=1.0, max_dt_sec=1.0)
+    mulai = time.time()
+    while time.time() - mulai < 1.5:
+        fsm.update(Observation.TRIGGER_POSTURE)
+        time.sleep(0.05)
+
+    nyata = time.time() - mulai
+    assert fsm.state == FallState.CONFIRMED_FALL
+    assert abs(fsm.fall_duration - nyata) < 0.3, "durasi menyimpang dari waktu sebenarnya"

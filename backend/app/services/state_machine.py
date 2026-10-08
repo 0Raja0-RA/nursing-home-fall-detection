@@ -35,6 +35,7 @@ class FallStateMachine:
         possible_fall_threshold: Detik sebelum transisi ke POSSIBLE_FALL.
         debounce_frames: Jumlah frame non-pemicu sebelum mereset hitungan.
         grace_period_sec: Detik batas person lost sebelum mereset hitungan.
+        max_dt_sec: Batas atas waktu yang boleh dihitung dari satu observasi.
         on_confirmed_fall: Callback yang dipanggil saat fall dikonfirmasi.
     """
 
@@ -43,6 +44,20 @@ class FallStateMachine:
     possible_fall_threshold: float = 2.0
     debounce_frames: int = 5
     grace_period_sec: float = 3.0
+    # Satu observasi hanya boleh menambah waktu sebanyak-banyaknya sekian detik.
+    #
+    # Timer dihitung dari selisih waktu antar pemanggilan update(), yang
+    # mengandaikan pipeline tidak pernah berhenti. Kenyataannya ia berhenti:
+    # memuat model YOLO pertama kali memakan 8-10 detik, inference di CPU bisa
+    # tersendat, dan kamera yang terputus menyambung ulang. Tanpa batas ini,
+    # observasi pemicu PERTAMA setelah jeda panjang langsung menyumbang seluruh
+    # jeda itu -- terukur: jeda 5 detik lalu satu observasi pemicu menghasilkan
+    # akumulasi 5,0 detik dan CONFIRMED_FALL seketika, padahal tidak ada bukti
+    # apa pun tentang apa yang terjadi selama jeda.
+    #
+    # Dibatasi, bukan dibuang: jeda panjang tidak boleh mengarang waktu, tapi
+    # juga tidak boleh menghapus hitungan yang sudah sah terkumpul.
+    max_dt_sec: float = 1.0
     on_confirmed_fall: Optional[Callable] = None
 
     # Internal state
@@ -70,7 +85,9 @@ class FallStateMachine:
             State terbaru setelah update.
         """
         now = time.time()
-        dt = now - self._last_update_time
+        # Dibatasi: lihat penjelasan pada max_dt_sec. Jeda yang tidak terpantau
+        # tidak boleh dihitung sebagai waktu tergeletak.
+        dt = min(now - self._last_update_time, self.max_dt_sec)
         self._last_update_time = now
 
         if observation == Observation.OFFLINE:

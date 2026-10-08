@@ -62,6 +62,7 @@ async def mulai_kamera(record: CameraRecord) -> bool:
         possible_fall_threshold=settings.POSSIBLE_FALL_THRESHOLD,
         debounce_frames=settings.DEBOUNCE_FRAMES,
         grace_period_sec=settings.GRACE_PERIOD_SEC,
+        max_dt_sec=settings.MAX_FRAME_GAP_SEC,
         on_confirmed_fall=trigger_alert,
     )
 
