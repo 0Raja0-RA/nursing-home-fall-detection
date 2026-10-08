@@ -46,8 +46,13 @@ class Settings(BaseSettings):
     ALERT_COOLDOWN_SEC: float = 60.0
 
     # ---- Camera --------------------------------------------
+    # Dipakai sebagai kamera bawaan saat tabel `cameras` masih kosong. Setelah ada
+    # kamera terdaftar, sumbernya diambil dari database (bisa diatur dari dashboard).
     CAMERA_SOURCE: str = "0"  # "0" = webcam, atau URL RTSP
     CAMERA_FPS: int = 15
+    # Batas jumlah kamera. Inference berjalan di CPU, jadi tiap kamera menambah
+    # beban secara linear -- batas ini mencegah sistem melambat diam-diam.
+    MAX_CAMERAS: int = 4
     # Rotasi searah jarum jam: 0, 90, 180, 270. Kamera HP sering mengirim gambar miring (90 atau 270).
     CAMERA_ROTATE: int = 0
     # Frame yang lebih tua dari ini dianggap basi, dan kamera dilaporkan OFFLINE.
