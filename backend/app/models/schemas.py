@@ -172,6 +172,16 @@ class ScanCandidate(BaseModel):
     label: str = Field(..., description="Dugaan jenis perangkat berdasarkan nomor port")
 
 
+class LocalDevice(BaseModel):
+    """Kamera yang terpasang langsung di komputer ini."""
+    index: int = Field(..., description="Indeks perangkat, dipakai OpenCV sebagai sumber")
+    name: str = Field(..., description="Nama perangkat menurut sistem operasi")
+    label: str = Field(..., description="Nama untuk ditampilkan; Iriun memakai penamaan aplikasinya")
+    driver: Optional[str] = Field(None, description="Perangkat lunak di baliknya, mis. Iriun")
+    source: str = Field(..., description="Nilai siap pakai untuk field source")
+    in_use: bool = Field(False, description="Sudah dipakai salah satu kamera terdaftar")
+
+
 class ScanResponse(BaseModel):
     """Hasil pemindaian jaringan lokal."""
     subnets: list[str] = Field(..., description="Subnet yang dipindai, mis. 192.168.1.0/24")

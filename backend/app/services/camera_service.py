@@ -15,6 +15,7 @@ Supports:
 import asyncio
 import http.client
 import socket
+import sys
 import ssl
 import threading
 import time
@@ -259,7 +260,19 @@ class CameraService:
         src = int(self.source) if self.source.isdigit() else self.source
         if isinstance(src, str) and "://" in src and not self._host_terjangkau():
             return cv2.VideoCapture()
-        cap = cv2.VideoCapture(src)
+
+        if isinstance(src, int) and sys.platform.startswith("win"):
+            # Kamera lokal dibuka lewat DirectShow, bukan MSMF yang jadi bawaan OpenCV
+            # di Windows. Dua alasannya:
+            #   1. Daftar perangkat di endpoint /devices disusun dari enumerasi
+            #      DirectShow, jadi nomor indeksnya hanya cocok kalau pembukaannya
+            #      memakai DirectShow juga.
+            #   2. MSMF tidak melihat sebagian kamera virtual (OBS tidak muncul sama
+            #      sekali) dan kadang mengembalikan nol frame dari perangkat yang
+            #      lewat DirectShow terbaca normal.
+            cap = cv2.VideoCapture(src, cv2.CAP_DSHOW)
+        else:
+            cap = cv2.VideoCapture(src)
         if not self._is_file:
             try:
                 cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
