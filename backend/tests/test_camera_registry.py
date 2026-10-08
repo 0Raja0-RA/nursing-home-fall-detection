@@ -1,0 +1,186 @@
+"""
+test_camera_registry.py
+=======================
+Uji untuk pendaftaran kamera lewat dashboard: validasi sumber, repository,
+dan pemuatan model yang aman saat beberapa kamera berjalan bersamaan.
+
+Tidak memuat model YOLO sungguhan dan tidak membuka kamera fisik, jadi bisa
+dijalankan di mana saja.
+"""
+
+import asyncio
+import sys
+import threading
+import types
+from pathlib import Path
+
+import pytest
+import pytest_asyncio
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.orm import sessionmaker
+
+from app.db.models import Base
+from app.db.repository import CameraRepository
+from app.models.schemas import CameraCreate, CameraUpdate
+from app.services.camera_service import sumber_adalah_file, validasi_sumber
+
+
+# ---- Validasi sumber ---------------------------------------
+
+def test_sumber_kosong_ditolak():
+    ok, alasan = validasi_sumber("   ")
+    assert ok is False
+    assert "kosong" in alasan.lower()
+
+
+def test_file_video_yang_ada_diterima(tmp_path: Path):
+    berkas = tmp_path / "rekaman.mp4"
+    berkas.write_bytes(b"bukan video sungguhan, cukup ada")
+    ok, alasan = validasi_sumber(str(berkas))
+    assert ok is True, alasan
+
+
+def test_file_video_tidak_ada_ditolak():
+    ok, alasan = validasi_sumber("D:/jelas/tidak/ada/rekaman.mp4")
+    assert ok is False
+    assert "tidak ditemukan" in alasan
+
+
+def test_skema_url_asing_ditolak():
+    ok, alasan = validasi_sumber("ftp://192.168.1.50/video")
+    assert ok is False
+    assert "tidak didukung" in alasan
+
+
+def test_host_tidak_terjangkau_ditolak_cepat():
+    """Alamat yang tidak terjangkau harus gagal dalam hitungan detik, bukan ~90 detik.
+
+    Ini yang membuat tombol "Tambah Kamera" bisa memvalidasi lebih dulu tanpa
+    membuat pengguna menunggu lama.
+    """
+    import time
+
+    mulai = time.monotonic()
+    ok, alasan = validasi_sumber("http://10.255.255.1:8080/video", batas=2.0)
+    durasi = time.monotonic() - mulai
+
+    assert ok is False
+    assert durasi < 10.0, f"validasi makan {durasi:.1f} detik, terlalu lama untuk UI"
+    # Pesannya harus menyebut penyebab yang paling sering terjadi di lapangan.
+    assert "client isolation" in alasan
+
+
+def test_sumber_adalah_file_tidak_bingung_dengan_url(tmp_path: Path):
+    berkas = tmp_path / "a.mp4"
+    berkas.write_bytes(b"x")
+    assert sumber_adalah_file(str(berkas)) is True
+    assert sumber_adalah_file("0") is False
+    assert sumber_adalah_file("http://192.168.1.50:8080/video") is False
+
+
+# ---- Repository --------------------------------------------
+
+@pytest_asyncio.fixture
+async def sesi() -> AsyncSession:
+    """Session SQLAlchemy ke SQLite in-memory dengan tabel sudah dibuat."""
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    factory = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    async with factory() as s:
+        yield s
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_id_kamera_berurutan_dan_slot_kosong_dipakai_ulang(sesi: AsyncSession):
+    repo = CameraRepository(sesi)
+
+    for n in range(1, 4):
+        rec = await repo.create_camera(CameraCreate(name=f"Kamar {n}", source=f"rtsp://10.0.0.{n}:554/s"))
+        assert rec.id == f"cam-{n:02d}"
+
+    # Hapus yang di tengah: id-nya harus dipakai ulang, bukan melompat ke cam-04.
+    assert await repo.delete_camera("cam-02") is True
+    rec = await repo.create_camera(CameraCreate(name="Pengganti", source="rtsp://10.0.0.9:554/s"))
+    assert rec.id == "cam-02"
+    assert await repo.count() == 3
+
+
+@pytest.mark.asyncio
+async def test_sumber_ganda_terdeteksi(sesi: AsyncSession):
+    repo = CameraRepository(sesi)
+    await repo.create_camera(CameraCreate(name="A", source="http://10.0.0.5:8080/video"))
+
+    assert await repo.source_dipakai("http://10.0.0.5:8080/video") is True
+    assert await repo.source_dipakai("http://10.0.0.6:8080/video") is False
+    # Kamera itu sendiri tidak boleh dianggap bentrok dengan dirinya sendiri.
+    assert await repo.source_dipakai("http://10.0.0.5:8080/video", kecuali_id="cam-01") is False
+
+
+@pytest.mark.asyncio
+async def test_update_hanya_mengubah_field_yang_dikirim(sesi: AsyncSession):
+    repo = CameraRepository(sesi)
+    await repo.create_camera(CameraCreate(name="Kamar 01", source="http://10.0.0.5:8080/video", rotate=90))
+
+    # Skenario pindah WiFi: hanya alamatnya yang berganti.
+    rec = await repo.update_camera("cam-01", CameraUpdate(source="http://192.168.43.1:8080/video"))
+    assert rec.source == "http://192.168.43.1:8080/video"
+    assert rec.name == "Kamar 01"
+    assert rec.rotate == 90
+    assert rec.enabled is True
+
+    assert await repo.update_camera("cam-99", CameraUpdate(name="x")) is None
+
+
+# ---- Pemuatan model saat banyak kamera ---------------------
+
+def test_model_hanya_dimuat_sekali_walau_banyak_thread(monkeypatch, tmp_path: Path):
+    """Empat kamera yang menyala bersamaan tidak boleh memuat model empat kali.
+
+    Setiap kamera memanggil run_inference lewat asyncio.to_thread, sehingga
+    beberapa thread bisa lolos pengecekan `_model is None` secara bersamaan dan
+    masing-masing membuat salinan YOLO sendiri. Terlihat nyata di log sebagai
+    "Model loaded" lima kali, memboroskan RAM dan waktu muat.
+    """
+    from app.services import inference_service
+
+    jumlah_muat = 0
+    kunci = threading.Lock()
+
+    class YOLOPalsu:
+        def __init__(self, path):
+            nonlocal jumlah_muat
+            with kunci:
+                jumlah_muat += 1
+            # Tiru pemuatan yang lambat supaya thread lain sempat masuk.
+            threading.Event().wait(0.2)
+
+    modul_palsu = types.ModuleType("ultralytics")
+    modul_palsu.YOLO = YOLOPalsu
+    monkeypatch.setitem(sys.modules, "ultralytics", modul_palsu)
+
+    berkas_model = tmp_path / "best.pt"
+    berkas_model.write_bytes(b"model palsu")
+    monkeypatch.setattr(
+        inference_service, "get_settings",
+        lambda: types.SimpleNamespace(MODEL_PATH=str(berkas_model)),
+    )
+
+    inference_service.unload_model()
+    try:
+        hasil = []
+        threads = [
+            threading.Thread(target=lambda: hasil.append(inference_service.load_model()))
+            for _ in range(8)
+        ]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(timeout=10)
+
+        assert jumlah_muat == 1, f"model dimuat {jumlah_muat} kali, seharusnya 1"
+        assert len(hasil) == 8
+        assert all(m is hasil[0] for m in hasil), "tidak semua thread dapat instance yang sama"
+    finally:
+        inference_service.unload_model()
