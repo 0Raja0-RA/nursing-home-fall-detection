@@ -3,7 +3,17 @@
 # Diproses secara otomatis via ml/scripts/prepare_urfall.py
 # ============================================================
 
-path: C:/Project_2026/Falling Detection/ml/data/processed
+# CATATAN: 'path' sengaja DIKOSONGKAN, jangan diisi path absolut.
+#
+# Kalau 'path' kosong, Ultralytics memakai folder tempat berkas ini berada
+# sebagai akar dataset:
+#   path = Path(extract_dir or data.get("path") or Path(data["yaml_file"]).parent)
+#
+# Jadi berkas ini bekerja apa adanya di komputer siapa pun dan dari folder kerja
+# mana pun. Mengisinya dengan path absolut membuat berkas ini hanya jalan di satu
+# laptop, dan setiap anggota tim terpaksa menyuntingnya sebelum bisa melatih
+# model -- lalu suntingan itu ikut ter-commit dan merusaknya untuk yang lain.
+path:
 train: images/train
 val: images/val
 test: images/test
