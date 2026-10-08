@@ -37,6 +37,13 @@ frontend/build/
 .env
 .env.local
 .env.*.local
+# Cadangan/salinan .env juga menyimpan token, jadi ikut dikecualikan.
+# Pengecualian untuk .env.example, yang memang tidak berisi nilai asli.
+.env.bak*
+.env.*.bak
+*.env.backup
+!.env.example
+!**/.env.example
 
 # ---- IDE / OS ----------------------------------------------
 .vscode/
