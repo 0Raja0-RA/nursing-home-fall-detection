@@ -43,9 +43,11 @@ class AlertService:
         self._last_alert_time[camera_id] = now
         
         log.info(f"[{camera_id}] 🚨 Memicu AlertService untuk jatuh berdurasi {duration:.1f}s")
-        
+
+        nama_kamera = await self._nama_kamera(camera_id)
+
         # Siapkan payload
-        message_text = f"Peringatan: Terdeteksi jatuh pada {camera_id} selama {duration:.1f} detik."
+        message_text = f"Terdeteksi jatuh pada {nama_kamera} selama {duration:.1f} detik."
         alert_data = AlertCreate(
             camera_id=camera_id,
             severity=AlertSeverity.CRITICAL,
@@ -57,26 +59,63 @@ class AlertService:
         factory = get_session_factory()
         db_alert = None
         async with factory() as session:
-            repo = AlertRepository(session)
-            db_alert = await repo.create_alert(alert_data)
-            
-            # TODO: Di sini kita bisa panggil API Telegram secara async
-            # jika berhasil -> await repo.mark_as_notified(db_alert.id, True)
-        
-        # 3. Broadcast ke WebSocket
-        if db_alert:
-            ws_msg = WSMessage(
-                event="alert",
-                data={
-                    "id": db_alert.id,
-                    "camera_id": db_alert.camera_id,
-                    "message": db_alert.message,
-                    "severity": db_alert.severity,
-                    "created_at": db_alert.created_at.isoformat(),
-                    "fall_duration": db_alert.fall_duration,
-                }
-            )
-            await manager.broadcast(ws_msg)
+            db_alert = await AlertRepository(session).create_alert(alert_data)
+
+        if not db_alert:
+            return
+
+        # 3. Broadcast ke WebSocket -- SEBELUM Telegram, dan di luar sesi database.
+        # Dashboard harus menyala seketika. Telegram boleh lambat atau gagal; ia
+        # lapisan kedua, bukan jalur utama. Menaruhnya lebih dulu berarti perawat
+        # yang sedang menatap dashboard ikut menunggu timeout jaringan.
+        await manager.broadcast(WSMessage(
+            event="alert",
+            data={
+                "id": db_alert.id,
+                "camera_id": db_alert.camera_id,
+                "camera_name": nama_kamera,
+                "message": db_alert.message,
+                "severity": db_alert.severity,
+                "created_at": db_alert.created_at.isoformat(),
+                "fall_duration": db_alert.fall_duration,
+            }
+        ))
+
+        # 4. Telegram, lengkap dengan potret kejadiannya.
+        # Frame terakhir sudah digambari kotak dan dikemas jadi JPEG oleh pipeline,
+        # jadi melampirkannya tidak menambah pekerjaan sama sekali.
+        from app.runtime.registry import registry
+        from app.services.notification_service import send_telegram_alert
+
+        foto = registry.latest_jpeg.get(camera_id)
+        terkirim = await send_telegram_alert(
+            camera_name=nama_kamera,
+            fall_duration=duration,
+            foto=foto,
+            waktu=db_alert.created_at,
+        )
+
+        # 5. Catat hasilnya. Kolom ini yang membuat kegagalan terlihat di Riwayat
+        # Insiden, bukan hilang diam-diam dan menyisakan keyakinan palsu bahwa
+        # notifikasi sudah sampai.
+        async with factory() as session:
+            await AlertRepository(session).mark_as_notified(db_alert.id, terkirim)
+
+    async def _nama_kamera(self, camera_id: str) -> str:
+        """Nama kamar untuk ditampilkan, dengan camera_id sebagai cadangan.
+
+        Perawat mengenal "Kamar 01 - Jenderal Ilham", bukan "cam-01".
+        """
+        from app.db.repository import CameraRepository
+
+        try:
+            async with get_session_factory()() as session:
+                record = await CameraRepository(session).get_camera(camera_id)
+                if record and record.name:
+                    return record.name
+        except Exception as e:   # database bermasalah tidak boleh membatalkan alert
+            log.info(f"[{camera_id}] gagal membaca nama kamera: {e}")
+        return camera_id
 
 
 # Singleton
