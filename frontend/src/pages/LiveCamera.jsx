@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Camera, RefreshCw, AlertTriangle, Video, CheckCircle2 } from 'lucide-react';
 
 // Alamat video dari backend. Yang tampil di sini adalah hasil olahan backend:
@@ -10,6 +10,16 @@ const STREAM_URL = `${BACKEND}/api/cameras/cam-01/stream`;
 export default function LiveCamera({ addHistoryItem }) {
     const [rotasi, setRotasi] = useState(0); // derajat tampilan, untuk tombol "Putar Kamera"
     const [errorMsg, setErrorMsg] = useState('');
+
+    // MJPEG adalah respons HTTP yang tidak pernah selesai. Kalau elemen <img>-nya
+    // dibuang tanpa mengosongkan src lebih dulu, browser menahan koneksi itu tetap
+    // terbuka, dan setelah beberapa kali berpindah halaman batas koneksi per host
+    // habis sehingga dashboard terlihat membeku.
+    const imgRef = useRef(null);
+    useEffect(() => {
+        const el = imgRef.current;
+        return () => { if (el) el.src = ''; };
+    }, []);
 
     // Status deteksi model simulasi
     const [detectionStatus, setDetectionStatus] = useState('normal'); // 'normal', 'lying'
@@ -110,6 +120,7 @@ export default function LiveCamera({ addHistoryItem }) {
             {/* Tampilan Stream Kamera Utama */}
             <div className="relative bg-slate-950 rounded-3xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-2xl aspect-video flex items-center justify-center">
                 <img
+                    ref={imgRef}
                     src={STREAM_URL}
                     alt="Video dari backend"
                     onLoad={() => setErrorMsg('')}
