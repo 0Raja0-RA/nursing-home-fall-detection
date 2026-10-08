@@ -6,20 +6,28 @@ REM ============================================================
 REM  PENGATURAN -- ubah bagian ini sesuai komputer & kamera kamu
 REM ============================================================
 
-REM Sumber kamera:
-REM   "0"                                     = webcam laptop
-REM   "http://10.252.129.120:8080/video"      = kamera HP via aplikasi IP Webcam
-REM   "D:\...\fall-01-cam0.mp4"               = file video untuk uji ulang
+REM ------------------------------------------------------------
+REM  PENTING: daftar kamera sekarang disimpan di database, dan
+REM  diatur lewat halaman "Kelola Kamera" di dashboard.
 REM
-REM CATATAN: alamat IP HP berubah setiap kali pindah/menyambung ulang WiFi.
-REM Lihat alamatnya di layar aplikasi IP Webcam, lalu samakan baris di bawah.
-REM Di WiFi kampus biasanya antar-perangkat diblokir (client isolation), jadi
-REM pakai hotspot HP atau USB tethering. Penjelasannya ada di TESTING.md.
-set "CAMERA_SOURCE=http://10.252.129.120:8080/video"
+REM  Dua baris di bawah HANYA dipakai saat database masih kosong,
+REM  yaitu untuk membuat kamera pertama. Setelah ada kamera yang
+REM  terdaftar, keduanya DIABAIKAN -- mengubahnya di sini tidak
+REM  akan mengganti kamera yang sedang dipakai.
+REM
+REM  Mau ganti kamera? Buka dashboard -> Kelola Kamera.
+REM ------------------------------------------------------------
 
-REM Putar gambar searah jarum jam: 0, 90, 180, atau 270.
-REM Kamera HP biasanya mengirim gambar miring, jadi butuh 90.
-set "CAMERA_ROTATE=90"
+REM Kamera pertama saat database masih kosong:
+REM   "0"                          = webcam laptop
+REM   "1"                          = Iriun Camera #1 (tekan Pindai untuk lihat daftarnya)
+REM   "http://IP-HP:8080/video"    = kamera HP via aplikasi IP Webcam
+REM   "D:\...\fall-01-cam0.mp4"    = file video untuk uji ulang
+set "CAMERA_SOURCE=0"
+
+REM Rotasi bawaan untuk kamera pertama itu (0, 90, 180, 270 searah jarum jam).
+REM Rotasi tiap kamera bisa diubah per baris di halaman Kelola Kamera.
+set "CAMERA_ROTATE=0"
 
 REM Model hasil training tim (EXP-006 / exp006_hybrid_adamw).
 REM File .pt tidak ikut di repo (lihat .gitignore), jadi minta ke anggota ML
@@ -76,22 +84,29 @@ if not exist "%MODEL_PATH%" (
 )
 
 echo Model           : %MODEL_PATH%
-echo Sumber kamera   : %CAMERA_SOURCE%
-echo Rotasi gambar   : %CAMERA_ROTATE% derajat
 echo Ambang keyakinan: %CONFIDENCE_THRESHOLD%
 echo.
 
-echo Mengecek apakah kamera bisa dibuka...
 set "OPENCV_FFMPEG_CAPTURE_OPTIONS=timeout;5000000"
-"%PY%" "%~dp0tools\check_camera.py" "%CAMERA_SOURCE%" 2>nul
-if errorlevel 1 (
+
+if exist "%~dp0backend\fall_detection.db" (
+    echo Kamera          : diambil dari database yang sudah ada.
+    echo                   Untuk melihat atau menggantinya, buka dashboard
+    echo                   lalu masuk ke halaman "Kelola Kamera".
     echo.
-    echo Backend tetap dijalankan, tapi tidak akan ada gambar maupun deteksi
-    echo sampai sumber kameranya bisa dibuka.
+) else (
+    echo Database belum ada. Kamera pertama akan dibuat dari: %CAMERA_SOURCE%
+    echo Mengecek apakah kamera itu bisa dibuka...
+    "%PY%" "%~dp0tools\check_camera.py" "%CAMERA_SOURCE%" 2>nul
+    if errorlevel 1 (
+        echo.
+        echo Backend tetap dijalankan. Kamera bisa ditambahkan belakangan
+        echo lewat halaman "Kelola Kamera" di dashboard.
+        echo.
+        pause
+    )
     echo.
-    pause
 )
-echo.
 
 echo ============================================================
 echo  Setelah server menyala, buka alamat ini di browser:
