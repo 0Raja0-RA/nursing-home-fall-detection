@@ -249,9 +249,98 @@ setelah 3 detik. Untuk produksi, nilai aslinya 2 detik dan 10 detik.
 curl.exe -s http://127.0.0.1:8000/api/alerts/
 ```
 
+Perhatikan kolom `notified` — itu status pengiriman Telegram untuk alert tersebut.
+
 ---
 
-## 5. Masalah yang sering terjadi
+## 5. Notifikasi Telegram
+
+### Menyiapkan bot (sekali saja)
+
+1. Buat bot lewat [@BotFather](https://t.me/BotFather) dengan `/newbot`, lalu salin tokennya.
+2. Isi `backend/.env`. Nama variabelnya harus **persis** seperti ini:
+
+   ```
+   TELEGRAM_BOT_TOKEN=<token dari BotFather>
+   ```
+
+3. Buat grup untuk perawat, masukkan botnya, lalu kirim `/start@NamaBot_bot` **di dalam grup
+   itu**. Bot Telegram tidak bisa mengirim pesan ke pihak yang belum menyapanya, dan di grup
+   bot hanya melihat pesan yang menyebut namanya — `/start` saja tidak cukup.
+4. Ambil `chat_id`-nya **segera setelah** mengirim pesan tadi:
+
+   ```powershell
+   .venv\Scripts\python.exe tools\get_chat_id.py
+   ```
+
+   Lalu simpan yang grup (nilainya negatif):
+
+   ```powershell
+   .venv\Scripts\python.exe tools\get_chat_id.py --simpan -1001234567890
+   ```
+
+5. Jalankan ulang backend supaya `.env` yang baru terbaca.
+
+> **Urutannya penting.** Antrean update Telegram kedaluwarsa setelah 24 jam. Kirim pesan
+> dulu, baru jalankan skripnya — bukan sebaliknya. Kalau daftarnya kosong, jalankan
+> `tools\get_chat_id.py --diagnosa`: ia menyebutkan bot pemilik token, status webhook, dan
+> jumlah update, sehingga penyebabnya langsung ketahuan.
+
+### Menguji koneksinya
+
+```powershell
+curl.exe -s -X POST http://127.0.0.1:8000/api/settings/test-telegram
+```
+
+> **Pakai `curl.exe`, bukan `curl`.** Di Windows PowerShell, `curl` adalah alias untuk
+> `Invoke-WebRequest`, yang tidak mengenal `-X` dan akan menolak dengan
+> *"A parameter cannot be found that matches parameter name 'X'"*. Menulis `.exe` memaksa
+> PowerShell memakai curl yang sesungguhnya.
+>
+> Cara asli PowerShell juga bisa:
+>
+> ```powershell
+> Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/api/settings/test-telegram
+> ```
+
+Yang diharapkan:
+
+```json
+{"terkirim":true,"dikonfigurasi":true,"pesan":"Pesan uji terkirim. Cek grup Telegram-mu."}
+```
+
+disertai satu pesan masuk ke grup. Kalau `dikonfigurasi` bernilai `false`, token atau
+`chat_id`-nya belum terbaca — periksa nama variabelnya di `backend/.env`.
+
+### Uji sungguhan
+
+Berbaringlah di depan kamera lebih lama dari `FALL_DURATION_THRESHOLD`. Yang seharusnya
+terjadi, berurutan:
+
+1. Dashboard menyala **seketika** lewat WebSocket
+2. Beberapa detik kemudian, **foto** kejadian masuk ke grup Telegram, lengkap dengan
+   bounding box, nama kamar, durasi, dan jam
+3. `GET /api/alerts/` menunjukkan `notified: true`
+
+Urutan itu disengaja: Telegram dikirim setelah dashboard diberi tahu, jadi gangguan
+jaringan tidak pernah menunda peringatan di layar.
+
+### Kalau Telegram gagal
+
+| Gejala | Penyebab |
+|---|---|
+| `dikonfigurasi: false` | `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` belum terbaca. Nama variabelnya harus persis, dan backend perlu dijalankan ulang setelah `.env` diubah |
+| `terkirim: false`, log menyebut koneksi | Tidak ada internet. Ini yang terjadi kalau laptop jadi hotspot tanpa tersambung WiFi lain |
+| HTTP 400 dari Telegram | `chat_id` salah, atau bot sudah dikeluarkan dari grup |
+| HTTP 403 | Bot diblokir, atau belum pernah disapa di chat tujuan |
+
+Kegagalan Telegram **tidak** membatalkan alert: barisnya tetap tersimpan dan dashboard
+tetap menyala, hanya `notified` bernilai `false`. Itu disengaja — notifikasi yang gagal
+diam-diam jauh lebih berbahaya daripada yang gagal terang-terangan.
+
+---
+
+## 6. Masalah yang sering terjadi
 
 ### Video hanya satu gambar diam
 
@@ -359,7 +448,7 @@ Sudah tidak terjadi. Backend memakai `logging` dengan UTF-8, bukan `print()`.
 
 ---
 
-## 6. Menjalankan test otomatis
+## 7. Menjalankan test otomatis
 
 ```powershell
 cd backend
@@ -370,17 +459,15 @@ Saat ini **13 test** dan semuanya harus lulus.
 
 ---
 
-## 7. Yang belum berfungsi
+## 8. Yang belum berfungsi
 
 Supaya tidak ada yang mengira ini bug baru:
 
 | Bagian | Status |
 |---|---|
-| Notifikasi Telegram | **Belum tersambung.** `alert_service.py` baru berisi TODO, jadi kolom `notified` di database selalu `0` |
-| Halaman "Simulasi Live" | Masih simulasi, belum menampilkan kamera sungguhan |
-| Halaman "Kelola Kamera" | Masih data contoh di browser, belum tersambung backend |
-| Jumlah kamera | Baru satu (`cam-01`), ditetapkan di `main.py` |
+| Tombol "Sudah ditangani" di Telegram | Belum ada. Alert hanya bisa ditutup dari dashboard |
 | Riwayat alert di WebSocket | Alert lama tidak dikirim ulang ke klien baru. Ambil lewat `GET /api/alerts/` |
+| Kolom `notified` di dashboard | Sudah dikembalikan API, tapi belum ditampilkan di halaman Riwayat Insiden |
 
 Akurasi prediksi postur juga masih rendah di luar dataset URFD. Itu keterbatasan dataset,
 bukan kesalahan backend.
