@@ -1,15 +1,36 @@
 import { useState, useEffect, useRef } from 'react';
 import { Camera, RefreshCw, AlertTriangle, Video, CheckCircle2 } from 'lucide-react';
 
-// Alamat video dari backend. Yang tampil di sini adalah hasil olahan backend:
-// gambar kamera (webcam laptop ATAU kamera HP, sesuai CAMERA_SOURCE di run-backend.bat)
-// yang sudah digambari bounding box oleh YOLO.
-const BACKEND = 'http://localhost:8000';
-const STREAM_URL = `${BACKEND}/api/cameras/cam-01/stream`;
+import { API_BASE } from '../config';
+
+// Halaman ini menampilkan satu kamera untuk diuji dari dekat. Kameranya dipilih
+// sendiri lewat dropdown di kanan atas, bukan dikunci ke cam-01 seperti sebelumnya
+// -- dulu halaman ini selalu menampilkan kamera pertama (biasanya webcam laptop)
+// walaupun kamera HP sudah terdaftar.
 
 export default function LiveCamera({ addHistoryItem }) {
     const [rotasi, setRotasi] = useState(0); // derajat tampilan, untuk tombol "Putar Kamera"
     const [errorMsg, setErrorMsg] = useState('');
+    const [daftarKamera, setDaftarKamera] = useState([]);
+    const [kameraId, setKameraId] = useState('');
+
+    // Ambil daftar kamera supaya pengguna bisa memilih yang mana yang diuji.
+    useEffect(() => {
+        let batal = false;
+        const ambil = async () => {
+            try {
+                const r = await fetch(`${API_BASE}/api/cameras/`);
+                if (!r.ok || batal) return;
+                const d = await r.json();
+                setDaftarKamera(d);
+                // Pilihan awal: kamera pertama yang benar-benar mengalir.
+                setKameraId((k) => k || (d.find((c) => c.is_active) || d[0])?.camera_id || '');
+            } catch { /* backend belum jalan */ }
+        };
+        ambil();
+        const t = setInterval(ambil, 5000);
+        return () => { batal = true; clearInterval(t); };
+    }, []);
 
     // MJPEG adalah respons HTTP yang tidak pernah selesai. Kalau elemen <img>-nya
     // dibuang tanpa mengosongkan src lebih dulu, browser menahan koneksi itu tetap
@@ -18,15 +39,15 @@ export default function LiveCamera({ addHistoryItem }) {
     const imgRef = useRef(null);
     useEffect(() => {
         const el = imgRef.current;
-        if (!el) return;
+        if (!el || !kameraId) return;
         // src dipasang di sini, bukan lewat atribut JSX. React.StrictMode menjalankan
         // efek dua kali di mode dev (pasang -> bersihkan -> pasang lagi); kalau src
         // ditulis di JSX, pembersihan pertama membatalkan permintaan dan React tidak
         // pernah memasangnya kembali karena prop-nya dianggap tidak berubah. Akibatnya
         // gambar kosong selamanya dengan net::ERR_ABORTED.
-        el.src = STREAM_URL;
+        el.src = `${API_BASE}/api/cameras/${kameraId}/stream`;
         return () => { el.src = ''; };
-    }, []);
+    }, [kameraId]);
 
     // Status deteksi model simulasi
     const [detectionStatus, setDetectionStatus] = useState('normal'); // 'normal', 'lying'
@@ -77,6 +98,19 @@ export default function LiveCamera({ addHistoryItem }) {
                     <p className="text-xs md:text-sm text-slate-500">Uji coba langsung deteksi postur menggunakan kamera perangkat keras secara real-time.</p>
                 </div>
                 <div className="flex items-center gap-3">
+                    <select
+                        value={kameraId}
+                        onChange={(e) => setKameraId(e.target.value)}
+                        title="Pilih kamera yang ingin diuji"
+                        className="bg-slate-200 dark:bg-slate-800 hover:opacity-80 px-3 py-2 rounded-xl text-xs md:text-sm font-medium transition-colors focus:outline-none"
+                    >
+                        {daftarKamera.length === 0 && <option value="">Belum ada kamera</option>}
+                        {daftarKamera.map((c) => (
+                            <option key={c.camera_id} value={c.camera_id}>
+                                {c.name}{c.is_active ? '' : ' (terputus)'}
+                            </option>
+                        ))}
+                    </select>
                     <button
                         onClick={switchCamera}
                         className="bg-slate-200 dark:bg-slate-800 hover:opacity-80 px-4 py-2 rounded-xl text-xs md:text-sm font-medium flex items-center gap-2 transition-colors"
