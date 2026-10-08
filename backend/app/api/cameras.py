@@ -19,7 +19,6 @@ server — alamat kamera HP berubah setiap kali berpindah jaringan WiFi.
 
 import asyncio
 
-import cv2
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -35,7 +34,6 @@ from app.models.schemas import (
     CameraStatus,
     CameraUpdate,
     LocalDevice,
-    PostureClass,
     ScanResponse,
 )
 from app.runtime import camera_manager
@@ -45,15 +43,6 @@ from app.services.camera_service import validasi_sumber
 log = get_logger("app.api.cameras")
 
 router = APIRouter()
-
-# Warna kotak per postur (format BGR karena OpenCV).
-_WARNA = {
-    PostureClass.NORMAL: (80, 200, 80),            # hijau
-    PostureClass.TRANSITIONAL: (0, 165, 255),      # oranye
-    PostureClass.LYING_ON_GROUND: (60, 60, 230),   # merah
-}
-_ABU = (150, 150, 150)   # dipakai saat confidence di bawah ambang
-
 
 def _gabung(record: CameraRecord) -> CameraInfo:
     """Gabungkan data kamera dari database dengan status runtime-nya.
@@ -218,52 +207,28 @@ async def hapus_kamera(camera_id: str, db: AsyncSession = Depends(get_db)):
     return None
 
 
-def _gambar_deteksi(frame, camera_id: str):
-    """Gambar bounding box + label dari deteksi terakhir ke atas frame.
-
-    Kotaknya berasal dari hasil inference yang sudah dihitung detection_pipeline,
-    jadi endpoint ini tidak menjalankan model lagi.
-
-    Deteksi dengan confidence di bawah CONFIDENCE_THRESHOLD tetap digambar, tapi
-    berwarna abu-abu dan diberi tanda "(ragu)". Ini disengaja: tanpa itu, layar
-    terlihat kosong dan kita tidak bisa membedakan "model tidak melihat apa pun"
-    dari "model melihat sesuatu tapi kurang yakin".
-    """
-    hasil = registry.latest_detection.get(camera_id)
-    if hasil is None or not hasil.bbox:
-        return frame
-
-    settings = get_settings()
-    yakin = hasil.confidence >= settings.CONFIDENCE_THRESHOLD
-    warna = _WARNA.get(hasil.posture, _ABU) if yakin else _ABU
-
-    x1, y1, x2, y2 = (int(v) for v in hasil.bbox)
-    cv2.rectangle(frame, (x1, y1), (x2, y2), warna, 3)
-
-    teks = f"{hasil.posture.value} {hasil.confidence:.2f}" + ("" if yakin else " (ragu)")
-    (tw, th), _ = cv2.getTextSize(teks, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)
-    atas = max(y1 - th - 10, 0)
-    cv2.rectangle(frame, (x1, atas), (x1 + tw + 10, atas + th + 10), warna, -1)
-    cv2.putText(frame, teks, (x1 + 5, atas + th + 3),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-    return frame
-
-
 async def generate_frames(camera_id: str):
-    """Generator MJPEG: frame terbaru dari kamera, dengan kotak deteksi tergambar."""
-    camera = registry.cameras.get(camera_id)
-    if not camera:
+    """Generator MJPEG: frame terbaru dari kamera, dengan kotak deteksi tergambar.
+
+    Frame-nya sudah digambari dan di-encode oleh detection_pipeline, jadi generator
+    ini hanya meneruskan byte yang sudah jadi. Sebelumnya tiap penonton menggambar
+    dan meng-encode sendiri di event loop, sehingga membuka dua halaman sekaligus
+    membuat keduanya berebut CPU dengan REST, WebSocket, dan pipeline deteksi --
+    gejalanya satu halaman mengalir sementara yang lain tampak membeku. Sekarang
+    penonton tambahan tidak menambah beban sama sekali.
+    """
+    if camera_id not in registry.cameras:
         return
 
+    terakhir = -1
     while camera_id in registry.cameras:
-        frame = camera.get_latest_frame()
-        if frame is not None:
-            # copy() supaya gambar yang dipakai pipeline tidak ikut tercoret.
-            ret, buffer = cv2.imencode(".jpg", _gambar_deteksi(frame.copy(), camera_id))
-            if ret:
-                yield (b"--frame\r\n"
-                       b"Content-Type: image/jpeg\r\n\r\n" + buffer.tobytes() + b"\r\n")
-        await asyncio.sleep(0.03)  # ~30 fps
+        seq = registry.frame_seq.get(camera_id, 0)
+        jpeg = registry.latest_jpeg.get(camera_id)
+        if jpeg is not None and seq != terakhir:
+            terakhir = seq
+            yield (b"--frame\r\n"
+                   b"Content-Type: image/jpeg\r\n\r\n" + jpeg + b"\r\n")
+        await asyncio.sleep(0.02)
 
 
 @router.get("/{camera_id}/stream")
