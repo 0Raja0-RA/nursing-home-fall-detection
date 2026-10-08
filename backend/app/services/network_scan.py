@@ -12,10 +12,18 @@ Cara kerjanya sederhana: untuk setiap alamat di subnet /24 milik laptop, coba
 buka koneksi TCP ke beberapa port yang lazim dipakai aplikasi kamera. Port yang
 menerima koneksi dianggap kandidat.
 
+Prefiks subnet dibaca dari antarmuka yang sebenarnya, bukan diasumsikan /24.
+Jaringan kampus sering memakai subnet lebih lebar: di eepiswlan maskernya
+255.255.248.0 (/21), sehingga laptop di 10.252.144.87 dan HP di 10.252.151.81
+berada di satu subnet yang sama meski oktet ketiganya berbeda. Pemindai yang
+mengasumsikan /24 tidak akan pernah menemukan HP itu.
+
 Batasan yang disengaja:
     - Hanya memindai rentang IP privat (RFC 1918). Kalau laptop kebetulan
       memegang alamat publik, pemindaian dilewati.
-    - Hanya /24 (254 alamat) per antarmuka, bukan seluruh /16 atau /8.
+    - Subnet yang lebih besar dari MAX_ALAMAT host dipersempit ke /24 di sekitar
+      alamat sendiri, supaya pemindaian tidak berubah jadi menyapu puluhan ribu
+      alamat.
     - Hanya membuka lalu menutup koneksi TCP; tidak mengirim payload apa pun.
 """
 
@@ -30,56 +38,105 @@ from app.models.schemas import ScanCandidate
 log = get_logger("app.services.network_scan")
 
 
-# Port -> (label perangkat, pola URL sumber yang siap dipakai)
+# Port -> (label, pola URL sumber yang siap dipakai)
+#
+# Labelnya hanya tebakan dari nomor port, bukan hasil identifikasi perangkat.
+# Port 8080 di jaringan kampus sering dipakai proxy atau perangkat lain, jadi
+# kata-katanya sengaja tidak memastikan.
 PORT_PROFIL: dict[int, tuple[str, str]] = {
-    8080: ("IP Webcam (Android)", "http://{ip}:8080/video"),
-    4747: ("DroidCam", "http://{ip}:4747/video"),
-    8081: ("IP Webcam (port alternatif)", "http://{ip}:8081/video"),
-    554: ("RTSP / CCTV", "rtsp://{ip}:554/"),
+    8080: ("Port 8080 — biasanya IP Webcam (Android)", "http://{ip}:8080/video"),
+    4747: ("Port 4747 — biasanya DroidCam", "http://{ip}:4747/video"),
+    8081: ("Port 8081 — kamera di port alternatif", "http://{ip}:8081/video"),
+    554: ("Port 554 — biasanya RTSP / CCTV", "rtsp://{ip}:554/"),
 }
 
-# Jumlah koneksi paralel. 254 alamat x 4 port = 1016 percobaan; dengan 256 thread
-# dan timeout 0.3 detik, satu subnet selesai dalam hitungan detik.
-MAX_WORKERS = 256
+# Jumlah koneksi paralel. Thread yang sedang menunggu connect() hampir tidak memakai
+# CPU, jadi angkanya bisa besar. Dengan /21 (2046 host x 4 port = 8184 percobaan),
+# 512 thread dan timeout 0.3 detik, satu sapuan selesai sekitar 5 detik.
+MAX_WORKERS = 512
 TIMEOUT_PORT = 0.3
+
+# Batas jumlah alamat yang disapu per antarmuka. /21 (2046 host) masih masuk;
+# subnet yang lebih lebar dipersempit ke /24 supaya pemindaian tidak berkepanjangan.
+MAX_ALAMAT = 4096
+
+
+def antarmuka_lokal() -> list[tuple[str, str]]:
+    """Pasangan (alamat IPv4, netmask) milik mesin ini, tanpa loopback.
+
+    Netmask dibaca dari antarmuka lewat psutil supaya prefiks subnet yang
+    sebenarnya terpakai. Kalau psutil tidak ada, netmask-nya dikosongkan dan
+    pemanggil memakai /24 sebagai asumsi terakhir.
+    """
+    hasil: dict[str, str] = {}
+
+    try:
+        import psutil
+
+        for addrs in psutil.net_if_addrs().values():
+            for a in addrs:
+                if a.family == socket.AF_INET and a.address and not a.address.startswith("127."):
+                    hasil[a.address] = a.netmask or ""
+    except Exception:  # psutil tidak terpasang atau gagal membaca antarmuka
+        log.info("psutil tidak tersedia; prefiks subnet diasumsikan /24")
+
+    if not hasil:
+        try:
+            for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
+                alamat = info[4][0]
+                if not alamat.startswith("127."):
+                    hasil.setdefault(alamat, "")
+        except OSError:
+            pass
+
+        # Cadangan: cari alamat antarmuka yang dipakai untuk keluar jaringan.
+        # connect() pada UDP tidak mengirim paket apa pun, hanya memilih rute.
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+                s.settimeout(0.5)
+                s.connect(("8.8.8.8", 80))
+                hasil.setdefault(s.getsockname()[0], "")
+        except OSError:
+            pass
+
+    return sorted(hasil.items())
 
 
 def alamat_lokal() -> list[str]:
     """Daftar alamat IPv4 milik mesin ini, tanpa loopback."""
-    hasil: set[str] = set()
-
-    try:
-        for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
-            hasil.add(info[4][0])
-    except OSError:
-        pass
-
-    # Cadangan: cari alamat antarmuka yang dipakai untuk keluar jaringan.
-    # connect() pada UDP tidak mengirim paket apa pun, hanya memilih rute.
-    try:
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-            s.settimeout(0.5)
-            s.connect(("8.8.8.8", 80))
-            hasil.add(s.getsockname()[0])
-    except OSError:
-        pass
-
-    return sorted(a for a in hasil if not a.startswith("127."))
+    return [a for a, _ in antarmuka_lokal()]
 
 
 def subnet_yang_dipindai() -> list[ipaddress.IPv4Network]:
-    """Subnet /24 privat yang akan dipindai, satu per antarmuka."""
+    """Subnet privat yang akan dipindai, satu per antarmuka.
+
+    Memakai prefiks sesungguhnya dari antarmuka. Subnet yang lebih lebar dari
+    MAX_ALAMAT host dipersempit ke /24 di sekitar alamat sendiri.
+    """
     jaringan: list[ipaddress.IPv4Network] = []
     terlihat: set[str] = set()
 
-    for alamat in alamat_lokal():
+    for alamat, netmask in antarmuka_lokal():
         try:
             ip = ipaddress.IPv4Address(alamat)
         except ipaddress.AddressValueError:
             continue
         if not ip.is_private or ip.is_link_local:
             continue
-        net = ipaddress.IPv4Network(f"{alamat}/24", strict=False)
+
+        try:
+            net = ipaddress.IPv4Network(f"{alamat}/{netmask}" if netmask else f"{alamat}/24",
+                                        strict=False)
+        except (ValueError, ipaddress.NetmaskValueError):
+            net = ipaddress.IPv4Network(f"{alamat}/24", strict=False)
+
+        if net.num_addresses > MAX_ALAMAT:
+            log.info(
+                f"Subnet {net} terlalu lebar ({net.num_addresses} alamat); "
+                f"dipersempit ke /24 di sekitar {alamat}."
+            )
+            net = ipaddress.IPv4Network(f"{alamat}/24", strict=False)
+
         if str(net) not in terlihat:
             terlihat.add(str(net))
             jaringan.append(net)
