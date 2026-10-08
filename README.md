@@ -124,140 +124,189 @@ fall-detection/
 
 ## Quick Start (Development Lokal)
 
-> **Mau langsung menguji sistemnya?** Jalankan `run-backend.bat` dan `run-frontend.bat`,
-> lalu ikuti **[TESTING.md](TESTING.md)**. Dokumen itu memuat cara menghubungkan kamera HP,
-> cara memastikan bounding box muncul, dan daftar masalah yang sering terjadi.
+Seluruh perintah di bawah ditulis untuk **Windows PowerShell** dan dijalankan dari
+**folder root repo**. Semuanya sudah diuji pada clone yang benar-benar baru.
+
+> **Branch mana yang harus dipakai**
 >
-> Catatan: butuh **Python 3.12** (bukan 3.13/3.14, karena `ultralytics` belum mendukungnya),
-> dan virtual environment dibuat di **root repo** (`.venv`), bukan di dalam `backend/`.
+> | Tujuan | Branch |
+> |---|---|
+> | Menjalankan sistem lengkap (dashboard + backend) | `integration` |
+> | Membaca atau mengerjakan kode backend saja | `backend` |
+>
+> Branch `backend` sengaja hanya memuat sisi backend. Frontend di dalamnya masih versi
+> lama dan **belum punya** halaman Kelola Kamera, Simulasi Live, maupun Testing Kamera HP
+> — ketiganya ada di `integration`, tempat kerja backend dan frontend disatukan.
+>
+> Jadi kalau kamu ingin **memakai** sistemnya, bukan sekadar membaca kodenya, pakai
+> `integration`. Seluruh langkah di bawah sama persis untuk kedua branch.
 
-### Prerequisites
+### Yang harus terpasang lebih dulu
 
-- **Python** 3.12
-- **Node.js** 18+
-- **Git**
+| Kebutuhan | Versi | Cara memastikan |
+|---|---|---|
+| Python | **3.12** | `py -0p` — harus ada baris `-3.12` |
+| Node.js | 18+ | `node --version` |
+| Git | — | `git --version` |
 
-### 1. Clone & Setup Environment
+> **Harus 3.12, bukan 3.13 atau 3.14.** `ultralytics` belum menyediakan wheel untuk
+> versi yang lebih baru, dan pemasangannya akan gagal di tengah jalan.
 
-```bash
-git clone <repo-url>
-cd fall-detection
+### 1. Clone
+
+```powershell
+git clone https://github.com/0Raja0-RA/nursing-home-fall-detection.git
+cd nursing-home-fall-detection
+git switch integration    # atau: git switch backend, lihat catatan di atas
 ```
 
-Copy environment variables:
+### 2. Pasang dependensi Python
 
-```bash
-cp deployment/.env.example backend/.env
+Virtual environment dibuat di **root repo**, bukan di dalam `backend/`. Launcher dan
+seluruh perintah di dokumen ini mengandalkan letak itu.
+
+```powershell
+py -3.12 -m venv .venv
+.venv\Scripts\python.exe -m pip install --upgrade pip
+.venv\Scripts\python.exe -m pip install -r backend\requirements.txt
 ```
 
-Edit `backend/.env` dan isi:
+Unduhannya sekitar 1 GB (PyTorch ikut terbawa oleh `ultralytics`), jadi siapkan waktu
+beberapa menit. Tidak perlu `activate` — semua perintah memanggil `.venv\Scripts\python.exe`
+secara langsung, sehingga tidak ada kebingungan Python mana yang sedang dipakai.
 
-- `TELEGRAM_BOT_TOKEN` — Token dari [@BotFather](https://t.me/BotFather)
-- `TELEGRAM_CHAT_ID` — Chat ID tujuan notifikasi
+Pastikan berhasil:
 
-Cara mendapatkan `chat_id`, menguji koneksinya, dan daftar penyebab kegagalan ada di
-**[TESTING.md](TESTING.md)** bagian *Notifikasi Telegram*. Singkatnya:
+```powershell
+.venv\Scripts\python.exe -m pytest backend\tests -q
+```
+
+Semua uji harus lulus. Tahap ini belum butuh model, kamera, maupun internet.
+
+### 3. Taruh file model
+
+File bobot `.pt` **tidak ikut di repo** (lihat `.gitignore`). Minta `best.pt` hasil
+EXP-006 ke anggota ML, lalu taruh tepat di:
+
+```
+ml\models\fall_detection\weights\best.pt
+```
+
+Pastikan file yang benar — bobot COCO bawaan YOLO berukuran mirip dan mudah tertukar:
+
+```powershell
+.venv\Scripts\python.exe -c "from ultralytics import YOLO; print(YOLO('ml/models/fall_detection/weights/best.pt').names)"
+```
+
+Harus muncul tepat `{0: 'normal', 1: 'transitional', 2: 'lying_on_ground'}`. Kalau yang
+muncul 80 kelas, itu bobot COCO, bukan model tim.
+
+### 4. Jalankan
+
+```powershell
+.\run-backend.bat
+```
+
+Di jendela terminal lain:
+
+```powershell
+.\run-frontend.bat
+```
+
+`run-frontend.bat` menjalankan `npm install` sendiri kalau `node_modules` belum ada.
+
+| Alamat | Isi |
+|---|---|
+| http://localhost:5173 | Dashboard |
+| http://127.0.0.1:8000/docs | Dokumentasi API interaktif |
+| http://127.0.0.1:8000/api/cameras/cam-01/stream | Video + bounding box |
+
+Kamera diatur dari dashboard, bukan dari berkas — lihat [Mengelola Kamera](#mengelola-kamera).
+Saat pertama dijalankan, satu kamera dibuat otomatis dari `CAMERA_SOURCE` di
+`run-backend.bat` (bawaannya `0`, yaitu webcam laptop).
+
+### 5. (Opsional) Notifikasi Telegram
+
+Tanpa langkah ini sistem tetap berjalan penuh; alert tersimpan dan muncul di dashboard,
+hanya notifikasi ke HP yang tidak dikirim.
+
+```powershell
+copy backend\.env.example backend\.env
+```
+
+Isi `TELEGRAM_BOT_TOKEN` dengan token dari [@BotFather](https://t.me/BotFather), lalu
+ambil `chat_id` tujuannya:
 
 ```powershell
 .venv\Scripts\python.exe tools\get_chat_id.py
+.venv\Scripts\python.exe tools\get_chat_id.py --simpan <chat_id>
+```
+
+Jalankan ulang backend, lalu uji:
+
+```powershell
 curl.exe -s -X POST http://127.0.0.1:8000/api/settings/test-telegram
 ```
 
+> Tulis **`curl.exe`**, bukan `curl`. Di PowerShell `curl` adalah alias untuk
+> `Invoke-WebRequest` yang tidak mengenal `-X`. Alternatifnya:
+> `Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/api/settings/test-telegram`
+
+Langkah lengkapnya — termasuk kenapa bot harus disapa lebih dulu dan apa yang harus
+dilakukan kalau `chat_id` tidak muncul — ada di **[TESTING.md](TESTING.md)**.
+
 Saat ada yang jatuh, grup menerima **foto** kejadian lengkap dengan bounding box, nama
-kamar, durasi, dan jam. Kegagalan kirim tidak membatalkan alert -- barisnya tetap
-tersimpan dengan `notified: false`, supaya kegagalan terlihat alih-alih hilang diam-diam.
+kamar, durasi, dan jam. Kegagalan kirim tidak membatalkan alert: barisnya tetap tersimpan
+dengan `notified: false`, supaya kegagalan terlihat alih-alih hilang diam-diam.
 
-Kamera **tidak** diatur di sini — lihat bagian [Mengelola Kamera](#mengelola-kamera).
+### 6. (Opsional) Training ulang model
 
-### 2. Jalankan Backend
-
-```bash
-cd backend
-
-# Buat virtual environment
-python -m venv .venv
-
-# Aktivasi (Windows)
-.venv\Scripts\activate
-
-# Aktivasi (Linux/Mac)
-# source .venv/bin/activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Jalankan server
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```powershell
+.venv\Scripts\python.exe ml\training\train.py --config ml\training\config.yaml
 ```
 
-Backend akan berjalan di **http://localhost:8000**
-
-- Swagger UI: http://localhost:8000/docs
-- ReDoc: http://localhost:8000/redoc
-
-### 3. Jalankan Frontend
-
-```bash
-cd frontend
-
-# Install dependencies
-npm install
-
-# Jalankan dev server
-npm run dev
-```
-
-Frontend akan berjalan di **http://localhost:5173**
-
-> Vite sudah dikonfigurasi untuk proxy `/api` dan `/ws` ke backend di port 8000.
-
-### 4. (Opsional) Training Model
-
-```bash
-cd ml/training
-
-# Pastikan sudah ada dataset di ml/data/processed/
-# dengan struktur YOLO format (images/ + labels/)
-
-python train.py --config config.yaml
-```
-
-Model `best.pt` akan tersimpan di `ml/models/fall_detection/weights/`.
+Perlu dataset format YOLO di `ml/data/processed/`. Model hasilnya tersimpan di
+`ml/models/fall_detection/weights/`.
 
 ---
 
 ## Docker Deployment
 
+> **Belum diuji, dan diketahui belum sesuai.** Berkas Compose dan Dockerfile masih dari
+> kerangka awal proyek: `backend/Dockerfile` memakai `python:3.11-slim`, padahal
+> `ultralytics` butuh 3.12. Jalur Docker juga belum menangani akses kamera dari dalam
+> container, yang di Windows tidak sesederhana memasang volume.
+>
+> Untuk sekarang, pakai `run-backend.bat` dan `run-frontend.bat` di Quick Start.
+
 ```bash
 cd deployment
-
-# Build & jalankan semua service
 docker compose up --build
-
-# Atau di background
-docker compose up --build -d
 ```
-
-- Backend: http://localhost:8000
-- Frontend: http://localhost:5173
 
 ---
 
 ## Testing
 
-Uji otomatis (tidak butuh kamera, model, maupun jaringan):
-
-```bash
-.venv\Scripts\python.exe -m pytest backend/tests -q
+```powershell
+.venv\Scripts\python.exe -m pytest backend\tests -q
 ```
 
-Yang dijaga: perilaku state machine (debounce, grace period, observasi ragu-ragu, alert
-tidak berulang), detection pipeline dengan kamera & model tiruan, validasi sumber kamera,
-repository kamera, pemetaan subnet pemindai, dan model YOLO yang hanya boleh dimuat sekali
-meski beberapa kamera menyala bersamaan.
+**52 uji**, dan semuanya berjalan tanpa kamera, tanpa model, tanpa token, dan tanpa
+koneksi internet — Telegram digantikan server HTTP lokal, kamera dan model digantikan
+objek tiruan. Jadi anggota tim mana pun bisa menjalankannya segera setelah `pip install`,
+sebelum meminta file model ke siapa pun.
 
-Pengujian manual — menghubungkan kamera HP, memastikan bounding box muncul, dan daftar
-masalah yang sering terjadi — ada di **[TESTING.md](TESTING.md)**.
+| Berkas | Yang dijaga |
+|---|---|
+| `test_state_machine.py` | Debounce, grace period, observasi ragu-ragu, alert tidak berulang, dan jeda pipeline yang tidak boleh terhitung sebagai durasi tergeletak |
+| `test_detection_pipeline.py` | Loop deteksi dengan kamera & model tiruan |
+| `test_camera_registry.py` | Validasi sumber kamera, repository, pemetaan subnet pemindai, dan model YOLO yang hanya boleh dimuat sekali meski beberapa kamera menyala bersamaan |
+| `test_telegram.py` | Pemilihan sendPhoto/sendMessage, escape HTML, percobaan ulang, penandaan simulasi, dan token yang tidak boleh bocor ke log |
+| `test_alert_service.py` | Urutan DB → WebSocket → Telegram, cooldown, kegagalan Telegram yang tidak boleh membatalkan alert |
+
+Pengujian manual — menghubungkan kamera HP, memastikan bounding box muncul, menguji
+Telegram, dan daftar masalah yang sering terjadi — ada di **[TESTING.md](TESTING.md)**.
 
 ---
 
@@ -280,6 +329,7 @@ masalah yang sering terjadi — ada di **[TESTING.md](TESTING.md)**.
 | POST   | `/api/cameras/scan`          | Pindai subnet lokal untuk mencari kamera IP         |
 | GET    | `/api/settings/`             | Konfigurasi aktif                                   |
 | PUT    | `/api/settings/threshold`    | Update threshold durasi                             |
+| POST   | `/api/cameras/{id}/simulate-fall` | Paksa simulasi jatuh (untuk demo)              |
 | POST   | `/api/settings/test-telegram`| Kirim notifikasi uji ke Telegram                    |
 | WS     | `/ws`                        | WebSocket live updates                              |
 
@@ -315,6 +365,53 @@ Hal yang perlu diketahui:
   database masih kosong. Setelah itu diabaikan.
 
 Panduan pengujian langkah demi langkah ada di **[TESTING.md](TESTING.md)**.
+
+---
+
+## Simulasi Jatuh
+
+Model masih sering membaca orang yang berbaring sebagai `transitional` di luar ruangan
+dataset URFD, sehingga alarm sungguhan sulit dipicu dengan tubuh. Tombol **Trigger
+Simulasi Orang Jatuh** di halaman Simulasi Live menutup celah itu untuk keperluan demo.
+
+Yang disimulasikan **hanya keluaran detektor**. Sisanya berjalan apa adanya:
+
+```
+tombol → observasi ditimpa jadi "postur pemicu" selama beberapa detik
+       → state machine menghitung durasinya sendiri
+       → debounce dan cooldown tetap berlaku
+       → alert tersimpan, disiarkan ke dashboard, dikirim ke Telegram beserta
+         foto frame kamera saat itu juga
+```
+
+Dengan begitu yang ditunjukkan saat demo adalah mekanisme yang memang dibangun, bukan
+jalan pintasnya. Kalimat yang bisa disampaikan ke penguji: *"yang kami simulasikan hanya
+keluaran modelnya, karena modelnya belum optimal di luar ruangan dataset. Seluruh rantai
+sesudahnya berjalan apa adanya."*
+
+Alert hasil simulasi **selalu bisa dibedakan** dari kejadian nyata:
+
+| Di mana | Bentuknya |
+|---|---|
+| Database | kolom `simulated = true` |
+| Pesan alert | diawali `[SIMULASI]` |
+| Telegram | judul **SIMULASI — BUKAN KEJADIAN SUNGGUHAN** di baris pertama |
+| Riwayat Insiden | badge kuning *Simulasi* |
+
+Itu disengaja, bukan sekadar kerapian: sistem deteksi jatuh yang bisa memunculkan alarm
+tanpa meninggalkan jejak membuat seluruh riwayat insidennya kehilangan nilai sebagai
+bukti — baik bagi perawat maupun bagi penguji.
+
+Lewat API:
+
+```powershell
+curl.exe -s -X POST http://127.0.0.1:8000/api/cameras/cam-01/simulate-fall
+```
+
+> `ALERT_COOLDOWN_SEC` di `run-backend.bat` diturunkan ke **10 detik**, karena saat demo
+> wajar diminta mengulang simulasi beberapa kali berturut-turut. Dengan nilai bawaan 60
+> detik, tekanan tombol kedua tidak mengirim apa pun dan sistemnya terlihat seperti rusak.
+> Kembalikan ke 60 untuk pemakaian sungguhan.
 
 ---
 

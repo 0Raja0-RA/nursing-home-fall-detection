@@ -258,7 +258,13 @@ Perhatikan kolom `notified` — itu status pengiriman Telegram untuk alert terse
 ### Menyiapkan bot (sekali saja)
 
 1. Buat bot lewat [@BotFather](https://t.me/BotFather) dengan `/newbot`, lalu salin tokennya.
-2. Isi `backend/.env`. Nama variabelnya harus **persis** seperti ini:
+2. Salin templat `.env`, lalu isi tokennya:
+
+   ```powershell
+   copy backend\.env.example backend\.env
+   ```
+
+   Nama variabelnya harus **persis** seperti ini:
 
    ```
    TELEGRAM_BOT_TOKEN=<token dari BotFather>
