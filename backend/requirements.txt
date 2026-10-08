@@ -7,7 +7,13 @@ fastapi>=0.110.0
 uvicorn[standard]>=0.29.0
 
 # ---- Database ----------------------------------------------
-sqlalchemy>=2.0.0
+# Ekstra [asyncio] menarik greenlet, yang WAJIB ada untuk AsyncSession.
+# Tanpa itu backend gagal saat start dengan:
+#   ImportError: The SQLAlchemy asyncio module requires that the Python
+#   'greenlet' library is installed.
+# Ketahuan saat memasang dari nol di clone yang benar-benar baru; venv lama
+# tidak terdampak karena greenlet sempat dipasang manual.
+sqlalchemy[asyncio]>=2.0.0
 aiosqlite>=0.20.0
 
 # ---- Settings & Validation ---------------------------------
