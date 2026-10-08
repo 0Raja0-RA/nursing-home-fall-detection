@@ -13,6 +13,7 @@ Model di-load sekali saat startup dan digunakan berulang kali
 untuk setiap frame yang masuk dari camera service.
 """
 
+import threading
 from pathlib import Path
 from typing import Optional
 
@@ -34,6 +35,20 @@ _CLASS_MAP = {
 # Singleton model instance
 _model = None
 
+# Setiap kamera menjalankan inference lewat asyncio.to_thread, jadi beberapa thread
+# bisa masuk ke sini bersamaan begitu ada lebih dari satu kamera.
+#
+# _load_lock mencegah model dimuat berkali-kali. Tanpa ini, empat kamera yang
+# menyala bersamaan sama-sama lolos pengecekan `_model is None` dan masing-masing
+# membuat salinan YOLO sendiri -- terbukti di log: "Model loaded" lima kali.
+#
+# _infer_lock membuat pemanggilan model berurutan. Objek YOLO milik ultralytics
+# menyimpan state internal (predictor) yang dipakai ulang antar panggilan, jadi
+# memanggilnya dari beberapa thread sekaligus tidak aman. Lagi pula inference
+# berjalan di CPU: menjalankan empat sekaligus hanya memperebutkan core yang sama.
+_load_lock = threading.Lock()
+_infer_lock = threading.Lock()
+
 
 def load_model(model_path: Optional[str] = None):
     """Load model YOLO11 dari file .pt.
@@ -52,27 +67,33 @@ def load_model(model_path: Optional[str] = None):
     if _model is not None:
         return _model
 
-    from ultralytics import YOLO
+    with _load_lock:
+        # Diperiksa ulang di dalam lock: thread lain bisa saja sudah memuatnya
+        # selagi kita menunggu giliran.
+        if _model is not None:
+            return _model
 
-    settings = get_settings()
-    path = model_path or settings.MODEL_PATH
+        from ultralytics import YOLO
 
-    if not Path(path).exists():
-        log.info(f"⚠️ Model custom belum ditemukan di '{path}'.")
-        log.info("   Menggunakan base model 'yolo11n.pt' sebagai fallback sementara (mode demo).")
-        log.info("   [DEMO MODE] Untuk mensimulasikan JATUH, tunjukkan 'cell phone' ke kamera!")
-        path = "yolo11n.pt"
-        
-        # Override _CLASS_MAP untuk demo dengan yolo11n.pt
-        global _CLASS_MAP
-        _CLASS_MAP = {
-            0: PostureClass.NORMAL,             # Person -> Normal
-            67: PostureClass.LYING_ON_GROUND,   # Cell phone -> Jatuh
-        }
+        settings = get_settings()
+        path = model_path or settings.MODEL_PATH
 
-    _model = YOLO(path)
-    log.info(f"✅ Model loaded: {path}")
-    return _model
+        if not Path(path).exists():
+            log.info(f"⚠️ Model custom belum ditemukan di '{path}'.")
+            log.info("   Menggunakan base model 'yolo11n.pt' sebagai fallback sementara (mode demo).")
+            log.info("   [DEMO MODE] Untuk mensimulasikan JATUH, tunjukkan 'cell phone' ke kamera!")
+            path = "yolo11n.pt"
+
+            # Override _CLASS_MAP untuk demo dengan yolo11n.pt
+            global _CLASS_MAP
+            _CLASS_MAP = {
+                0: PostureClass.NORMAL,             # Person -> Normal
+                67: PostureClass.LYING_ON_GROUND,   # Cell phone -> Jatuh
+            }
+
+        _model = YOLO(path)
+        log.info(f"✅ Model loaded: {path}")
+        return _model
 
 
 def run_inference(frame: np.ndarray) -> Optional[DetectionResult]:
@@ -93,7 +114,8 @@ def run_inference(frame: np.ndarray) -> Optional[DetectionResult]:
     model = load_model()
     settings = get_settings()
 
-    results = model(frame, verbose=False, conf=settings.DETECTION_MIN_CONF)
+    with _infer_lock:
+        results = model(frame, verbose=False, conf=settings.DETECTION_MIN_CONF)
 
     if not results or len(results[0].boxes) == 0:
         return None
@@ -118,4 +140,5 @@ def run_inference(frame: np.ndarray) -> Optional[DetectionResult]:
 def unload_model() -> None:
     """Unload model dari memori (untuk cleanup)."""
     global _model
-    _model = None
+    with _load_lock:
+        _model = None
