@@ -155,10 +155,17 @@ Edit `backend/.env` dan isi:
 - `TELEGRAM_BOT_TOKEN` — Token dari [@BotFather](https://t.me/BotFather)
 - `TELEGRAM_CHAT_ID` — Chat ID tujuan notifikasi
 
-> **Status Telegram: belum tersambung.** `notification_service.py` sudah bisa mengirim
-> pesan, tapi `alert_service.py` belum memanggilnya, jadi kolom `notified` pada alert
-> selalu bernilai 0. Alert tetap tersimpan ke database dan muncul di dashboard lewat
-> WebSocket. Mengisi dua variabel di atas sekarang belum menghasilkan notifikasi apa pun.
+Cara mendapatkan `chat_id`, menguji koneksinya, dan daftar penyebab kegagalan ada di
+**[TESTING.md](TESTING.md)** bagian *Notifikasi Telegram*. Singkatnya:
+
+```powershell
+.venv\Scripts\python.exe tools\get_chat_id.py
+curl.exe -s -X POST http://127.0.0.1:8000/api/settings/test-telegram
+```
+
+Saat ada yang jatuh, grup menerima **foto** kejadian lengkap dengan bounding box, nama
+kamar, durasi, dan jam. Kegagalan kirim tidak membatalkan alert -- barisnya tetap
+tersimpan dengan `notified: false`, supaya kegagalan terlihat alih-alih hilang diam-diam.
 
 Kamera **tidak** diatur di sini — lihat bagian [Mengelola Kamera](#mengelola-kamera).
 
@@ -273,6 +280,7 @@ masalah yang sering terjadi — ada di **[TESTING.md](TESTING.md)**.
 | POST   | `/api/cameras/scan`          | Pindai subnet lokal untuk mencari kamera IP         |
 | GET    | `/api/settings/`             | Konfigurasi aktif                                   |
 | PUT    | `/api/settings/threshold`    | Update threshold durasi                             |
+| POST   | `/api/settings/test-telegram`| Kirim notifikasi uji ke Telegram                    |
 | WS     | `/ws`                        | WebSocket live updates                              |
 
 Dokumentasi interaktif tersedia di `http://127.0.0.1:8000/docs` saat server berjalan.
