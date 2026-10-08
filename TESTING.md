@@ -294,14 +294,31 @@ ditarik backend, berapa pun IP-nya diubah.
 Cara memastikan ini penyebabnya:
 
 ```powershell
-ipconfig | Select-String "IPv4"           # IP laptop
-ping 10.252.129.120                       # IP HP
-Test-NetConnection 10.252.129.120 -Port 8080
-arp -a | Select-String "10.252.129.120"
+Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -like '10.*' }
+ping <IP-HP>
+ping <IP-gateway>
 ```
 
-Tandanya: laptop dan HP berada di subnet yang sama, gateway bisa di-ping dengan lancar, tapi
-ping ke HP menjawab *"Destination host unreachable"* dan **tidak ada entri ARP** untuk IP HP.
+Tandanya: **gateway terjangkau, klien lain tidak satu pun**.
+
+Hasil pengukuran nyata di `eepiswlan` (8 Oktober 2026), laptop `10.252.144.87`:
+
+| Tujuan | Hasil |
+|---|---|
+| Gateway `10.252.144.2` | ping 3 ms, port 80 terbuka seketika |
+| HP `10.252.151.81` | ping 100% hilang, TCP 8080 timeout |
+| Empat tetangga lain di `10.252.144.x` (ada di tabel ARP) | tidak satu pun membalas ping |
+| Sapuan port 8080 ke seluruh `10.252.144.0/21` | hanya `10.252.144.1` (perangkat jaringan) |
+
+Perhatikan baris ketiga: tetangga yang **muncul di tabel ARP pun tidak bisa dihubungi**.
+Jadi yang diblokir adalah lalu lintas antar-klien, bukan sekadar soal alamat.
+
+> **Oktet ketiga yang berbeda itu normal, bukan penyebab masalah.** Di `eepiswlan` maskernya
+> `255.255.248.0` (/21), jadi satu subnet membentang dari `10.252.144.0` sampai
+> `10.252.151.255` — 2046 alamat. DHCP membagikan alamat mana saja dari kolam itu, sehingga
+> laptop bisa dapat `10.252.144.87` dan HP dapat `10.252.151.81` walau tersambung ke SSID
+> yang sama. Keduanya **tetap satu subnet**. Jangan membuang waktu mencoba menyamakan oktet
+> ketiganya.
 
 Solusinya, berurutan dari yang paling mudah:
 
@@ -314,8 +331,18 @@ Solusinya, berurutan dari yang paling mudah:
 4. **Tailscale.** Pasang Tailscale di HP dan laptop dengan akun yang sama, lalu pakai alamat
    `100.x.y.z` milik HP. Tetap jalan walaupun jaringannya terisolasi.
 
-Selama belum bisa, pakai `CAMERA_SOURCE=0` (webcam laptop) atau file video supaya pengujian
+Selama belum bisa, pakai sumber `0` (webcam laptop) atau file video supaya pengujian
 backend tetap bisa berjalan.
+
+### Alamat bisa dihubungi tapi kamera tetap gagal
+
+Alamat yang ditampilkan aplikasi IP Webcam di layar HP (`http://10.252.151.81:8080`) adalah
+**halaman webnya**, bukan aliran videonya. Yang dibutuhkan adalah alamat itu **ditambah
+`/video`**. Tanpa itu, pemeriksaan koneksi lolos tapi OpenCV tidak mendapat gambar.
+
+Backend sekarang menangkap kekeliruan ini saat kamera ditambahkan: kalau alamatnya
+mengembalikan halaman HTML, kamera ditolak dan pesannya langsung menyebutkan alamat
+lengkap yang seharusnya dipakai.
 
 ### Gambar dari HP miring 90 derajat
 

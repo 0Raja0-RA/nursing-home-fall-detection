@@ -13,7 +13,9 @@ Supports:
 """
 
 import asyncio
+import http.client
 import socket
+import ssl
 import threading
 import time
 from pathlib import Path
@@ -63,6 +65,56 @@ def host_terjangkau(source: str, batas: float = 3.0) -> bool:
         return False
 
 
+def _periksa_konten_http(source: str, batas: float = 3.0) -> tuple[bool, str]:
+    """Pastikan URL benar-benar mengirim aliran gambar, bukan halaman web.
+
+    Host yang bisa dihubungi belum berarti alamatnya benar. Aplikasi IP Webcam
+    menyajikan halaman HTML di akar (`http://IP:8080`) dan aliran MJPEG-nya di
+    `/video`. Alamat tanpa `/video` lolos pemeriksaan TCP tapi gagal saat dibuka
+    OpenCV, dan kegagalannya muncul belakangan tanpa penjelasan.
+
+    Hanya header yang dibaca; badan respons tidak pernah diambil, jadi aliran
+    MJPEG yang tak berujung tidak membuat pemeriksaan ini menggantung.
+    """
+    u = urlparse(source)
+    koneksi = None
+    try:
+        if u.scheme == "https":
+            # Kamera di jaringan lokal lazimnya memakai sertifikat tanda tangan sendiri.
+            konteks = ssl._create_unverified_context()
+            koneksi = http.client.HTTPSConnection(u.hostname, u.port or 443,
+                                                  timeout=batas, context=konteks)
+        else:
+            koneksi = http.client.HTTPConnection(u.hostname, u.port or 80, timeout=batas)
+
+        koneksi.request("GET", u.path or "/", headers={"User-Agent": "FallDetect/1.0"})
+        respons = koneksi.getresponse()
+        status = respons.status
+        tipe = (respons.headers.get("Content-Type") or "").lower()
+    except Exception:
+        # Tidak bisa disimpulkan (server tidak bicara HTTP, mis. RTSP di port tak lazim).
+        # Jangan menolak hanya karena probe ini gagal.
+        return True, ""
+    finally:
+        if koneksi is not None:
+            try:
+                koneksi.close()
+            except Exception:
+                pass
+
+    if status >= 400:
+        return False, f"Server menjawab HTTP {status} untuk alamat itu. Periksa kembali path-nya."
+
+    if tipe.startswith("text/html"):
+        akar = f"{u.scheme}://{u.hostname}:{u.port or 80}"
+        return False, (
+            "Alamat itu mengembalikan halaman web, bukan aliran video. "
+            f"Untuk aplikasi IP Webcam, tambahkan /video di belakangnya: {akar}/video"
+        )
+
+    return True, ""
+
+
 def validasi_sumber(source: str, batas: float = 3.0) -> tuple[bool, str]:
     """Periksa apakah sumber kamera benar-benar bisa dipakai.
 
@@ -109,6 +161,8 @@ def validasi_sumber(source: str, batas: float = 3.0) -> tuple[bool, str]:
                 "memblokir koneksi antar-perangkat (client isolation) -- pakai hotspot HP "
                 "atau USB tethering."
             )
+        if u.scheme in ("http", "https"):
+            return _periksa_konten_http(source, batas)
         return True, ""
 
     if Path(source).exists():

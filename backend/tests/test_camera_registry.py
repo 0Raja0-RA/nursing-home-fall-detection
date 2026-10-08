@@ -9,6 +9,7 @@ dijalankan di mana saja.
 """
 
 import asyncio
+import ipaddress
 import sys
 import threading
 import types
@@ -184,3 +185,91 @@ def test_model_hanya_dimuat_sekali_walau_banyak_thread(monkeypatch, tmp_path: Pa
         assert all(m is hasil[0] for m in hasil), "tidak semua thread dapat instance yang sama"
     finally:
         inference_service.unload_model()
+
+
+# ---- Pemindaian jaringan -----------------------------------
+
+def test_subnet_memakai_netmask_sesungguhnya(monkeypatch):
+    """Prefiks subnet harus dibaca dari antarmuka, bukan diasumsikan /24.
+
+    Di WiFi kampus (eepiswlan) maskernya 255.255.248.0 (/21), sehingga laptop di
+    10.252.144.87 dan HP di 10.252.151.81 berada di satu subnet yang sama meski
+    oktet ketiganya berbeda. Pemindai yang mengasumsikan /24 tidak akan pernah
+    menemukan HP itu.
+    """
+    from app.services import network_scan as ns
+
+    monkeypatch.setattr(ns, "antarmuka_lokal", lambda: [("10.252.144.87", "255.255.248.0")])
+    jaringan = ns.subnet_yang_dipindai()
+
+    assert len(jaringan) == 1
+    assert str(jaringan[0]) == "10.252.144.0/21"
+    assert ipaddress.IPv4Address("10.252.151.81") in jaringan[0]
+
+
+def test_subnet_terlalu_lebar_dipersempit(monkeypatch):
+    """Subnet /16 tidak boleh disapu seluruhnya (65 ribu alamat)."""
+    from app.services import network_scan as ns
+
+    monkeypatch.setattr(ns, "antarmuka_lokal", lambda: [("192.168.5.10", "255.255.0.0")])
+    jaringan = ns.subnet_yang_dipindai()
+
+    assert str(jaringan[0]) == "192.168.5.0/24"
+    assert jaringan[0].num_addresses <= ns.MAX_ALAMAT
+
+
+def test_alamat_publik_dan_link_local_dilewati(monkeypatch):
+    from app.services import network_scan as ns
+
+    monkeypatch.setattr(ns, "antarmuka_lokal", lambda: [
+        ("8.8.8.8", "255.255.255.0"),          # publik
+        ("169.254.20.110", "255.255.0.0"),     # link-local
+    ])
+    assert ns.subnet_yang_dipindai() == []
+
+
+# ---- Alamat yang bisa dihubungi tapi bukan aliran video ----
+
+def _server_http(content_type: str, body: bytes = b"<html>halo</html>"):
+    """Jalankan server HTTP sekali-pakai di port acak, kembalikan (port, shutdown)."""
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *args):
+            pass
+
+    srv = HTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    return srv.server_port, srv.shutdown
+
+
+def test_url_yang_mengembalikan_halaman_web_ditolak():
+    """http://IP:8080 tanpa /video lolos cek TCP tapi bukan aliran video.
+
+    Ini kesalahan yang mudah terjadi: aplikasi IP Webcam menampilkan alamat akar
+    di layar HP, padahal yang dibutuhkan OpenCV adalah path /video. Tanpa
+    pemeriksaan ini, kameranya tersimpan lalu gagal diam-diam.
+    """
+    port, matikan = _server_http("text/html; charset=utf-8")
+    try:
+        ok, alasan = validasi_sumber(f"http://127.0.0.1:{port}")
+        assert ok is False
+        assert "/video" in alasan
+    finally:
+        matikan()
+
+
+def test_url_yang_mengembalikan_aliran_gambar_diterima():
+    port, matikan = _server_http("multipart/x-mixed-replace; boundary=frame", b"x")
+    try:
+        ok, alasan = validasi_sumber(f"http://127.0.0.1:{port}/video")
+        assert ok is True, alasan
+    finally:
+        matikan()
