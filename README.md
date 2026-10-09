@@ -6,19 +6,7 @@ Sistem deteksi jatuh real-time untuk panti jompo menggunakan YOLO11 computer vis
 
 ## Architecture
 
-```
-Kamera (RTSP/Webcam)
-    │
-    ▼
-Camera Service ──▶ Inference Service (YOLO11) ──▶ State Machine
-                                                       │
-                              ┌─────────────────────────┤
-                              ▼                         ▼
-                    Telegram Notification        WebSocket Push
-                              │                         │
-                              ▼                         ▼
-                        📱 Penjaga               🖥️ Dashboard
-```
+![Arsitektur sistem: kamera, camera service, inference service, state machine, alert service, lalu database, WebSocket, dan Telegram](docs/assets/flowchart-arsitektur.svg)
 
 **Flow:** Kamera menangkap video → YOLO11 mendeteksi postur (normal/transitional/lying_on_ground) per frame → State machine menghitung durasi "lying_on_ground" → Jika melebihi threshold → Kirim alert Telegram + tampilkan di dashboard.
 
@@ -277,13 +265,7 @@ Hal yang perlu diketahui:
 
 ## State Machine
 
-```
-MONITORING ──[postur pemicu]──▶ POSSIBLE_FALL ──[durasi ≥ threshold]──▶ CONFIRMED_FALL
-     ▲                              │                                         │
-     └──[postur bukan pemicu, N frame berturut-turut]──┴─────────────────────┘
-
-UNKNOWN ◀──[kamera offline]
-```
+![Diagram state machine: MONITORING, POSSIBLE_FALL, CONFIRMED_FALL, dan UNKNOWN beserta syarat tiap perpindahannya](docs/assets/flowchart-state-machine.svg)
 
 | State | Arti |
 | --- | --- |
