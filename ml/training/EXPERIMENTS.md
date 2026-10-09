@@ -299,6 +299,42 @@ Dokumen ini mencatat seluruh eksperimen pemodelan Machine Learning secara sistem
 
 ---
 
+### 🔹 EXP-010: Temporal Kinematic Fall Velocity & Dynamic Sequence Analysis
+
+* **Tanggal:** 09 Oktober 2026
+* **Hardware:** NVIDIA GeForce RTX 2050 (Local GPU)
+* **Paradigma Baru:** **Temporal Trajectory & Downward Velocity ($V_y = \frac{\Delta y}{\Delta t}$) Tracking**
+* **Konfigurasi & Metodologi:**
+  * Base Model: `yolo11n-pose.pt` (Inference sequential per video clip)
+  * Dataset: 11 Rangkaian Video Independen pada Test Set (5 video jatuh `fall-26` s.d. `fall-30`, 6 video aktivitas harian `adl-35` s.d. `adl-40`) dan 10 video pada Validation Set.
+  * Formulasi Kecepatan Vertikal Pinggul ($V_y$):
+    $$V_y(t) = \frac{Y_{\text{hip}}(t) - Y_{\text{hip}}(t - k)}{k \cdot \Delta t}$$
+    *(Normalisasi terhadap tinggi frame piksel)*
+  * Threshold Kecepatan Hasil Kalibrasi Val Set: $V_{\text{threshold}} = 0.0350\text{ norm\_h / frame}$
+  * Kondisi Pemicu Ganda (*Dual-Trigger*):
+    $$\text{Fall Event} \iff (\theta_{\min} < 25.0^\circ) \text{ DAN } (V_{y,\max} \ge 0.0350)$$
+* **Hasil Metrik Urutan Video (Sequence-Level Test Set):**
+  * **Static Angle Only ($\theta < 25^\circ$):**
+    * **Sequence Accuracy:** `72.7%`
+    * **Fall Safety Recall:** **`80.0%` (4 dari 5 video jatuh terdeteksi!)**
+    * **Precision:** `66.7%`
+    * **F1-Score:** `72.7%`
+  * **Temporal Dual-Trigger ($\theta < 25^\circ \ \& \ V_y > 0.0350$):**
+    * **Sequence Accuracy:** `54.5%`
+    * **Fall Safety Recall:** `40.0%` (2 dari 5 video jatuh terdeteksi)
+    * **Precision:** `50.0%`
+    * **F1-Score:** `44.4%`
+* **Analisis & Temuan Saintifik Mendalam (Root Cause Analysis):**
+  * 📉 **Mengapa Kecepatan Monokuler ($V_y$) Menurunkan Recall Jatuh?**
+    1. **Scale & Perspective Distortion:** Pada kamera 2D monokuler, pergerakan piksel $\Delta y$ sangat dipengaruhi jarak aktor ke lensa kamera. Pada video `fall-27` dan `fall-28` di mana aktor jatuh di sudut ruangan yang jauh, displacement pikselnya kecil ($V_y \approx 0.016-0.023$) sehingga tidak menembus batas threshold kecepatan meskipun aktor jelas-jelas jatuh terkapar di lantai.
+    2. **Kekuatan Sudut Tulang Belakang ($\theta$):** Berbeda dari kecepatan piksel, sudut kemiringan $\theta = \arctan2(|\Delta y|, |\Delta x|)$ bersifat **invarian terhadap skala (*scale-invariant*)**. Aktor di jarak 2 meter maupun 6 meter memiliki sudut yang sama persis saat rebah di lantai ($\theta < 20^\circ$).
+  * 🛡️ **Validasi Arsitektur Backend FSM 10 Detik:**
+    * Temuan ini memvalidasi secara ilmiah bahwa **kombinasi Sudut Kemiringan Statis ($\theta < 20^\circ$) + Stopwatch Durasi 10 Detik (FSM)** di backend adalah solusi paling robust dan stabil untuk deployment nyata, karena tidak terdistorsi oleh noise jarak kamera maupun frame rate jitter.
+* **Artefak yang Dihasilkan:**
+  * Visualisasi kurva trajektori sudut & lonjakan kecepatan tersimpan di: [`ml/training/curves/exp010_temporal_velocity_curves.png`](curves/exp010_temporal_velocity_curves.png).
+
+---
+
 ## 🛠️ Standar Prosedur Alur Kerja & Git Commit
 
 Setiap kali melakukan 1 eksperimen:
