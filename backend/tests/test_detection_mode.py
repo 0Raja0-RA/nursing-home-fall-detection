@@ -218,3 +218,33 @@ async def test_threshold_baru_diteruskan_ke_kamera_yang_menyala(sesi: AsyncSessi
     finally:
         registry.state_machines.pop("cam-uji", None)
         get_settings().FALL_DURATION_THRESHOLD = semula
+
+
+# ---- Skeleton di stream ------------------------------------
+
+def test_skeleton_tergambar_di_mode_pose_dan_sendi_samar_dilewati():
+    """Mode pose harus menampilkan skeleton, bukan hanya kotak -- tapi sendi
+    yang tidak terbaca tidak boleh digambar, karena koordinatnya tebakan dan
+    membuat skeleton mencuat ke tempat yang tidak masuk akal."""
+    from app.models.schemas import DetectionResult
+    from app.services.overlay import gambar_deteksi
+
+    k = kpts((100, 100), (100, 200), conf=0.9).tolist()
+    k[15] = [40.0, 280.0, 0.05]      # pergelangan kaki kiri: tidak terbaca
+
+    hasil = DetectionResult(posture=PostureClass.NORMAL, confidence=0.9,
+                            bbox=[60, 60, 160, 300], keypoints=k)
+    frame = gambar_deteksi(np.zeros((320, 320, 3), np.uint8), hasil, ambang=0.5)
+
+    assert frame[150, 100].any(), "garis bahu-pinggul harus tergambar"
+    assert not frame[280, 40].any(), "sendi berkeyakinan rendah tidak boleh digambar"
+
+
+def test_mode_bbox_tetap_hanya_kotak():
+    from app.models.schemas import DetectionResult
+    from app.services.overlay import gambar_deteksi
+
+    hasil = DetectionResult(posture=PostureClass.NORMAL, confidence=0.9,
+                            bbox=[60, 60, 160, 300])
+    frame = gambar_deteksi(np.zeros((320, 320, 3), np.uint8), hasil, ambang=0.5)
+    assert not frame[150, 110].any(), "tanpa keypoint, bagian dalam kotak harus kosong"

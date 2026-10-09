@@ -253,6 +253,10 @@ class DetectionResult(BaseModel):
     posture: PostureClass
     confidence: float
     bbox: Optional[list[float]] = None  # [x1, y1, x2, y2]
+    # Hanya terisi di mode pose: 17 keypoint COCO, masing-masing [x, y, conf].
+    # Dipakai overlay untuk menggambar skeleton. Tidak ikut disiarkan lewat
+    # WebSocket -- yang disiarkan CameraStatus, bukan objek ini.
+    keypoints: Optional[list[list[float]]] = None
 
 
 # ---- WebSocket Messages -----------------------------------

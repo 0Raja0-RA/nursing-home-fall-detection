@@ -29,9 +29,47 @@ WARNA = {
 }
 ABU = (150, 150, 150)   # dipakai saat confidence di bawah ambang
 
+# Pasangan sendi yang disambung garis, urutan keypoint COCO-17:
+#   0 hidung, 1-2 mata, 3-4 telinga, 5-6 bahu, 7-8 siku, 9-10 pergelangan,
+#   11-12 pinggul, 13-14 lutut, 15-16 pergelangan kaki.
+TULANG = [
+    (5, 6), (11, 12), (5, 11), (6, 12),          # badan
+    (5, 7), (7, 9), (6, 8), (8, 10),             # lengan
+    (11, 13), (13, 15), (12, 14), (14, 16),      # kaki
+    (0, 1), (0, 2), (1, 3), (2, 4),              # kepala
+]
+# Sendi di bawah ini tidak digambar. Model pose tetap mengeluarkan koordinat
+# untuk sendi yang tidak terlihat (tertutup, di luar frame), dan koordinat itu
+# tebakan -- kalau digambar, skeletonnya mencuat ke tempat yang tidak masuk akal.
+SENDI_MIN_CONF = 0.3
+
+# Garis yang dipakai sudut tulang belakang (bahu -> pinggul) ditebalkan, supaya
+# saat demo kelihatan apa yang sebenarnya dinilai model untuk memutuskan postur.
+TULANG_PENENTU = {(5, 11), (6, 12)}
+
+
+def _gambar_skeleton(frame: np.ndarray, keypoints: list[list[float]], warna) -> None:
+    def titik(i):
+        x, y, c = keypoints[i]
+        return (int(x), int(y)) if c >= SENDI_MIN_CONF else None
+
+    for a, b in TULANG:
+        pa, pb = titik(a), titik(b)
+        if pa and pb:
+            tebal = 4 if (a, b) in TULANG_PENENTU else 2
+            cv2.line(frame, pa, pb, warna, tebal, cv2.LINE_AA)
+
+    for i in range(len(keypoints)):
+        p = titik(i)
+        if p:
+            cv2.circle(frame, p, 4, (255, 255, 255), -1, cv2.LINE_AA)
+            cv2.circle(frame, p, 4, warna, 1, cv2.LINE_AA)
+
 
 def gambar_deteksi(frame: np.ndarray, hasil: Optional[DetectionResult], ambang: float) -> np.ndarray:
     """Gambar bounding box + label ke atas frame (frame dimodifikasi di tempat).
+
+    Di mode pose, skeleton ikut digambar dengan warna yang sama dengan kotaknya.
 
     Deteksi dengan confidence di bawah `ambang` tetap digambar, tapi berwarna abu-abu
     dan diberi tanda "(ragu)". Ini disengaja: tanpa itu layar terlihat kosong dan kita
@@ -45,6 +83,11 @@ def gambar_deteksi(frame: np.ndarray, hasil: Optional[DetectionResult], ambang: 
     warna = WARNA.get(hasil.posture, ABU) if yakin else ABU
 
     x1, y1, x2, y2 = (int(v) for v in hasil.bbox)
+
+    # Skeleton digambar lebih dulu supaya kotak dan labelnya tetap di atas.
+    if hasil.keypoints:
+        _gambar_skeleton(frame, hasil.keypoints, warna)
+
     cv2.rectangle(frame, (x1, y1), (x2, y2), warna, 3)
 
     teks = f"{hasil.posture.value} {hasil.confidence:.2f}" + ("" if yakin else " (ragu)")

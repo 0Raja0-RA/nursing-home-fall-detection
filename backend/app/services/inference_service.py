@@ -284,7 +284,12 @@ def run_inference(frame: np.ndarray) -> Optional[DetectionResult]:
         postur, mutu = _postur_dari_pose(kpts, aspect_ratio)
         # Yang dilaporkan adalah yang paling lemah di antara "ini benar orang"
         # dan "posturnya terbaca jelas".
-        return DetectionResult(posture=postur, confidence=min(confidence, mutu), bbox=bbox)
+        return DetectionResult(
+            posture=postur,
+            confidence=min(confidence, mutu),
+            bbox=bbox,
+            keypoints=kpts.tolist(),
+        )
 
     cls_id = int(boxes.cls[best_idx].item())
     return DetectionResult(
