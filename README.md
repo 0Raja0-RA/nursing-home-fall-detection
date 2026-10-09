@@ -22,6 +22,24 @@ Camera Service ──▶ Inference Service (YOLO11) ──▶ State Machine
 
 **Flow:** Kamera menangkap video → YOLO11 mendeteksi postur (normal/transitional/lying_on_ground) per frame → State machine menghitung durasi "lying_on_ground" → Jika melebihi threshold → Kirim alert Telegram + tampilkan di dashboard.
 
+### Alur lengkap, langkah demi langkah
+
+Dari lansia berada di ruangan sampai perawat menerima alarm dan menolong — termasuk
+cabang-cabang yang gampang terlewat: orang hilang sebentar dari frame, deteksi yang
+ragu-ragu, dan tombol simulasi yang dipakai saat demo.
+
+![Animasi alur deteksi jatuh, dari kamera merekam sampai perawat menerima alarm](docs/assets/flow-detection.gif)
+
+Ada satu animasi lagi untuk sisi API, di bagian [API Endpoints](#api-endpoints).
+
+> **Mengedit diagramnya.** Sumber kedua animasi ada di `docs/flow/` dalam format
+> `.excalidraw` — buka lewat menu *Open* di [excalidraw.com](https://excalidraw.com),
+> atau gunakan berkas itu sendiri kalau hanya ingin memperbesar bagian tertentu.
+> Setelah diedit, GIF-nya dibuat ulang dengan perintah di
+> [tools/flowanim/README.md](tools/flowanim/README.md). Perintah itu butuh **puppeteer**
+> dan **ffmpeg**, yang tidak diperlukan untuk menjalankan sistemnya — jadi lewati saja
+> kalau kamu tidak sedang mengubah diagram.
+
 Lihat detail lengkap di [docs/architecture.md](docs/architecture.md).
 
 ---
@@ -106,14 +124,18 @@ fall-detection/
 │
 ├── docs/
 │   ├── architecture.md          # Diagram arsitektur sistem
-│   └── api.md                   # Dokumentasi endpoint API
+│   ├── api.md                   # Dokumentasi endpoint API
+│   ├── flow/                    # Sumber flowchart (.excalidraw, bisa diedit ulang)
+│   └── assets/                  # GIF hasil render flowchart (dipakai README ini)
 │
 ├── deployment/
 │   ├── docker-compose.yml       # Orchestrasi backend + frontend
 │   └── .env.example             # Template environment variables
 │
 ├── tools/
-│   └── check_camera.py          # Uji satu sumber kamera dalam 3 detik
+│   ├── check_camera.py          # Uji satu sumber kamera dalam 3 detik
+│   ├── get_chat_id.py           # Cari chat_id Telegram untuk .env
+│   └── flowanim/                # Excalidraw → GIF beranimasi (punya README sendiri)
 │
 ├── run-backend.bat              # Jalankan backend (cek venv, model, kamera dulu)
 ├── run-frontend.bat             # Jalankan dashboard
@@ -366,6 +388,15 @@ Telegram, dan daftar masalah yang sering terjadi — ada di **[TESTING.md](TESTI
 | WS     | `/ws`                        | WebSocket live updates                              |
 
 Dokumentasi interaktif tersedia di `http://127.0.0.1:8000/docs` saat server berjalan.
+
+### Kapan tiap endpoint dipanggil
+
+Tabel di atas mengelompokkan endpoint per router. Animasi di bawah menyusunnya ulang
+mengikuti **urutan pemakaian dashboard** — dari halaman dibuka, mendaftarkan kamera,
+menonton stream, sampai menindaklanjuti alert — sehingga terlihat endpoint mana memanggil
+apa dan respons gagal apa saja yang mungkin muncul.
+
+![Animasi alur endpoint API mengikuti urutan pemakaian dashboard](docs/assets/flow-api.gif)
 
 ---
 
