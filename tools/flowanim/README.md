@@ -12,16 +12,10 @@ node tools/flowanim/capture.mjs flow-api
 Butuh **puppeteer** (terpasang global: `npm i -g puppeteer`) dan **ffmpeg** di PATH.
 Keluaran sementara ada di `build/flowanim/` yang sudah masuk `.gitignore`.
 
-Dua diagram lain -- arsitektur dan state machine -- tidak dianimasikan dan
-dipakai sebagai gambar diam di README:
-
-```bash
-python tools/flowanim/still.py          # -> docs/assets/*.svg
-```
-
-Jalur ini memakai perender yang sama (`render.py`) sehingga tampilannya seragam
-dengan GIF, tapi **tidak** butuh puppeteer maupun ffmpeg: diagram diam tidak
-perlu dirasterkan, jadi keluarannya SVG yang tetap tajam saat diperbesar.
+Dua diagram lain -- `flowchart-arsitektur` dan `flowchart-state-machine` -- tidak
+dianimasikan. Keduanya diekspor manual sebagai PNG dari excalidraw.com
+(`docs/assets/architecture.png` dan `state-machine.png`), jadi tidak lewat
+perkakas ini sama sekali.
 
 ## Kenapa dibikin begini
 
