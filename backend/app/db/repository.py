@@ -12,7 +12,7 @@ from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import utc_now_naive
-from app.db.models import AlertRecord, CameraRecord
+from app.db.models import AlertRecord, AppSetting, CameraRecord
 from app.models.schemas import AlertCreate, CameraCreate, CameraUpdate
 
 
@@ -146,3 +146,27 @@ class CameraRepository:
             stmt = stmt.where(CameraRecord.id != kecuali_id)
         result = await self.session.execute(stmt)
         return result.scalars().first() is not None
+
+
+class SettingRepository:
+    """Pengaturan kunci-nilai yang bertahan setelah backend di-restart."""
+
+    def __init__(self, session: AsyncSession):
+        self.session = session
+
+    async def semua(self) -> dict[str, str]:
+        hasil = await self.session.execute(select(AppSetting))
+        return {r.key: r.value for r in hasil.scalars().all()}
+
+    async def ambil(self, key: str) -> str | None:
+        baris = await self.session.get(AppSetting, key)
+        return baris.value if baris is not None else None
+
+    async def simpan(self, key: str, value: str) -> None:
+        """Tulis nilai baru, buat barisnya kalau belum ada."""
+        baris = await self.session.get(AppSetting, key)
+        if baris is None:
+            self.session.add(AppSetting(key=key, value=value))
+        else:
+            baris.value = value
+        await self.session.commit()

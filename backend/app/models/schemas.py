@@ -222,12 +222,28 @@ class ThresholdUpdate(BaseModel):
     )
 
 
+class ModeUpdate(BaseModel):
+    """Schema untuk mengganti mode detektor."""
+    detection_mode: str = Field(..., description="bbox | pose")
+
+
+class ModeInfo(BaseModel):
+    """Satu pilihan mode detektor, untuk mengisi dropdown di dashboard."""
+    id: str
+    label: str
+    description: str
+    recommended: bool
+
+
 class SettingsResponse(BaseModel):
     """Response berisi konfigurasi aktif."""
     fall_duration_threshold: float
     possible_fall_threshold: float
     confidence_threshold: float
     camera_source: str
+    detection_mode: str
+    available_modes: list[ModeInfo]
+    telegram_configured: bool
 
 
 # ---- Detection Result (internal) --------------------------

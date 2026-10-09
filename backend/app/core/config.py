@@ -32,6 +32,18 @@ class Settings(BaseSettings):
     MODEL_PATH: str = str(
         Path(__file__).resolve().parents[3] / "ml" / "models" / "fall_detection" / "weights" / "best.pt"
     )
+    # Model kedua: estimasi pose (17 keypoint). Dipakai mode "pose".
+    # Berkas rilis standar Ultralytics; kalau belum ada, diunduh otomatis saat
+    # pertama dipakai. Jangan tulis nama telanjang "yolo11n-pose.pt" di kode --
+    # Ultralytics akan meresolusinya relatif ke working directory dan mengunduh
+    # salinan baru ke sana, bukan memakai berkas yang sudah ada di repo.
+    POSE_MODEL_PATH: str = str(
+        Path(__file__).resolve().parents[3] / "ml" / "models" / "fall_detection" / "weights" / "yolo11n-pose.pt"
+    )
+    # Mode detektor bawaan saat database masih kosong: "bbox" | "pose".
+    # Nilai yang benar-benar dipakai dibaca dari tabel app_settings saat startup.
+    DETECTION_MODE: str = "pose"
+
     CONFIDENCE_THRESHOLD: float = 0.5
     # Batas bawah agar deteksi lemah tetap dikembalikan model (untuk digambar & didiagnosa).
     # Keputusan dipercaya atau tidak tetap memakai CONFIDENCE_THRESHOLD di pipeline.

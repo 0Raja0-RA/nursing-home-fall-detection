@@ -165,7 +165,11 @@ def test_model_hanya_dimuat_sekali_walau_banyak_thread(monkeypatch, tmp_path: Pa
     berkas_model.write_bytes(b"model palsu")
     monkeypatch.setattr(
         inference_service, "get_settings",
-        lambda: types.SimpleNamespace(MODEL_PATH=str(berkas_model)),
+        lambda: types.SimpleNamespace(
+            MODEL_PATH=str(berkas_model),
+            POSE_MODEL_PATH=str(berkas_model),
+            DETECTION_MODE="bbox",
+        ),
     )
 
     inference_service.unload_model()

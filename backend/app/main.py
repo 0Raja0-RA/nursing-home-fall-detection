@@ -36,6 +36,15 @@ async def lifespan(app: FastAPI):
     log.info(f"🚀 Starting Fall Detection Backend (env={settings.ENVIRONMENT})")
     await init_db()
 
+    # Terapkan pengaturan yang pernah diubah lewat dashboard SEBELUM kamera
+    # dinyalakan, supaya pipeline memakai model dan threshold yang benar sejak
+    # frame pertama -- bukan memakai bawaan sebentar lalu berganti.
+    from app.api.settings import muat_dari_db as muat_pengaturan
+    from app.db.database import get_session_factory
+
+    async with get_session_factory()() as session:
+        await muat_pengaturan(session)
+
     # Import saat runtime untuk menghindari circular dependency
     from app.runtime import camera_manager
 

@@ -115,6 +115,32 @@ mudah tertukar, dan kalau tertukar kelasnya kacau tanpa pesan error:
 | `{0: 'normal', 1: 'transitional', 2: 'lying_on_ground'}` | Benar |
 | 80 kelas berisi `person`, `car`, dst. | **Salah** — itu bobot COCO, minta ulang |
 
+#### Model kedua (opsional): Pose Estimation
+
+Halaman **Pengaturan** punya pilihan model. Selain `best.pt` di atas, ada mode
+**Pose Estimation** yang memakai `yolo11n-pose.pt` — model rilis standar
+Ultralytics, bukan hasil training kita. Taruh di folder yang sama:
+
+```
+ml\models\fall_detection\weights\yolo11n-pose.pt
+```
+
+Kalau berkasnya tidak ada, Ultralytics mengunduhnya otomatis saat mode itu
+pertama dipilih — tapi itu butuh internet, jadi sebaiknya disiapkan sebelum demo.
+
+Bedanya: mode `bbox` membaca kelas postur langsung dari model custom kita,
+sedangkan mode `pose` menghitung postur dari sudut tulang belakang antara titik
+tengah bahu dan titik tengah pinggul. Pilihan ini tersimpan di database, jadi
+bertahan setelah backend di-restart.
+
+> **Mana yang lebih baik belum terjawab.** Pada dataset kita, mode `bbox` terlihat
+> lebih unggul — tapi angka itu tidak bisa dipercaya, karena model itu dilatih
+> pada gambar yang sama dan dataset ini cuma punya **12 gambar** berlabel
+> `lying_on_ground` dari sekitar 1.500. Justru ketimpangan itu yang menjelaskan
+> kenapa model custom sering membaca orang berbaring sebagai `transitional` di
+> dunia nyata. Pembanding yang sah adalah pengujian langsung dengan kamera HP —
+> dan itulah gunanya pilihan model ini ada di dashboard.
+
 ### 4. Jalankan
 
 ```powershell
@@ -215,8 +241,9 @@ docker compose up --build
 | GET    | `/api/cameras/{id}/stream`   | Video MJPEG dengan bounding box tergambar           |
 | GET    | `/api/cameras/devices`       | Kamera lokal (webcam, Iriun) beserta namanya        |
 | POST   | `/api/cameras/scan`          | Pindai subnet lokal untuk mencari kamera IP         |
-| GET    | `/api/settings/`             | Konfigurasi aktif                                   |
-| PUT    | `/api/settings/threshold`    | Update threshold durasi                             |
+| GET    | `/api/settings/`             | Konfigurasi aktif + daftar model yang tersedia      |
+| PUT    | `/api/settings/threshold`    | Update threshold durasi (disimpan, diteruskan ke kamera) |
+| PUT    | `/api/settings/mode`         | Ganti model detektor (`bbox` / `pose`)              |
 | POST   | `/api/cameras/{id}/simulate-fall` | Paksa simulasi jatuh (untuk demo)              |
 | POST   | `/api/settings/test-telegram`| Kirim notifikasi uji ke Telegram                    |
 | WS     | `/ws`                        | WebSocket live updates                              |

@@ -39,6 +39,26 @@ class CameraRecord(Base):
     created_at = Column(DateTime, default=utc_now_naive)
 
 
+class AppSetting(Base):
+    """Pengaturan yang bisa diubah dari dashboard dan harus bertahan setelah restart.
+
+    Disimpan sebagai pasangan kunci-nilai, bukan satu kolom per pengaturan, supaya
+    menambah pengaturan baru tidak menuntut ALTER TABLE pada database yang sudah
+    berisi data orang lain.
+
+    Alasan ini ada sama dengan alasan daftar kamera tinggal di database: kalau
+    pilihannya cuma hidup di memori, satu kali restart backend mengembalikannya ke
+    bawaan tanpa pemberitahuan -- dan saat demo, yang tampil bukan model yang
+    dikira sedang dipakai.
+    """
+
+    __tablename__ = "app_settings"
+
+    key = Column(String, primary_key=True)
+    value = Column(String, nullable=False)
+    updated_at = Column(DateTime, default=utc_now_naive, onupdate=utc_now_naive)
+
+
 class AlertRecord(Base):
     """Tabel riwayat alert fall detection."""
 
