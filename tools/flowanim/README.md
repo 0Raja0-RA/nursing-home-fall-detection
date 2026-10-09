@@ -27,21 +27,33 @@ menggambar ulangnya cuma soal rect / ellipse / diamond / polyline. Tidak perlu
 roughjs. Yang dibaca dari berkasnya: `containerId` (teks milik node mana),
 `startBinding` / `endBinding` (panah menghubungkan apa ke apa), dan `points`.
 
-**Kenapa pakai bab dengan kamera diam, bukan pan-zoom yang halus?**
-Dua alasan. Pertama, kanvasnya 4500–4900 px; kalau dimuat utuh ke GIF selebar
-README, teksnya menyusut ke ~22% dan tidak terbaca. Kedua — dan ini yang
-menentukan ukuran berkas — kamera yang nge-pan mengubah SETIAP piksel di setiap
-frame, sehingga kompresi antar-frame GIF mati total dan berkasnya bisa puluhan
-MB. Dengan kamera diam, mayoritas piksel identik antar frame:
+**Kenapa kameranya bergeser, padahal itu memperbesar berkas?**
+Kanvasnya 4500–4900 px, jadi tiap bab harus dibingkai sendiri supaya teksnya
+terbaca. Pertanyaannya cuma: pindah antar bab dengan memotong, atau menggeser.
 
-| | frame | hasil |
-|---|---|---|
-| `flow-detection.gif` | 441 @ 1280×720 | 1,4 MB |
-| `flow-api.gif` | 374 @ 1280×720 | 1,1 MB |
+Versi pertama memotong, dan itu **jauh lebih kecil** — kamera diam membuat
+mayoritas piksel identik antar frame, sehingga `palettegen=stats_mode=diff` +
+`paletteuse=diff_mode=rectangle` hanya perlu menulis bagian yang berubah.
+Tapi memotong membuat mata kehilangan jejak: tiap bab ada di bagian kanvas yang
+berbeda dan tidak ada petunjuk ke mana perpindahannya, jadi terasa meloncat.
 
-`palettegen=stats_mode=diff` + `paletteuse=diff_mode=rectangle` di `capture.mjs`
-yang memanfaatkan sifat itu: palet dan penulisan frame hanya memperhatikan
-bagian yang berubah.
+Sekarang kameranya menggeser dan mem-posisi ulang, dibuka dengan tampilan utuh
+lebih dulu supaya penonton punya peta sebelum masuk ke detail. Harganya nyata:
+
+| | frame | kamera memotong | kamera bergeser |
+|---|---|---|---|
+| `flow-detection.gif` | 441 → 588 | 1,4 MB | **4,1 MB** |
+| `flow-api.gif` | 374 → 510 | 1,1 MB | **4,2 MB** |
+
+Selisihnya datang dari ~230 frame yang kameranya sedang bergerak; pada frame itu
+setiap piksel berubah dan kompresi antar-frame tidak membantu sama sekali.
+
+**Mengecilkan lebar keluaran TIDAK menolong** — sudah diukur, bukan dikira:
+`--width 1040` menghasilkan 4,13 MB dan 4,32 MB, yaitu sedikit lebih BESAR.
+Penskalaan lanczos menambah warna antara pada gambar bergaris, dan kerugiannya
+di palet melebihi untungnya dari pengurangan piksel. Kalau ukurannya perlu
+ditekan, yang berpengaruh adalah memperpendek `TRANS_MS`/`INTRO_MS` di
+`build.py` (frame bergeraknya berkurang), bukan memperkecil gambar.
 
 **Kenapa frame di-set manual, bukan direkam real-time?**
 `capture.mjs` memanggil `window.__setFrame(n)` satu per satu, bukan merekam

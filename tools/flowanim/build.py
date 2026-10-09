@@ -49,7 +49,16 @@ ARROW_MS = 330
 ARROW_LEAD = 240          # node muncul setelah panahnya hampir selesai
 NODE_MS = 220
 STEP_MS = 620             # jarak antar langkah
-CHAPTER_OUTRO_MS = 520    # jeda sebelum potong ke bab berikutnya
+CHAPTER_OUTRO_MS = 520    # jeda sebelum pindah ke bab berikutnya
+
+# Kamera. Alurnya dibuka dengan tampilan utuh, lalu merayap masuk ke bab 1 dan
+# BERGESER dari bab ke bab -- bukan memotong. Potongan keras bikin mata
+# kehilangan jejak posisi, karena tiap bab berada di bagian kanvas yang
+# berbeda dan tidak ada petunjuk ke mana perpindahannya.
+OVERVIEW_MS = 2200        # tampilan utuh ditahan di awal
+INTRO_MS = 1500           # tampilan utuh -> bab 1
+TRANS_MS = 950            # bab -> bab berikutnya
+OVERVIEW_PAD = 70
 
 
 def step(ids, note, hold=None):
@@ -270,7 +279,7 @@ def build_timeline(d: Diagram, spec: dict, fps: int) -> dict:
     dari nomor frame mana pun. Tidak ada rAF, tidak ada transisi CSS -- supaya
     frame ke-N selalu identik setiap kali dijalankan."""
     chapters = []
-    t = 0
+    t = OVERVIEW_MS + INTRO_MS      # bab 1 baru mulai setelah pembuka
     warnings = []
 
     # Panah mana saja yang menyentuh sebuah node.
@@ -281,6 +290,8 @@ def build_timeline(d: Diagram, spec: dict, fps: int) -> dict:
                 touching.setdefault(end, []).append(aid)
 
     for ci, ch in enumerate(spec["chapters"]):
+        if ci > 0:
+            t += TRANS_MS           # ruang untuk geser kamera ke bab ini
         t0 = t
         active: set = set()
         events = []
@@ -333,16 +344,37 @@ def build_timeline(d: Diagram, spec: dict, fps: int) -> dict:
                 "t0": t0,
                 "t1": t,
                 "scale": round(scale, 4),
-                "tx": round(STAGE_W / 2 - scale * box.cx, 2),
-                "ty": round(STAGE_H / 2 - scale * box.cy, 2),
+                # Pusat dalam koordinat gambar, bukan translate jadi: kamera
+                # perlu di-interpolasi antar bab, dan menggeser titik tengah
+                # jauh lebih masuk akal daripada menggeser hasil translate-nya.
+                "cx": round(box.cx, 2),
+                "cy": round(box.cy, 2),
                 "events": events,
                 "notes": notes,
             }
         )
 
+    semua = [e["id"] for e in d.elements if not e.get("isDeleted")]
+    ov = bbox_of(d, semua).pad(OVERVIEW_PAD)
+    # Sengaja TIDAK dibatasi MIN_SCALE: tampilan pembuka memang harus memuat
+    # seluruh kanvas, dan di sini teks belum perlu terbaca.
+    ov_scale = min(STAGE_W / ov.w, STAGE_H / ov.h)
+
     frames = int(round(t / 1000 * fps))
     return {
         "fps": fps,
+        "stageW": STAGE_W,
+        "stageH": STAGE_H,
+        "overview": {
+            "scale": round(ov_scale, 4),
+            "cx": round(ov.cx, 2),
+            "cy": round(ov.cy, 2),
+            "t1": OVERVIEW_MS,
+        },
+        "overviewNote": spec.get(
+            "overviewNote",
+            "Seluruh alur dalam satu layar — berikutnya ditelusuri bab demi bab.",
+        ),
         "durationMs": t,
         "frames": frames,
         "title": spec["title"],
@@ -471,19 +503,59 @@ function reset() {
   }
 }
 
-function chapterAt(t) {
-  let ch = TL.chapters[0];
-  for (const c of TL.chapters) if (t >= c.t0) ch = c;
-  return ch;
+const STAGE_W = TL.stageW, STAGE_H = TL.stageH;
+
+// Mulai dan berhenti sama-sama pelan. Ease kubik saja masih terasa "direm
+// mendadak" di akhir geseran sepanjang kanvas ini.
+function smoother(p) { return p * p * p * (p * (6 * p - 15) + 10); }
+
+function applyCam(c) {
+  const tx = STAGE_W / 2 - c.scale * c.cx;
+  const ty = STAGE_H / 2 - c.scale * c.cy;
+  cam.setAttribute('transform',
+    `translate(${tx.toFixed(2)} ${ty.toFixed(2)}) scale(${c.scale.toFixed(5)})`);
 }
 
-function setFrame(n) {
-  const t = (n * 1000) / TL.fps;
-  const ch = chapterAt(t);
+// Skala di-interpolasi secara GEOMETRIS, bukan linear. Dengan linear, zoom
+// dari 0,26 ke 1,0 terasa melesat di awal lalu merayap di akhir; dengan
+// geometris, kecepatan perbesarannya terasa rata.
+function camBetween(a, b, p) {
+  return {
+    scale: a.scale * Math.pow(b.scale / a.scale, p),
+    cx: a.cx + (b.cx - a.cx) * p,
+    cy: a.cy + (b.cy - a.cy) * p,
+  };
+}
 
-  cam.setAttribute('transform', `translate(${ch.tx} ${ch.ty}) scale(${ch.scale})`);
+// Seluruh diagram tampil penuh. `fade` 0 = penuh, 1 = persis keadaan awal bab
+// (semuanya redup). Nilai di antaranya dipakai saat zoom pembuka, sehingga
+// gambar utuh LARUT menjadi kanvas kosong yang siap digambar bab 1 -- bukan
+// ditukar mendadak di satu frame.
+function showAll(fade) {
+  const f = fade || 0;
+  const vis = 1 - f;
+  for (const [id, o] of groups) {
+    if (o.kind === 'static' || statics.has(id)) {
+      o.g.style.opacity = o.baseOp * STATIC_OP;
+      continue;
+    }
+    if (o.kind === 'arrow') {
+      o.g.style.opacity = o.baseOp;
+      o.ghost.style.opacity = OFF;
+      o.line.style.opacity = o.dashed ? vis : 1;
+      if (!o.dashed && o.len) o.line.style.strokeDashoffset = o.len * f;
+      o.head.style.opacity = vis;
+      if (o.lbl) o.lbl.style.opacity = OFF + (1 - OFF) * vis;
+      continue;
+    }
+    o.g.style.opacity = o.baseOp * (OFF + (1 - OFF) * vis);
+    o.g.style.transform = '';
+    if (o.halo) o.halo.style.opacity = 0;
+  }
+}
+
+function applyChapter(ch, t) {
   reset();
-
   for (const ev of ch.events) {
     if (t < ev.t) continue;
     const o = groups.get(ev.id);
@@ -507,11 +579,79 @@ function setFrame(n) {
       if (o.halo) o.halo.style.opacity = 0.4 * Math.max(0, 1 - age / HALO_MS);
     }
   }
+}
 
-  let note = '';
+function noteAt(ch, t) {
+  let note = ch.notes.length ? ch.notes[0].text : '';
   for (const nt of ch.notes) if (t >= nt.t) note = nt.text;
-  crumb.textContent = `Bab ${ch.index}/${TL.nChapters} \\u00b7 ${ch.title}`;
-  noteEl.textContent = note;
+  return note;
+}
+
+// Di mana posisi waktu t: pembuka, sedang bergeser antar bab, atau di dalam bab.
+function locate(t) {
+  if (t < TL.overview.t1) return { mode: 'ov' };
+  const first = TL.chapters[0];
+  if (t < first.t0) {
+    return { mode: 'tr', prev: null, next: 0,
+             from: TL.overview, to: first,
+             p: (t - TL.overview.t1) / (first.t0 - TL.overview.t1) };
+  }
+  for (let i = 0; i < TL.chapters.length; i++) {
+    const c = TL.chapters[i];
+    if (t < c.t1) return { mode: 'ch', i };
+    const nx = TL.chapters[i + 1];
+    if (nx && t < nx.t0) {
+      return { mode: 'tr', prev: i, next: i + 1, from: c, to: nx,
+               p: (t - c.t1) / (nx.t0 - c.t1) };
+    }
+  }
+  return { mode: 'ch', i: TL.chapters.length - 1 };
+}
+
+function setFrame(n) {
+  const t = (n * 1000) / TL.fps;
+  const L = locate(t);
+
+  if (L.mode === 'ov') {
+    applyCam(TL.overview);
+    showAll();
+    crumb.textContent = TL.title;
+    noteEl.textContent = TL.overviewNote;
+  } else if (L.mode === 'tr') {
+    applyCam(camBetween(L.from, L.to, smoother(Math.max(0, Math.min(1, L.p)))));
+    // Isi layar ditukar di TENGAH geseran, bukan di ujungnya: saat itu kamera
+    // sedang bergerak paling kencang, jadi pergantian keadaan nyaris tidak
+    // terlihat. Kalau ditukar di awal atau akhir, ia tampak sebagai kedipan.
+    if (L.prev === null) {
+      // Pembuka: isi gambar melebur sepanjang zoom, jadi tidak ada titik tukar.
+      showAll(smoother(Math.max(0, Math.min(1, L.p))));
+      const c = TL.chapters[0];
+      const masuk = L.p >= 0.5;
+      crumb.textContent = masuk
+        ? `Bab ${c.index}/${TL.nChapters} · ${c.title}`
+        : TL.title;
+      noteEl.textContent = masuk ? noteAt(c, -1) : TL.overviewNote;
+    } else if (L.p < 0.5) {
+      {
+        const c = TL.chapters[L.prev];
+        applyChapter(c, c.t1);
+        crumb.textContent = `Bab ${c.index}/${TL.nChapters} \u00b7 ${c.title}`;
+        noteEl.textContent = noteAt(c, c.t1);
+      }
+    } else {
+      const c = TL.chapters[L.next];
+      applyChapter(c, c.t0 - 1);        // keadaan awal bab: belum ada yang menyala
+      crumb.textContent = `Bab ${c.index}/${TL.nChapters} \u00b7 ${c.title}`;
+      noteEl.textContent = noteAt(c, -1);
+    }
+  } else {
+    const c = TL.chapters[L.i];
+    applyCam(c);
+    applyChapter(c, t);
+    crumb.textContent = `Bab ${c.index}/${TL.nChapters} \u00b7 ${c.title}`;
+    noteEl.textContent = noteAt(c, t);
+  }
+
   bar.style.width = (100 * Math.min(1, t / TL.durationMs)).toFixed(2) + '%';
 }
 
