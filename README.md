@@ -24,21 +24,7 @@ Camera Service ──▶ Inference Service (YOLO11) ──▶ State Machine
 
 ### Alur lengkap, langkah demi langkah
 
-Dari lansia berada di ruangan sampai perawat menerima alarm dan menolong — termasuk
-cabang-cabang yang gampang terlewat: orang hilang sebentar dari frame, deteksi yang
-ragu-ragu, dan tombol simulasi yang dipakai saat demo.
-
 ![Animasi alur deteksi jatuh, dari kamera merekam sampai perawat menerima alarm](docs/assets/flow-detection.gif)
-
-Ada satu animasi lagi untuk sisi API, di bagian [API Endpoints](#api-endpoints).
-
-> **Mengedit diagramnya.** Sumber kedua animasi ada di `docs/flow/` dalam format
-> `.excalidraw` — buka lewat menu *Open* di [excalidraw.com](https://excalidraw.com),
-> atau gunakan berkas itu sendiri kalau hanya ingin memperbesar bagian tertentu.
-> Setelah diedit, GIF-nya dibuat ulang dengan perintah di
-> [tools/flowanim/README.md](tools/flowanim/README.md). Perintah itu butuh **puppeteer**
-> dan **ffmpeg**, yang tidak diperlukan untuk menjalankan sistemnya — jadi lewati saja
-> kalau kamu tidak sedang mengubah diagram.
 
 Lihat detail lengkap di [docs/architecture.md](docs/architecture.md).
 
@@ -47,123 +33,37 @@ Lihat detail lengkap di [docs/architecture.md](docs/architecture.md).
 ## Project Structure
 
 ```
-fall-detection/
-├── ml/                          # Data science & training
-│   ├── data/
-│   │   ├── raw/                 # Video mentah (gitignored)
-│   │   ├── extracted_frames/    # Frame hasil ekstraksi (gitignored)
-│   │   └── processed/           # Dataset YOLO format + data.yaml
-│   ├── scripts/
-│   │   ├── extract_frames.py    # Ekstrak frame dari video
-│   │   └── dedup_check.py       # Deteksi & hapus frame duplikat
-│   ├── notebooks/               # Jupyter notebooks untuk eksplorasi
-│   ├── models/                  # File .pt hasil training (gitignored)
-│   └── training/
-│       ├── config.yaml          # Hyperparameter training
-│       └── train.py             # Script training YOLO11
-│
-├── backend/                     # FastAPI backend
-│   ├── app/
-│   │   ├── main.py              # Entry point + lifespan (nyalakan kamera & pipeline)
-│   │   ├── api/                 # REST endpoints — hanya MEMBACA state, tidak memilikinya
-│   │   │   ├── alerts.py        # Riwayat alert
-│   │   │   ├── cameras.py       # CRUD kamera, pemindaian, daftar perangkat, stream MJPEG
-│   │   │   └── settings.py      # Konfigurasi runtime
-│   │   ├── core/
-│   │   │   ├── config.py        # Settings (env variables)
-│   │   │   └── logging.py       # Logger + helper waktu UTC
-│   │   ├── services/            # Komponen MURNI — tidak tahu-menahu soal FastAPI
-│   │   │   ├── inference_service.py    # Load & run YOLO11 (sekali muat, inference berurutan)
-│   │   │   ├── state_machine.py        # FSM fall detection
-│   │   │   ├── camera_service.py       # Video capture + rotasi + sambung ulang
-│   │   │   ├── overlay.py              # Gambar bounding box lalu encode JPEG
-│   │   │   ├── local_devices.py        # Daftar webcam/Iriun beserta namanya
-│   │   │   ├── network_scan.py         # Cari kamera IP di subnet lokal
-│   │   │   ├── alert_service.py        # DB → WebSocket → Telegram + cooldown
-│   │   │   └── notification_service.py # Telegram alerts
-│   │   ├── runtime/             # State yang hidup selama aplikasi berjalan
-│   │   │   ├── registry.py             # Kamera, FSM, task, frame & status terakhir
-│   │   │   ├── camera_manager.py       # Nyalakan/matikan kamera saat runtime
-│   │   │   └── detection_pipeline.py   # Loop utama per kamera
-│   │   ├── models/
-│   │   │   └── schemas.py       # Pydantic schemas
-│   │   ├── db/
-│   │   │   ├── database.py      # Engine & session (SQLite + SQLAlchemy async)
-│   │   │   ├── models.py        # Tabel cameras & alerts
-│   │   │   └── repository.py    # Satu-satunya tempat query SQL
-│   │   └── websocket/
-│   │       └── ws_manager.py    # WebSocket broadcast manager
-│   ├── tests/
-│   │   ├── test_state_machine.py
-│   │   ├── test_detection_pipeline.py
-│   │   └── test_camera_registry.py
-│   ├── requirements.txt
-│   └── Dockerfile
-│
-├── frontend/                    # React + Vite dashboard
-│   │   ├── src/
-│   │   │   ├── context/
-│   │   │   │   └── ThemeContext.jsx      # Pengelola mode gelap/terang (Dark/Light Mode)
-│   │   │   ├── pages/
-│   │   │   │   ├── LandingPage.jsx       # Halaman sambutan utama (Landing Page)
-│   │   │   │   ├── Login.jsx             # Halaman login caregiver
-│   │   │   │   ├── SimulationDashboard.jsx # Dasbor simulasi live monitoring CCTV & YOLO11
-│   │   │   ├── LiveCamera.jsx        # Pengujian kamera perangkat (HP/Laptop) via WebRTC
-│   │   │   ├── Cameras.jsx           # Halaman manajemen daftar kamera CCTV
-│   │   │   ├── AlertHistory.jsx      # Riwayat notifikasi insiden jatuh
-│   │   │   └── Settings.jsx          # Pengaturan sistem dan threshold durasi
-│   │   ├── components/
-│   │   │   └── DashboardLayout.jsx   # Tata letak responsif dengan sidebar collapsible
-│   │   ├── App.jsx                   # Pusat navigasi & rute aplikasi (React Router)
-│   │   ├── main.jsx                  # Entry point React
-│   │   └── index.css                 # Konfigurasi Tailwind CSS
-│   ├── public/                       # Aset publik, favicon, dan ikon
-│   ├── package.json                  # Dependensi dan skrip npm
-│   ├── vite.config.js                # Konfigurasi build Vite
-│   └── Dockerfile                    # Konfigurasi Docker frontend
-│
-├── docs/
-│   ├── architecture.md          # Diagram arsitektur sistem
-│   ├── api.md                   # Dokumentasi endpoint API
-│   ├── flow/                    # Sumber flowchart (.excalidraw, bisa diedit ulang)
-│   └── assets/                  # GIF hasil render flowchart (dipakai README ini)
-│
-├── deployment/
-│   ├── docker-compose.yml       # Orchestrasi backend + frontend
-│   └── .env.example             # Template environment variables
-│
-├── tools/
-│   ├── check_camera.py          # Uji satu sumber kamera dalam 3 detik
-│   ├── get_chat_id.py           # Cari chat_id Telegram untuk .env
-│   └── flowanim/                # Excalidraw → GIF beranimasi (punya README sendiri)
-│
-├── run-backend.bat              # Jalankan backend (cek venv, model, kamera dulu)
-├── run-frontend.bat             # Jalankan dashboard
-├── TESTING.md                   # Panduan pengujian manual langkah demi langkah
-├── .gitignore
-└── README.md                    # ← Anda di sini
+nursing-home-fall-detection/
+├── ml/              # Dataset, training, dan bobot model YOLO11
+├── backend/         # FastAPI: REST, WebSocket, pipeline deteksi
+├── frontend/        # React + Vite dashboard
+├── docs/            # Dokumentasi, sumber flowchart, dan GIF-nya
+├── deployment/      # docker-compose + template .env
+├── tools/           # Skrip bantu (uji kamera, chat_id Telegram, pembuat GIF)
+├── run-backend.bat  # Jalankan backend
+└── run-frontend.bat # Jalankan dashboard
 ```
+
+Isi `backend/app/` dipisah menurut siapa yang memiliki state:
+
+| Folder | Isi |
+|---|---|
+| `api/` | Endpoint REST — hanya **membaca** state, tidak memilikinya |
+| `services/` | Komponen murni: YOLO11, state machine, kamera, overlay, Telegram |
+| `runtime/` | State yang hidup selama aplikasi berjalan (registry, pipeline, manajer kamera) |
+| `db/` | SQLite + SQLAlchemy async; semua query SQL hanya ada di `repository.py` |
+| `websocket/` | Broadcast alert ke dashboard |
 
 ---
 
 ## Quick Start (Development Lokal)
 
-Seluruh perintah di bawah ditulis untuk **Windows PowerShell** dan dijalankan dari
-**folder root repo**. Semuanya sudah diuji pada clone yang benar-benar baru.
+Perintah di bawah untuk **Windows PowerShell**, dijalankan dari **root repo**, dan sudah
+diuji pada clone baru.
 
-> **Branch mana yang harus dipakai**
->
-> | Tujuan | Branch |
-> |---|---|
-> | Menjalankan sistem lengkap (dashboard + backend) | `integration` |
-> | Membaca atau mengerjakan kode backend saja | `backend` |
->
-> Branch `backend` sengaja hanya memuat sisi backend. Frontend di dalamnya masih versi
-> lama dan **belum punya** halaman Kelola Kamera, Simulasi Live, maupun Testing Kamera HP
-> — ketiganya ada di `integration`, tempat kerja backend dan frontend disatukan.
->
-> Jadi kalau kamu ingin **memakai** sistemnya, bukan sekadar membaca kodenya, pakai
-> `integration`. Seluruh langkah di bawah sama persis untuk kedua branch.
+> Pakai branch **`integration`** kalau ingin menjalankan sistemnya. Branch `backend`
+> hanya memuat sisi backend; frontend di dalamnya versi lama dan belum punya halaman
+> Kelola Kamera maupun Simulasi Live.
 
 ### Yang harus terpasang lebih dulu
 
@@ -172,23 +72,22 @@ Seluruh perintah di bawah ditulis untuk **Windows PowerShell** dan dijalankan da
 | Python | **3.12** | `py -0p` — harus ada baris `-3.12` |
 | Node.js | 18+ | `node --version` |
 | Git | — | `git --version` |
-| File model `best.pt` | EXP-006 | **tidak ada di repo** — minta ke anggota ML, lihat [langkah 3](#3-taruh-file-model) |
+| File model `best.pt` | EXP-006 | **tidak ada di repo** — lihat [langkah 3](#3-taruh-file-model) |
 
-> **Harus 3.12, bukan 3.13 atau 3.14.** `ultralytics` belum menyediakan wheel untuk
-> versi yang lebih baru, dan pemasangannya akan gagal di tengah jalan.
+> Harus **3.12**. `ultralytics` belum punya wheel untuk 3.13+, pemasangannya akan gagal.
 
 ### 1. Clone
 
 ```powershell
 git clone https://github.com/0Raja0-RA/nursing-home-fall-detection.git
 cd nursing-home-fall-detection
-git switch integration    # atau: git switch backend, lihat catatan di atas
+git switch integration
 ```
 
 ### 2. Pasang dependensi Python
 
-Virtual environment dibuat di **root repo**, bukan di dalam `backend/`. Launcher dan
-seluruh perintah di dokumen ini mengandalkan letak itu.
+Virtual environment dibuat di **root repo**, bukan di dalam `backend/` — launcher
+mengandalkan letak itu.
 
 ```powershell
 py -3.12 -m venv .venv
@@ -196,42 +95,28 @@ py -3.12 -m venv .venv
 .venv\Scripts\python.exe -m pip install -r backend\requirements.txt
 ```
 
-Unduhannya sekitar 1 GB (PyTorch ikut terbawa oleh `ultralytics`), jadi siapkan waktu
-beberapa menit. Tidak perlu `activate` — semua perintah memanggil `.venv\Scripts\python.exe`
-secara langsung, sehingga tidak ada kebingungan Python mana yang sedang dipakai.
+Unduhannya sekitar 1 GB karena PyTorch ikut terbawa. Tidak perlu `activate`; semua
+perintah memanggil `.venv\Scripts\python.exe` langsung.
 
-Pastikan berhasil:
+Pastikan berhasil — tahap ini belum butuh model, kamera, maupun internet:
 
 ```powershell
 .venv\Scripts\python.exe -m pytest backend\tests -q
 ```
 
-Semua uji harus lulus. Tahap ini belum butuh model, kamera, maupun internet.
-
 ### 3. Taruh file model
 
-> ### ⚠️ File model tidak ada di repo — harus diminta
->
-> `git clone` **tidak** memberimu file modelnya. Bobot `.pt` dikecualikan lewat
-> `.gitignore` karena ukurannya puluhan MB dan git tidak cocok menyimpan berkas biner
-> yang berubah setiap kali training diulang.
->
-> **Minta `best.pt` hasil EXP-006 ke anggota ML**, lalu taruh tepat di:
->
-> ```
-> ml\models\fall_detection\weights\best.pt
-> ```
->
-> Tanpa file itu, backend tetap menyala tapi **tidak akan mendeteksi apa pun**, dan
-> `run-backend.bat` akan berhenti dengan pesan "File model tidak ditemukan".
+`git clone` **tidak** memberimu file modelnya — bobot `.pt` dikecualikan lewat
+`.gitignore`. Minta `best.pt` hasil **EXP-006** ke anggota ML, lalu taruh di:
 
-Model yang benar adalah **EXP-006** (`exp006_hybrid_adamw`): YOLO11n, 70 epoch, AdamW,
-dengan augmentasi untuk kondisi minim cahaya dan tubuh yang tertutup sebagian.
+```
+ml\models\fall_detection\weights\best.pt
+```
 
-**Pastikan file yang kamu terima benar.** Bobot COCO bawaan YOLO (`yolo11n.pt`) berukuran
-mirip dan sangat mudah tertukar — ini pernah terjadi di proyek ini, dan akibatnya
-pemetaan kelas jadi kacau tanpa pesan error apa pun: `person` terbaca `normal`, `car`
-terbaca `lying_on_ground`.
+Tanpa file itu backend tetap menyala tapi tidak mendeteksi apa pun.
+
+Periksa file yang kamu terima — bobot COCO bawaan YOLO (`yolo11n.pt`) berukuran mirip dan
+mudah tertukar, dan kalau tertukar kelasnya kacau tanpa pesan error:
 
 ```powershell
 .venv\Scripts\python.exe -c "from ultralytics import YOLO; print(YOLO('ml/models/fall_detection/weights/best.pt').names)"
@@ -239,11 +124,8 @@ terbaca `lying_on_ground`.
 
 | Yang muncul | Artinya |
 |---|---|
-| `{0: 'normal', 1: 'transitional', 2: 'lying_on_ground'}` | Benar, model tim |
-| 80 kelas berisi `person`, `car`, dan seterusnya | **Salah** — itu bobot COCO, minta ulang |
-| `FileNotFoundError` | File belum ada di lokasi di atas |
-
-Kalau mau melatih sendiri alih-alih meminta, lihat [langkah 6](#6-opsional-training-ulang-model).
+| `{0: 'normal', 1: 'transitional', 2: 'lying_on_ground'}` | Benar |
+| 80 kelas berisi `person`, `car`, dst. | **Salah** — itu bobot COCO, minta ulang |
 
 ### 4. Jalankan
 
@@ -251,28 +133,24 @@ Kalau mau melatih sendiri alih-alih meminta, lihat [langkah 6](#6-opsional-train
 .\run-backend.bat
 ```
 
-Di jendela terminal lain:
+Di terminal lain:
 
 ```powershell
 .\run-frontend.bat
 ```
 
-`run-frontend.bat` menjalankan `npm install` sendiri kalau `node_modules` belum ada.
-
 | Alamat | Isi |
 |---|---|
 | http://localhost:5173 | Dashboard |
 | http://127.0.0.1:8000/docs | Dokumentasi API interaktif |
-| http://127.0.0.1:8000/api/cameras/cam-01/stream | Video + bounding box |
 
-Kamera diatur dari dashboard, bukan dari berkas — lihat [Mengelola Kamera](#mengelola-kamera).
 Saat pertama dijalankan, satu kamera dibuat otomatis dari `CAMERA_SOURCE` di
-`run-backend.bat` (bawaannya `0`, yaitu webcam laptop).
+`run-backend.bat` (bawaannya `0`, webcam laptop). Selanjutnya kamera diatur dari
+dashboard — lihat [Mengelola Kamera](#mengelola-kamera).
 
 ### 5. (Opsional) Notifikasi Telegram
 
-Tanpa langkah ini sistem tetap berjalan penuh; alert tersimpan dan muncul di dashboard,
-hanya notifikasi ke HP yang tidak dikirim.
+Tanpa langkah ini sistem tetap berjalan penuh; hanya notifikasi ke HP yang tidak dikirim.
 
 ```powershell
 copy backend\.env.example backend\.env
@@ -292,16 +170,12 @@ Jalankan ulang backend, lalu uji:
 curl.exe -s -X POST http://127.0.0.1:8000/api/settings/test-telegram
 ```
 
-> Tulis **`curl.exe`**, bukan `curl`. Di PowerShell `curl` adalah alias untuk
-> `Invoke-WebRequest` yang tidak mengenal `-X`. Alternatifnya:
-> `Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/api/settings/test-telegram`
+> Tulis `curl.exe`, bukan `curl` — di PowerShell `curl` adalah alias `Invoke-WebRequest`
+> yang tidak mengenal `-X`.
 
-Langkah lengkapnya — termasuk kenapa bot harus disapa lebih dulu dan apa yang harus
-dilakukan kalau `chat_id` tidak muncul — ada di **[TESTING.md](TESTING.md)**.
-
-Saat ada yang jatuh, grup menerima **foto** kejadian lengkap dengan bounding box, nama
-kamar, durasi, dan jam. Kegagalan kirim tidak membatalkan alert: barisnya tetap tersimpan
-dengan `notified: false`, supaya kegagalan terlihat alih-alih hilang diam-diam.
+Saat ada yang jatuh, grup menerima foto kejadian beserta bounding box, nama kamar,
+durasi, dan jam. Kegagalan kirim tidak membatalkan alert: barisnya tetap tersimpan
+dengan `notified: false`.
 
 ### 6. (Opsional) Training ulang model
 
@@ -309,20 +183,16 @@ dengan `notified: false`, supaya kegagalan terlihat alih-alih hilang diam-diam.
 .venv\Scripts\python.exe ml\training\train.py --config ml\training\config.yaml
 ```
 
-Perlu dataset format YOLO di `ml/data/processed/`. Model hasilnya tersimpan di
-`ml/models/fall_detection/weights/best.pt` — lokasi yang sama dengan yang dicari backend,
-jadi tidak perlu menyalin apa pun.
+Perlu dataset format YOLO di `ml/data/processed/`. Hasilnya tersimpan di lokasi yang sama
+dengan yang dicari backend, jadi tidak perlu menyalin apa pun. File `.pt` tidak ikut
+ter-commit; kirimkan langsung ke anggota tim lain kalau perlu.
 
-File itu **tidak akan ikut ter-commit** (`.gitignore` mengecualikan `*.pt`). Kalau ingin
-dipakai anggota tim lain, kirimkan filenya langsung lewat Drive atau WhatsApp, bukan lewat
-git.
-
-`ml/data/processed/data.yaml` sengaja memakai `path:` kosong supaya berfungsi di komputer
-siapa pun; Ultralytics akan memakai folder tempat berkas itu berada sebagai akar dataset.
-**Jangan mengisinya dengan path absolut** — berkas itu akan rusak untuk semua orang
-selain pengisinya.
+> `ml/data/processed/data.yaml` sengaja memakai `path:` kosong supaya berfungsi di
+> komputer siapa pun. **Jangan mengisinya dengan path absolut** — berkas itu akan rusak
+> untuk semua orang selain pengisinya.
 
 ---
+
 
 ## Docker Deployment
 
@@ -337,30 +207,6 @@ selain pengisinya.
 cd deployment
 docker compose up --build
 ```
-
----
-
-## Testing
-
-```powershell
-.venv\Scripts\python.exe -m pytest backend\tests -q
-```
-
-**52 uji**, dan semuanya berjalan tanpa kamera, tanpa model, tanpa token, dan tanpa
-koneksi internet — Telegram digantikan server HTTP lokal, kamera dan model digantikan
-objek tiruan. Jadi anggota tim mana pun bisa menjalankannya segera setelah `pip install`,
-sebelum meminta file model ke siapa pun.
-
-| Berkas | Yang dijaga |
-|---|---|
-| `test_state_machine.py` | Debounce, grace period, observasi ragu-ragu, alert tidak berulang, dan jeda pipeline yang tidak boleh terhitung sebagai durasi tergeletak |
-| `test_detection_pipeline.py` | Loop deteksi dengan kamera & model tiruan |
-| `test_camera_registry.py` | Validasi sumber kamera, repository, pemetaan subnet pemindai, dan model YOLO yang hanya boleh dimuat sekali meski beberapa kamera menyala bersamaan |
-| `test_telegram.py` | Pemilihan sendPhoto/sendMessage, escape HTML, percobaan ulang, penandaan simulasi, dan token yang tidak boleh bocor ke log |
-| `test_alert_service.py` | Urutan DB → WebSocket → Telegram, cooldown, kegagalan Telegram yang tidak boleh membatalkan alert |
-
-Pengujian manual — menghubungkan kamera HP, memastikan bounding box muncul, menguji
-Telegram, dan daftar masalah yang sering terjadi — ada di **[TESTING.md](TESTING.md)**.
 
 ---
 
@@ -426,55 +272,6 @@ Hal yang perlu diketahui:
   beban secara linear.
 - `CAMERA_SOURCE` di `run-backend.bat` hanya dipakai untuk membuat kamera **pertama** saat
   database masih kosong. Setelah itu diabaikan.
-
-Panduan pengujian langkah demi langkah ada di **[TESTING.md](TESTING.md)**.
-
----
-
-## Simulasi Jatuh
-
-Model masih sering membaca orang yang berbaring sebagai `transitional` di luar ruangan
-dataset URFD, sehingga alarm sungguhan sulit dipicu dengan tubuh. Tombol **Trigger
-Simulasi Orang Jatuh** di halaman Simulasi Live menutup celah itu untuk keperluan demo.
-
-Yang disimulasikan **hanya keluaran detektor**. Sisanya berjalan apa adanya:
-
-```
-tombol → observasi ditimpa jadi "postur pemicu" selama beberapa detik
-       → state machine menghitung durasinya sendiri
-       → debounce dan cooldown tetap berlaku
-       → alert tersimpan, disiarkan ke dashboard, dikirim ke Telegram beserta
-         foto frame kamera saat itu juga
-```
-
-Dengan begitu yang ditunjukkan saat demo adalah mekanisme yang memang dibangun, bukan
-jalan pintasnya. Kalimat yang bisa disampaikan ke penguji: *"yang kami simulasikan hanya
-keluaran modelnya, karena modelnya belum optimal di luar ruangan dataset. Seluruh rantai
-sesudahnya berjalan apa adanya."*
-
-Alert hasil simulasi **selalu bisa dibedakan** dari kejadian nyata:
-
-| Di mana | Bentuknya |
-|---|---|
-| Database | kolom `simulated = true` |
-| Pesan alert | diawali `[SIMULASI]` |
-| Telegram | judul **SIMULASI — BUKAN KEJADIAN SUNGGUHAN** di baris pertama |
-| Riwayat Insiden | badge kuning *Simulasi* |
-
-Itu disengaja, bukan sekadar kerapian: sistem deteksi jatuh yang bisa memunculkan alarm
-tanpa meninggalkan jejak membuat seluruh riwayat insidennya kehilangan nilai sebagai
-bukti — baik bagi perawat maupun bagi penguji.
-
-Lewat API:
-
-```powershell
-curl.exe -s -X POST http://127.0.0.1:8000/api/cameras/cam-01/simulate-fall
-```
-
-> `ALERT_COOLDOWN_SEC` di `run-backend.bat` diturunkan ke **10 detik**, karena saat demo
-> wajar diminta mengulang simulasi beberapa kali berturut-turut. Dengan nilai bawaan 60
-> detik, tekanan tombol kedua tidak mengirim apa pun dan sistemnya terlihat seperti rusak.
-> Kembalikan ke 60 untuk pemakaian sungguhan.
 
 ---
 
