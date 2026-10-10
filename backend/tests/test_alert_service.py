@@ -227,3 +227,13 @@ def test_masa_simulasi_berakhir_sendiri():
 def test_kamera_tanpa_simulasi_tidak_pernah_dianggap_disimulasikan():
     from app.runtime.registry import registry
     assert registry.sedang_disimulasikan("cam-entah") is False
+
+
+def test_waktu_pesan_dikonversi_dari_utc_ke_jam_setempat():
+    """created_at tersimpan UTC; pesan Telegram harus memakai jam setempat."""
+    from datetime import datetime, timezone
+
+    utc = datetime(2026, 10, 10, 13, 53, 17)
+    hasil = mod.AlertService._waktu_lokal(utc)
+    harapan = utc.replace(tzinfo=timezone.utc).astimezone().replace(tzinfo=None)
+    assert hasil == harapan

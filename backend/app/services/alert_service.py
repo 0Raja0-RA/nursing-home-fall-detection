@@ -100,7 +100,7 @@ class AlertService:
             camera_name=nama_kamera,
             fall_duration=duration,
             foto=foto,
-            waktu=db_alert.created_at,
+            waktu=self._waktu_lokal(db_alert.created_at),
             simulasi=disimulasikan,
         )
 
@@ -109,6 +109,13 @@ class AlertService:
         # notifikasi sudah sampai.
         async with factory() as session:
             await AlertRepository(session).mark_as_notified(db_alert.id, terkirim)
+
+    @staticmethod
+    def _waktu_lokal(utc_naive):
+        """created_at tersimpan sebagai UTC tanpa zona. Perawat membaca jam setempat;
+        tanpa konversi ini pesan Telegram selisih 7 jam di WIB."""
+        from datetime import timezone
+        return utc_naive.replace(tzinfo=timezone.utc).astimezone().replace(tzinfo=None)
 
     async def _nama_kamera(self, camera_id: str) -> str:
         """Nama kamar untuk ditampilkan, dengan camera_id sebagai cadangan.

@@ -30,7 +30,9 @@ WARNA = {
 ABU = (150, 150, 150)   # dipakai saat confidence di bawah ambang
 
 
-def gambar_deteksi(frame: np.ndarray, hasil: Optional[DetectionResult], ambang: float) -> np.ndarray:
+def gambar_deteksi(frame: np.ndarray, hasil: Optional[DetectionResult], ambang: float,
+                   tampilkan_ragu: bool = True, ambang_pemicu: Optional[float] = None,
+                   kelas_pemicu: tuple = ()) -> np.ndarray:
     """Gambar bounding box + label ke atas frame (frame dimodifikasi di tempat).
 
     Deteksi dengan confidence di bawah `ambang` tetap digambar, tapi berwarna abu-abu
@@ -42,6 +44,12 @@ def gambar_deteksi(frame: np.ndarray, hasil: Optional[DetectionResult], ambang: 
         return frame
 
     yakin = hasil.confidence >= ambang
+    # Postur pemicu selalu digambar dengan warnanya, seperti yang dihitung pipeline.
+    if (not yakin and ambang_pemicu is not None
+            and hasil.posture.value in kelas_pemicu and hasil.confidence >= ambang_pemicu):
+        yakin = True
+    if not yakin and not tampilkan_ragu:
+        return frame
     warna = WARNA.get(hasil.posture, ABU) if yakin else ABU
 
     x1, y1, x2, y2 = (int(v) for v in hasil.bbox)
@@ -56,10 +64,17 @@ def gambar_deteksi(frame: np.ndarray, hasil: Optional[DetectionResult], ambang: 
     return frame
 
 
-def jadikan_jpeg(frame: np.ndarray, hasil: Optional[DetectionResult], ambang: float) -> Optional[bytes]:
-    """Gambar deteksi lalu kembalikan frame sebagai byte JPEG siap kirim.
+def jadikan_jpeg(frame: np.ndarray, hasil: Optional[list[DetectionResult]], ambang: float,
+                 tampilkan_ragu: bool = True, ambang_pemicu: Optional[float] = None,
+                 kelas_pemicu: tuple = ()) -> Optional[bytes]:
+    """Gambar semua deteksi lalu kembalikan frame sebagai byte JPEG siap kirim.
 
     Frame disalin dulu supaya gambar yang dipakai pipeline tidak ikut tercoret.
+    Deteksi berkeyakinan rendah digambar lebih dulu supaya kotak yang yakin
+    (misalnya orang yang jatuh) tidak tertimpa kotak lain.
     """
-    ok, buffer = cv2.imencode(".jpg", gambar_deteksi(frame.copy(), hasil, ambang))
+    gambar = frame.copy()
+    for h in sorted(hasil or [], key=lambda d: d.confidence):
+        gambar_deteksi(gambar, h, ambang, tampilkan_ragu, ambang_pemicu, kelas_pemicu)
+    ok, buffer = cv2.imencode(".jpg", gambar)
     return buffer.tobytes() if ok else None
