@@ -1,0 +1,29 @@
+# ============================================================
+# label_map.yaml  ->  ml/data/mcf/label_map.yaml
+# Pemetaan kode anotasi MCF (Multiple Cameras Fall Dataset) ke 3 kelas YOLO proyek.
+# Dibaca oleh: ml/scripts/prepare_mcf.py
+#
+# Keputusan tim:
+#   - kode 3 (lying on the ground)  -> lying_on_ground
+#   - kode 8 (lying on a sofa)      -> normal  (berbaring di sofa BUKAN jatuh)
+#   - kode 2 (falling)              -> transitional
+# Sisanya (berdiri, jongkok, duduk, dst.) -> normal.
+# Jika nama kode di annotations.csv (kolom code_name) berbeda dari komentar di
+# bawah, percayai annotations.csv dan sesuaikan angkanya di sini.
+# ============================================================
+
+classes:
+  0: normal
+  1: transitional
+  2: lying_on_ground
+
+code_to_class:
+  1: 0   # normal
+  2: 1   # transitional (falling)
+  3: 2   # lying_on_ground
+  4: 0
+  5: 0
+  6: 0
+  7: 0
+  8: 0   # lying on a sofa -> normal (keputusan tim)
+  9: 0

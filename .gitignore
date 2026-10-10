@@ -15,6 +15,7 @@ ml/models/*.pt
 ml/models/*.onnx
 ml/models/*.engine
 runs/
+diag/
 
 # ---- Python ------------------------------------------------
 __pycache__/

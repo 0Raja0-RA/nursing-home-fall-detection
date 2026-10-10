@@ -1,0 +1,60 @@
+{
+  "from": "D:\\PENS\\Semester 5\\projek sistem cerdas\\nursing-home-fall-detection\\ml\\data\\processed_v2",
+  "classes": {
+    "0": "normal",
+    "1": "transitional",
+    "2": "lying_on_ground"
+  },
+  "keep_transitional": true,
+  "transitional_keep_frac": 0.5,
+  "seed": 0,
+  "adl_lying_normal": [
+    "adl-10",
+    "adl-11"
+  ],
+  "adl_lying_drop": [
+    "adl-21",
+    "adl-22",
+    "adl-23",
+    "adl-30",
+    "adl-32",
+    "adl-33",
+    "adl-34",
+    "adl-35",
+    "adl-36",
+    "adl-37",
+    "adl-38",
+    "adl-39",
+    "adl-40"
+  ],
+  "dropped": {
+    "transitional (disubsampel di train)": 1164,
+    "lying ADL dibuang": 133
+  },
+  "counts": {
+    "mcf/test/normal": 1480,
+    "mcf/test/transitional": 1145,
+    "mcf/test/lying_on_ground": 252,
+    "mcf/train/normal": 718,
+    "mcf/train/transitional": 785,
+    "mcf/train/lying_on_ground": 619,
+    "mcf/val/normal": 449,
+    "mcf/val/transitional": 515,
+    "mcf/val/lying_on_ground": 114,
+    "urfall-adl/test/normal": 163,
+    "urfall-adl/test/transitional": 188,
+    "urfall-adl/train/normal": 888,
+    "urfall-adl/train/transitional": 79,
+    "urfall-adl/val/normal": 110,
+    "urfall-adl/val/transitional": 159,
+    "urfall-fall/test/normal": 34,
+    "urfall-fall/test/transitional": 127,
+    "urfall-fall/test/lying_on_ground": 12,
+    "urfall-fall/train/normal": 196,
+    "urfall-fall/train/transitional": 300,
+    "urfall-fall/train/lying_on_ground": 183,
+    "urfall-fall/val/normal": 19,
+    "urfall-fall/val/transitional": 96,
+    "urfall-fall/val/lying_on_ground": 14
+  }
+}
