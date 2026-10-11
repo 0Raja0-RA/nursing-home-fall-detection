@@ -9,6 +9,7 @@ diganti fungsi tiruan yang mencatat apa yang diterimanya.
 """
 
 import asyncio
+import time
 
 import pytest
 import pytest_asyncio
@@ -268,3 +269,114 @@ async def test_menandai_ditangani_disiarkan_ke_semua_dashboard():
         assert pesan.event == "alert_ack" and pesan.data == {"id": 1}
     finally:
         await engine.dispose()
+
+
+# ---- "Tandai Ditangani" menutup insiden di kamera ----------
+
+def _fsm_dalam_keadaan(state_tujuan):
+    """State machine sungguhan yang dibawa ke keadaan tertentu lewat observasi."""
+    from app.models.schemas import FallState, Observation
+    from app.services.state_machine import FallStateMachine
+
+    fsm = FallStateMachine(camera_id="cam-03", fall_duration_threshold=0.05,
+                           possible_fall_threshold=0.0)
+    for _ in range(40):
+        fsm.update(Observation.TRIGGER_POSTURE)
+        if fsm.state == state_tujuan:
+            break
+        if state_tujuan == FallState.POSSIBLE_FALL:
+            break
+        time.sleep(0.01)
+    return fsm
+
+
+@pytest_asyncio.fixture
+async def db_alert():
+    from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+    from sqlalchemy.orm import sessionmaker
+    from app.db.models import Base
+
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    factory = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    async with factory() as sesi:
+        yield sesi
+    await engine.dispose()
+
+
+async def _tambah_alert(sesi, camera_id="cam-03"):
+    from app.db.models import AlertRecord
+    a = AlertRecord(camera_id=camera_id, message="uji", fall_duration=5.0)
+    sesi.add(a)
+    await sesi.commit()
+    return a.id
+
+
+@pytest.mark.asyncio
+async def test_ditangani_mengembalikan_kamera_ke_monitoring(db_alert):
+    """Kamera tersangkut di CONFIRMED_FALL setelah alarm ditangani: deteksi yang
+    ragu-ragu menahan timer, jadi tidak ada observasi yang bisa mengeluarkannya."""
+    from unittest.mock import AsyncMock, patch
+    from app.api.alerts import acknowledge_alert
+    from app.models.schemas import FallState, Observation
+    from app.runtime.registry import registry
+
+    fsm = _fsm_dalam_keadaan(FallState.CONFIRMED_FALL)
+    assert fsm.state == FallState.CONFIRMED_FALL
+    fsm.update(Observation.UNCERTAIN)            # wajah memenuhi frame
+    assert fsm.state == FallState.CONFIRMED_FALL, "UNCERTAIN memang menahan state"
+
+    registry.state_machines["cam-03"] = fsm
+    registry.simulasi_sampai["cam-03"] = time.monotonic() + 30
+    try:
+        alert_id = await _tambah_alert(db_alert)
+        with patch("app.api.alerts.manager.broadcast", new=AsyncMock()):
+            await acknowledge_alert(alert_id, db_alert)
+        assert fsm.state == FallState.MONITORING
+        assert fsm.fall_duration == 0.0
+        assert not registry.sedang_disimulasikan("cam-03"), "simulasi harus ikut berakhir"
+    finally:
+        registry.state_machines.pop("cam-03", None)
+        registry.simulasi_sampai.pop("cam-03", None)
+
+
+@pytest.mark.asyncio
+async def test_alert_lama_tidak_mereset_kejadian_yang_sedang_berjalan(db_alert):
+    """Menandai alert kemarin dari halaman Riwayat Insiden tidak boleh menghapus
+    timer insiden yang sedang terjadi sekarang di kamera yang sama."""
+    from unittest.mock import AsyncMock, patch
+    from app.api.alerts import acknowledge_alert
+    from app.models.schemas import FallState
+    from app.runtime.registry import registry
+
+    fsm = _fsm_dalam_keadaan(FallState.CONFIRMED_FALL)
+    registry.state_machines["cam-03"] = fsm
+    try:
+        lama = await _tambah_alert(db_alert)
+        await _tambah_alert(db_alert)            # insiden yang sedang berjalan
+        with patch("app.api.alerts.manager.broadcast", new=AsyncMock()):
+            await acknowledge_alert(lama, db_alert)
+        assert fsm.state == FallState.CONFIRMED_FALL
+    finally:
+        registry.state_machines.pop("cam-03", None)
+
+
+@pytest.mark.asyncio
+async def test_jatuh_baru_yang_sedang_dihitung_tidak_ikut_terhapus(db_alert):
+    from unittest.mock import AsyncMock, patch
+    from app.api.alerts import acknowledge_alert
+    from app.models.schemas import FallState
+    from app.runtime.registry import registry
+
+    fsm = _fsm_dalam_keadaan(FallState.POSSIBLE_FALL)
+    fsm.fall_duration_threshold = 60.0            # pastikan belum terkonfirmasi
+    assert fsm.state == FallState.POSSIBLE_FALL
+    registry.state_machines["cam-03"] = fsm
+    try:
+        alert_id = await _tambah_alert(db_alert)
+        with patch("app.api.alerts.manager.broadcast", new=AsyncMock()):
+            await acknowledge_alert(alert_id, db_alert)
+        assert fsm.state == FallState.POSSIBLE_FALL
+    finally:
+        registry.state_machines.pop("cam-03", None)
