@@ -19,7 +19,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.logging import utc_now_naive
 from app.db.database import get_db
 from app.db.models import AlertRecord
-from app.models.schemas import AlertResponse
+from app.models.schemas import AlertResponse, WSMessage
+from app.websocket.ws_manager import manager
 
 router = APIRouter()
 
@@ -75,7 +76,13 @@ async def acknowledge_alert(
     alert_id: int,
     db: AsyncSession = Depends(get_db),
 ):
-    """Tandai alert sebagai sudah ditangani (acknowledged)."""
+    """Tandai alert sebagai sudah ditangani (acknowledged).
+
+    Lalu siarkan ke semua dashboard yang terbuka, supaya banner alarm hilang di
+    layar mana pun -- bukan hanya di layar tempat tombolnya diklik. Tanpa ini,
+    alert yang ditangani dari halaman Riwayat Insiden, atau oleh perawat lain di
+    perangkat berbeda, tetap menyala dan berbunyi sampai halamannya dimuat ulang.
+    """
     result = await db.execute(
         select(AlertRecord).where(AlertRecord.id == alert_id)
     )
@@ -87,4 +94,6 @@ async def acknowledge_alert(
     alert.acknowledged_at = utc_now_naive()
     await db.commit()
     await db.refresh(alert)
+
+    await manager.broadcast(WSMessage(event="alert_ack", data={"id": alert.id}))
     return alert

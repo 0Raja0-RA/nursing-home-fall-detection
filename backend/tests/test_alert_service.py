@@ -237,3 +237,34 @@ def test_waktu_pesan_dikonversi_dari_utc_ke_jam_setempat():
     hasil = mod.AlertService._waktu_lokal(utc)
     harapan = utc.replace(tzinfo=timezone.utc).astimezone().replace(tzinfo=None)
     assert hasil == harapan
+
+
+@pytest.mark.asyncio
+async def test_menandai_ditangani_disiarkan_ke_semua_dashboard():
+    """Banner alarm harus hilang di semua layar, bukan hanya di layar tempat
+    tombolnya diklik -- termasuk saat ditangani dari halaman Riwayat Insiden."""
+    from unittest.mock import AsyncMock, patch
+
+    from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+    from sqlalchemy.orm import sessionmaker
+
+    from app.api.alerts import acknowledge_alert
+    from app.db.models import AlertRecord, Base
+
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    factory = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    try:
+        async with factory() as sesi:
+            sesi.add(AlertRecord(camera_id="cam-01", message="uji", fall_duration=10.0))
+            await sesi.commit()
+
+            with patch("app.api.alerts.manager.broadcast", new=AsyncMock()) as siar:
+                hasil = await acknowledge_alert(1, sesi)
+
+        assert hasil.acknowledged
+        pesan = siar.await_args.args[0]
+        assert pesan.event == "alert_ack" and pesan.data == {"id": 1}
+    finally:
+        await engine.dispose()

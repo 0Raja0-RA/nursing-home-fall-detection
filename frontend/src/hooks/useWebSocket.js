@@ -32,6 +32,10 @@ export function useWebSocket(url) {
                 } else if (jenis === 'alert') {
                     // Tanpa duplikat: alert yang sama tidak boleh muncul dua kali.
                     setAlerts((prev) => (prev.some((a) => a.id === data.id) ? prev : [...prev, data]));
+                } else if (jenis === 'alert_ack') {
+                    // Sudah ditangani -- di layar ini, di halaman Riwayat Insiden, atau
+                    // oleh perawat lain. Banner di semua dashboard hilang bersamaan.
+                    setAlerts((prev) => prev.filter((a) => a.id !== data.id));
                 }
             };
 

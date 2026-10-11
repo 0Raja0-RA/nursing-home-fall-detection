@@ -263,5 +263,5 @@ class DetectionResult(BaseModel):
 
 class WSMessage(BaseModel):
     """Pesan yang dikirim via WebSocket ke frontend."""
-    event: str = Field(..., description="Tipe event: status_update | alert | heartbeat")
+    event: str = Field(..., description="Tipe event: status_update | alert | alert_ack | heartbeat")
     data: dict
