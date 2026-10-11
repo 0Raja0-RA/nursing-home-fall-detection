@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AlertTriangle, BellRing, Video } from 'lucide-react';
+import { AlertTriangle, Video } from 'lucide-react';
 import { API_BASE } from '../config';
-import { useWebSocket } from '../hooks/useWebSocket';
-import { WS_URL } from '../config';
+import { useLive } from '../context/LiveContext';
 
 // Label dan warna pil status, mengikuti state machine di backend.
 const STATUS = {
@@ -37,19 +36,15 @@ function StreamImg({ src, alt }) {
     return <img ref={ref} alt={alt} className="absolute inset-0 w-full h-full object-contain" />;
 }
 
-export default function SimulationDashboard({ addHistoryItem }) {
-    const [note, setNote] = useState('');
+export default function SimulationDashboard() {
     const [cameras, setCameras] = useState([]);
     const [kameraSimulasiId, setKameraSimulasiId] = useState('');
     const [memulaiSimulasi, setMemulaiSimulasi] = useState(false);
     const [galat, setGalat] = useState('');
 
-    const { cameraData, alerts } = useWebSocket(WS_URL);
-
-    // Alert terbaru yang belum ditangani, langsung dari backend lewat WebSocket.
-    // Sebelumnya banner ini dinyalakan oleh hitungan mundur palsu di browser --
-    // angkanya tidak pernah cocok dengan FALL_DURATION_THRESHOLD yang sebenarnya.
-    const alertAktif = alerts.length > 0 ? alerts[alerts.length - 1] : null;
+    // Alarm jatuh ditampilkan oleh AlertBanner global; halaman ini hanya butuh
+    // status per kamera.
+    const { cameraData } = useLive();
 
     // Daftar kamera diambil dari backend, jadi kamera yang didaftarkan di halaman
     // "Kelola Kamera" langsung muncul di sini tanpa menyunting kode.
@@ -107,21 +102,6 @@ export default function SimulationDashboard({ addHistoryItem }) {
         }
     };
 
-    const tandaiDitangani = async () => {
-        if (!alertAktif) return;
-        try {
-            await fetch(`${API_BASE}/api/alerts/${alertAktif.id}/ack`, { method: 'PUT' });
-        } catch { /* biarkan; riwayat tetap bisa ditandai dari halaman Riwayat Insiden */ }
-        addHistoryItem?.({
-            id: alertAktif.id,
-            location: alertAktif.camera_name || alertAktif.camera_id,
-            time: new Date().toLocaleString('id-ID'),
-            status: 'confirmed',
-            note: note || 'Dikonfirmasi oleh caregiver via dashboard.',
-        });
-        setNote('');
-    };
-
     const kameraSimulasi = cameras.find((c) => c.camera_id === kameraSimulasiId) || cameras[0];
 
     return (
@@ -158,40 +138,6 @@ export default function SimulationDashboard({ addHistoryItem }) {
             {galat && (
                 <div className="mb-6 p-4 rounded-xl border border-red-500/30 bg-red-500/10 text-red-500 text-sm">
                     {galat}
-                </div>
-            )}
-
-            {/* Banner Alert Darurat Aktif */}
-            {alertAktif && (
-                <div className="mb-6 bg-red-500/10 border-2 border-red-500 p-5 rounded-2xl animate-pulse flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                    <div className="flex items-center gap-3">
-                        <BellRing className="w-8 h-8 text-red-500 animate-bounce" />
-                        <div>
-                            <h2 className="text-red-600 dark:text-red-400 font-bold text-lg">
-                                {alertAktif.simulated ? 'SIMULASI' : 'DARURAT TERKONFIRMASI'}
-                                : {alertAktif.camera_name || alertAktif.camera_id}
-                            </h2>
-                            <p className="text-sm text-slate-600 dark:text-slate-300">
-                                {alertAktif.message}
-                                {alertAktif.simulated && ' — dipicu tombol simulasi, bukan kejadian sungguhan.'}
-                            </p>
-                        </div>
-                    </div>
-                    <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
-                        <input
-                            type="text"
-                            placeholder="Catatan kondisi lansia..."
-                            value={note}
-                            onChange={(e) => setNote(e.target.value)}
-                            className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm"
-                        />
-                        <button
-                            onClick={tandaiDitangani}
-                            className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap"
-                        >
-                            Tandai Ditangani & Selesai
-                        </button>
-                    </div>
                 </div>
             )}
 

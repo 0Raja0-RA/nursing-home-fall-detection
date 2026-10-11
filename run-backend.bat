@@ -35,9 +35,11 @@ REM lalu taruh di lokasi di bawah ini. Pastikan kelasnya ada 3
 REM (normal, transitional, lying_on_ground) -- bukan 80 kelas COCO.
 set "MODEL_PATH=%~dp0ml\models\fall_detection\weights\best.pt"
 
-REM Ambang keyakinan model. 0.5 terlalu tinggi untuk kamera di luar dataset URFD,
-REM sehingga layar sering kosong. 0.25 membuat kotak lebih sering muncul.
-set "CONFIDENCE_THRESHOLD=0.25"
+REM Ambang keyakinan POSTUR. Deteksi di bawah ini disembunyikan dari stream dan
+REM dibaca "ragu" (timer ditahan). 0.5 cocok untuk mode pose; turunkan ke 0.25
+REM hanya kalau memakai mode bbox di kamera yang jauh dari dataset URFD.
+REM Postur lying_on_ground punya ambang sendiri yang lebih longgar (TRIGGER_MIN_CONF).
+set "CONFIDENCE_THRESHOLD=0.5"
 
 REM Ambang state machine (detik).
 set "POSSIBLE_FALL_THRESHOLD=0.5"

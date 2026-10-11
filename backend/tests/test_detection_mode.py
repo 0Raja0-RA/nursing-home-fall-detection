@@ -248,3 +248,174 @@ def test_mode_bbox_tetap_hanya_kotak():
                             bbox=[60, 60, 160, 300])
     frame = gambar_deteksi(np.zeros((320, 320, 3), np.uint8), hasil, ambang=0.5)
     assert not frame[150, 110].any(), "tanpa keypoint, bagian dalam kotak harus kosong"
+
+
+# ---- Saringan benda yang bukan orang -----------------------
+
+def test_kotak_sampah_dibuang_sebelum_menentukan_keputusan(monkeypatch):
+    """Colokan (kecil) dan kursi (yakinnya rendah) tidak boleh lolos sebagai orang.
+
+    Kalau lolos, mereka dibaca UNCERTAIN dan menahan timer terus-menerus.
+    """
+    import types
+
+    class Tensor:
+        def __init__(self, v): self.v = v
+        def item(self): return self.v
+        def tolist(self): return self.v
+
+    # (conf, kelas, kotak): orang jelas, kursi yakin rendah, colokan kecil
+    data = [
+        (0.90, 0, [100, 50, 300, 450]),
+        (0.12, 0, [350, 200, 500, 450]),
+        (0.80, 0, [10, 10, 30, 30]),
+    ]
+
+    class Boxes:
+        conf = [Tensor(c) for c, _, _ in data]
+        cls = [Tensor(k) for _, k, _ in data]
+        xyxy = [Tensor(b) for _, _, b in data]
+        def __len__(self): return len(data)
+
+    class Model:
+        def __call__(self, *a, **k):
+            return [types.SimpleNamespace(boxes=Boxes())]
+
+    inference_service.unload_model()
+    inference_service._models[MODE_BBOX] = Model()
+    inference_service.set_mode(MODE_BBOX)
+    try:
+        hasil = inference_service.run_inference(np.zeros((480, 640, 3), np.uint8))
+        assert len(hasil) == 1
+        assert hasil[0].confidence == pytest.approx(0.90)
+    finally:
+        inference_service.unload_model()
+
+
+def test_mode_pose_membuang_kotak_tanpa_sendi_terbaca():
+    """Kursi bisa lolos sebagai kotak 'orang', tapi sendinya tidak terbaca."""
+    import types
+    import torch
+
+    class Tensor:
+        def __init__(self, v): self.v = v
+        def item(self): return self.v
+        def tolist(self): return self.v
+
+    orang = np.zeros((17, 3)); orang[:, 2] = 0.9           # 17 sendi jelas
+    kursi = np.zeros((17, 3)); kursi[:, 2] = 0.05          # tak satu pun terbaca
+    kursi[0, 2] = 0.9                                      # satu saja kebetulan yakin
+
+    class Kp:
+        data = [torch.tensor(orang), torch.tensor(kursi)]
+
+    class Boxes:
+        conf = [Tensor(0.9), Tensor(0.8)]
+        cls = [Tensor(0), Tensor(0)]
+        xyxy = [Tensor([100, 50, 300, 450]), Tensor([350, 200, 550, 450])]
+        def __len__(self): return 2
+
+    class Model:
+        def __call__(self, *a, **k):
+            return [types.SimpleNamespace(boxes=Boxes(), keypoints=Kp())]
+
+    inference_service.unload_model()
+    inference_service._models[MODE_POSE] = Model()
+    inference_service.set_mode(MODE_POSE)
+    try:
+        hasil = inference_service.run_inference(np.zeros((480, 640, 3), np.uint8))
+        assert len(hasil) == 1
+        assert hasil[0].bbox[0] == 100
+    finally:
+        inference_service.unload_model()
+
+
+def test_kotak_ragu_bisa_disembunyikan_dari_stream():
+    from app.models.schemas import DetectionResult
+    from app.services.overlay import gambar_deteksi
+
+    ragu = DetectionResult(posture=PostureClass.NORMAL, confidence=0.2, bbox=[60, 60, 160, 300])
+    kosong = gambar_deteksi(np.zeros((320, 320, 3), np.uint8), ragu, 0.5, tampilkan_ragu=False)
+    assert not kosong.any(), "kotak ragu tidak boleh tergambar"
+
+    ada = gambar_deteksi(np.zeros((320, 320, 3), np.uint8), ragu, 0.5, tampilkan_ragu=True)
+    assert ada.any()
+
+
+def test_berbaring_dengan_sendi_kabur_tetap_dilaporkan_yakin():
+    """Bahu dan pinggul orang tergeletak sulit terbaca, tapi kotaknya jelas.
+
+    Kalau yang dilaporkan keyakinan sendi (~0), postur pemicu selalu UNCERTAIN
+    dan alarm tidak pernah bisa berbunyi.
+    """
+    import types
+    import torch
+
+    class Tensor:
+        def __init__(self, v): self.v = v
+        def item(self): return self.v
+        def tolist(self): return self.v
+
+    k = np.zeros((17, 3))
+    k[[0, 1, 2, 3], 2] = 0.5        # kepala terbaca (cukup untuk lolos saringan)
+    k[[5, 6, 11, 12], 2] = 0.03     # bahu dan pinggul kabur
+
+    class Kp:
+        data = [torch.tensor(k)]
+
+    class Boxes:
+        conf = [Tensor(0.6)]
+        cls = [Tensor(0)]
+        xyxy = [Tensor([50, 300, 550, 400])]    # melebar: rasio 5
+        def __len__(self): return 1
+
+    class Model:
+        def __call__(self, *a, **kw):
+            return [types.SimpleNamespace(boxes=Boxes(), keypoints=Kp())]
+
+    inference_service.unload_model()
+    inference_service._models[MODE_POSE] = Model()
+    inference_service.set_mode(MODE_POSE)
+    try:
+        (hasil,) = inference_service.run_inference(np.zeros((480, 640, 3), np.uint8))
+        assert hasil.posture == PostureClass.LYING_ON_GROUND
+        assert hasil.confidence == pytest.approx(0.6)
+    finally:
+        inference_service.unload_model()
+
+
+# ---- Orang duduk tidak boleh terbaca berbaring --------------
+
+def test_duduk_kaki_lurus_dengan_sendi_kabur_bukan_berbaring():
+    """Kotak melebar (kaki lurus ke depan) dan bahu/pinggul tak terbaca.
+
+    Dulu rasio > 1,3 saja sudah dibaca berbaring, sehingga orang duduk memicu timer.
+    """
+    a = np.zeros((17, 3))
+    a[0] = [100, 100, 0.8]       # hidung, jelas
+    a[11] = a[12] = [100, 200, 0.2]   # pinggul remang-remang (di bawah ambang mutu)
+    a[5] = a[6] = [100, 140, 0.2]
+    # Kepala tegak 100 piksel di atas pinggul -> bukan berbaring.
+    postur, _ = _postur_dari_pose(a, aspect_ratio=1.5)
+    assert postur != PostureClass.LYING_ON_GROUND
+
+
+def test_hanya_kotak_rasio_sedang_tidak_cukup_untuk_berbaring():
+    a = np.zeros((17, 3))
+    postur, _ = _postur_dari_pose(a, aspect_ratio=1.5)
+    assert postur != PostureClass.LYING_ON_GROUND
+
+
+def test_kotak_sangat_pipih_tanpa_sendi_tetap_dibaca_berbaring():
+    a = np.zeros((17, 3))
+    postur, _ = _postur_dari_pose(a, aspect_ratio=2.5)
+    assert postur == PostureClass.LYING_ON_GROUND
+
+
+def test_kepala_sejajar_pinggul_dibaca_berbaring():
+    a = np.zeros((17, 3))
+    a[0] = [300, 200, 0.8]            # kepala di samping
+    a[11] = a[12] = [100, 205, 0.5]   # pinggul, hampir sejajar
+    a[5] = a[6] = [100, 205, 0.1]     # bahu tak terbaca
+    postur, _ = _postur_dari_pose(a, aspect_ratio=2.0)
+    assert postur == PostureClass.LYING_ON_GROUND

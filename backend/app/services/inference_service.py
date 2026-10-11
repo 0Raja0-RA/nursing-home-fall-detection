@@ -180,12 +180,19 @@ _KP_PINGGUL_KIRI, _KP_PINGGUL_KANAN = 11, 12
 # bisa dipercaya.
 _KP_MIN_CONF = 0.25
 
+# Sendi dihitung "terlihat" untuk saringan manusia di atas ambang ini.
+_KP_TERLIHAT = 0.3
+
 # Ambang hasil kalibrasi EXP-009, dalam derajat terhadap lantai
 # (0 = rebah mendatar, 90 = tegak berdiri).
 _SUDUT_REBAH = 20.0
 _SUDUT_REBAH_LONGGAR = 32.0   # dipakai kalau kotaknya jelas melebar
 _SUDUT_TRANSISI = 60.0
 _AR_REBAH = 1.15
+# Saat sendi tidak terbaca dan hanya bentuk kotak yang tersisa, "berbaring" baru
+# dipercaya kalau kotaknya sangat pipih. Orang duduk dengan kaki lurus ke depan
+# berkotak melebar sekitar 1,2-1,6; yang benar-benar tergeletak jauh lebih pipih.
+_AR_TEBAKAN_REBAH = 1.8
 _AR_TRANSISI = 0.95
 
 
@@ -200,6 +207,28 @@ def calculate_spine_angle(kpts: np.ndarray) -> float:
     dx = mid_bahu[0] - mid_pinggul[0]
     dy = mid_bahu[1] - mid_pinggul[1]
     return math.degrees(math.atan2(abs(dy), abs(dx)))
+
+
+def _titik_rata(kpts: np.ndarray, indeks: tuple[int, ...]):
+    """Titik tengah dari sendi yang terbaca, atau None kalau tidak ada satu pun."""
+    terbaca = [kpts[i][:2] for i in indeks if kpts[i][2] >= _KP_TERLIHAT]
+    if not terbaca:
+        return None
+    return (sum(t[0] for t in terbaca) / len(terbaca), sum(t[1] for t in terbaca) / len(terbaca))
+
+
+def _sudut_kepala_pinggul(kpts: np.ndarray) -> Optional[float]:
+    """Sudut garis kepala-ke-pinggul terhadap lantai, kalau keduanya terbaca.
+
+    Pengganti sudut tulang belakang saat bahu atau pinggul tidak terbaca: orang
+    yang duduk kepalanya tegak di atas pinggul, sedangkan orang yang tergeletak
+    kepalanya sejajar pinggul.
+    """
+    atas = _titik_rata(kpts, (_KP_BAHU_KIRI, _KP_BAHU_KANAN)) or _titik_rata(kpts, (0, 1, 2, 3, 4))
+    bawah = _titik_rata(kpts, (_KP_PINGGUL_KIRI, _KP_PINGGUL_KANAN))
+    if atas is None or bawah is None:
+        return None
+    return math.degrees(math.atan2(abs(atas[1] - bawah[1]), abs(atas[0] - bawah[0])))
 
 
 def _postur_dari_pose(kpts: np.ndarray, aspect_ratio: float) -> tuple[PostureClass, float]:
@@ -218,16 +247,20 @@ def _postur_dari_pose(kpts: np.ndarray, aspect_ratio: float) -> tuple[PostureCla
     if mutu >= _KP_MIN_CONF:
         sudut = calculate_spine_angle(kpts)
     else:
-        # Bahu atau pinggul tidak terbaca -- sudutnya ditebak dari bentuk kotak.
+        # Bahu atau pinggul tidak terbaca. Coba kepala-ke-pinggul dulu; kalau itu
+        # juga tidak ada, sudutnya ditebak dari bentuk kotak.
         #
-        # `mutu` sengaja tidak dinaikkan di sini. Karena _KP_MIN_CONF (0,25) ada
-        # di bawah CONFIDENCE_THRESHOLD (0,5), tebakan ini SELALU dibaca pipeline
-        # sebagai UNCERTAIN. Konsekuensinya disengaja: di mode pose, jatuh hanya
-        # dikonfirmasi kalau skeletonnya benar-benar terbaca. Saat tidak terbaca,
-        # timer DITAHAN (bukan direset), jadi hitungan dilanjutkan begitu sendinya
-        # terlihat lagi. Posturnya tetap dihitung supaya kotaknya bisa digambar
-        # di stream untuk diagnosa.
-        sudut = 90.0 if aspect_ratio < 0.8 else (20.0 if aspect_ratio > 1.3 else 50.0)
+        # `mutu` sengaja tidak dinaikkan di sini, jadi postur non-berbaring hasil
+        # tebakan tetap dibaca pipeline sebagai UNCERTAIN (timer ditahan, bukan
+        # direset). Postur dihitung supaya kotaknya tetap bisa digambar.
+        sudut = _sudut_kepala_pinggul(kpts)
+        if sudut is None:
+            if aspect_ratio < 0.8:
+                sudut = 90.0
+            elif aspect_ratio > _AR_TEBAKAN_REBAH:
+                sudut = 20.0
+            else:
+                sudut = 50.0
 
     if sudut < _SUDUT_REBAH or (aspect_ratio > _AR_REBAH and sudut < _SUDUT_REBAH_LONGGAR):
         postur = PostureClass.LYING_ON_GROUND
@@ -241,15 +274,21 @@ def _postur_dari_pose(kpts: np.ndarray, aspect_ratio: float) -> tuple[PostureCla
 
 # ---- Inference ---------------------------------------------
 
-def run_inference(frame: np.ndarray) -> Optional[DetectionResult]:
+def run_inference(frame: np.ndarray) -> list[DetectionResult]:
     """Jalankan inference pada satu frame, memakai mode yang sedang aktif.
 
     Args:
         frame: Frame video dalam format numpy array (BGR, dari OpenCV).
 
     Returns:
-        DetectionResult dengan postur terdeteksi, confidence, dan bounding box.
-        None jika model benar-benar tidak menemukan apa pun.
+        Satu DetectionResult per orang yang terdeteksi, urut dari confidence
+        tertinggi. List kosong jika model benar-benar tidak menemukan siapa pun.
+
+    Semua kotak dikembalikan, bukan hanya yang paling yakin. Dulu hanya kotak
+    ber-confidence tertinggi yang dipakai, sehingga orang yang berdiri jelas
+    menutupi orang yang tergeletak di frame yang sama: yang jatuh tidak pernah
+    sampai ke state machine. Memilih mana yang menentukan keputusan adalah tugas
+    detection_pipeline.
 
     Catatan: penyaringan memakai DETECTION_MIN_CONF (sangat rendah), BUKAN
     CONFIDENCE_THRESHOLD. Keputusan "cukup yakin atau tidak" dibuat di
@@ -264,39 +303,79 @@ def run_inference(frame: np.ndarray) -> Optional[DetectionResult]:
         results = model(frame, verbose=False, conf=settings.DETECTION_MIN_CONF)
 
     if not results or len(results[0].boxes) == 0:
-        return None
+        return []
 
+    # Ambil deteksi dengan confidence tertinggi
     boxes = results[0].boxes
-    best_idx = int(boxes.conf.argmax().item())
-    confidence = float(boxes.conf[best_idx].item())
-    bbox = boxes.xyxy[best_idx].tolist()
+    urutan = sorted(range(len(boxes)), key=lambda i: float(boxes.conf[i].item()), reverse=True)
 
+    keypoints = None
     if mode == MODE_POSE:
         keypoints = getattr(results[0], "keypoints", None)
-        if keypoints is None or keypoints.data is None or len(keypoints.data) <= best_idx:
-            # Bukan model pose, atau keypoint-nya tidak keluar untuk kotak ini.
-            return None
+        if keypoints is None or keypoints.data is None:
+            # Bukan model pose, atau keypoint-nya tidak keluar.
+            return []
+
+    luas_frame = float(frame.shape[0] * frame.shape[1])
+
+    hasil: list[DetectionResult] = []
+    for idx in urutan:
+        confidence = float(boxes.conf[idx].item())
+        bbox = boxes.xyxy[idx].tolist()
 
         x1, y1, x2, y2 = bbox
         aspect_ratio = max(1.0, x2 - x1) / max(1.0, y2 - y1)
-        kpts = keypoints.data[best_idx].cpu().numpy()
+        # Kotak melebar = calon orang berbaring, yang tidak boleh ikut tersaring.
+        melebar = aspect_ratio > _AR_REBAH
 
-        postur, mutu = _postur_dari_pose(kpts, aspect_ratio)
-        # Yang dilaporkan adalah yang paling lemah di antara "ini benar orang"
-        # dan "posturnya terbaca jelas".
-        return DetectionResult(
-            posture=postur,
-            confidence=min(confidence, mutu),
-            bbox=bbox,
-            keypoints=kpts.tolist(),
-        )
+        # Saring benda yang bukan orang: terlalu tidak yakin, atau terlalu kecil.
+        batas_yakin = min(settings.PERSON_MIN_CONF, settings.TRIGGER_MIN_CONF) if melebar             else settings.PERSON_MIN_CONF
+        if confidence < batas_yakin:
+            continue
+        luas_kotak = max(0.0, x2 - x1) * max(0.0, y2 - y1)
+        if luas_kotak / luas_frame < settings.MIN_BOX_AREA_FRAC:
+            continue
 
-    cls_id = int(boxes.cls[best_idx].item())
-    return DetectionResult(
-        posture=_CLASS_MAP.get(cls_id, PostureClass.NORMAL),
-        confidence=confidence,
-        bbox=bbox,
-    )
+        if mode == MODE_POSE:
+            if len(keypoints.data) <= idx:
+                continue
+            kpts = keypoints.data[idx].cpu().numpy()
+
+            # Tanpa cukup sendi yang terbaca, ini bukan manusia (kursi, colokan).
+            terlihat = int((kpts[:, 2] >= _KP_TERLIHAT).sum())
+            butuh = min(settings.MIN_VISIBLE_KEYPOINTS, settings.MIN_KEYPOINTS_PEMICU)                 if melebar else settings.MIN_VISIBLE_KEYPOINTS
+            if terlihat < butuh:
+                continue
+
+            postur, mutu = _postur_dari_pose(kpts, aspect_ratio)
+            # Yang dilaporkan adalah yang paling lemah di antara "ini benar orang"
+            # dan "posturnya terbaca jelas" -- KECUALI untuk berbaring.
+            #
+            # Orang yang tergeletak justru yang bahu dan pinggulnya paling sulit
+            # terbaca (tertutup, miring, menghadap kamera), jadi `mutu` mendekati
+            # nol padahal kotaknya terdeteksi baik. Kalau mutu ikut dilaporkan,
+            # postur pemicu selalu jatuh ke UNCERTAIN, timer tidak pernah maju, dan
+            # alarm yang menjadi tujuan utama sistem tidak pernah berbunyi. Untuk
+            # berbaring, yang dipercaya adalah keyakinan bahwa kotak itu orang.
+            if postur == PostureClass.LYING_ON_GROUND and mutu < _KP_MIN_CONF:
+                dilaporkan = confidence
+            else:
+                dilaporkan = min(confidence, mutu)
+            hasil.append(DetectionResult(
+                posture=postur,
+                confidence=dilaporkan,
+                bbox=bbox,
+                keypoints=kpts.tolist(),
+            ))
+        else:
+            cls_id = int(boxes.cls[idx].item())
+            hasil.append(DetectionResult(
+                posture=_CLASS_MAP.get(cls_id, PostureClass.NORMAL),
+                confidence=confidence,
+                bbox=bbox,
+            ))
+
+    return hasil
 
 
 def unload_model() -> None:

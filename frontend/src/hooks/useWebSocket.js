@@ -1,39 +1,58 @@
-import { useState, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
+/**
+ * Langganan WebSocket backend: status kamera per frame dan alert jatuh.
+ *
+ * Menyambung ulang sendiri kalau putus (backend di-restart, WiFi berpindah).
+ * Tanpa itu dashboard diam-diam berhenti menerima alarm sampai halamannya
+ * dimuat ulang -- kegagalan yang sangat tidak diinginkan untuk sistem alarm.
+ */
 export function useWebSocket(url) {
     const [cameraData, setCameraData] = useState({});
     const [alerts, setAlerts] = useState([]);
-    const ws = useRef(null);
+    const [connected, setConnected] = useState(false);
 
     useEffect(() => {
-        ws.current = new WebSocket(url);
+        let ws = null;
+        let timer = null;
+        let berhenti = false;
 
-        ws.current.onmessage = (event) => {
-            const message = JSON.parse(event.data);
-            const { event: eventType, data } = message;
+        const sambung = () => {
+            ws = new WebSocket(url);
 
-            if (eventType === 'status_update') {
-                // Update status kamera (normal, transitional, lying_on_ground)
-                // Backend mengirimkan: camera_id, is_active, fall_state, dll
-                setCameraData(prev => ({ ...prev, [data.camera_id]: data }));
-            } else if (eventType === 'alert') {
-                // Menerima peringatan jika batas waktu jatuh (threshold) terlewati
-                setAlerts(prev => [...prev, data]);
-            }
+            ws.onopen = () => setConnected(true);
+
+            ws.onmessage = (event) => {
+                let pesan;
+                try { pesan = JSON.parse(event.data); } catch { return; }
+                const { event: jenis, data } = pesan;
+
+                if (jenis === 'status_update') {
+                    setCameraData((prev) => ({ ...prev, [data.camera_id]: data }));
+                } else if (jenis === 'alert') {
+                    // Tanpa duplikat: alert yang sama tidak boleh muncul dua kali.
+                    setAlerts((prev) => (prev.some((a) => a.id === data.id) ? prev : [...prev, data]));
+                }
+            };
+
+            ws.onerror = () => ws.close();
+            ws.onclose = () => {
+                setConnected(false);
+                if (!berhenti) timer = setTimeout(sambung, 2000);
+            };
         };
 
-        ws.current.onclose = () => console.log('WebSocket terputus. Mencoba menyambung kembali...');
-
+        sambung();
         return () => {
-            if (ws.current) ws.current.close();
+            berhenti = true;
+            clearTimeout(timer);
+            if (ws) ws.close();
         };
     }, [url]);
 
-    const acknowledgeAlert = (alertId) => {
-        setAlerts(prev => prev.filter(a => a.id !== alertId));
-        // Kirim konfirmasi ke backend bahwa alarm telah ditangani
-        ws.current.send(JSON.stringify({ action: 'acknowledge', alertId }));
-    };
+    const dismissAlert = useCallback((id) => {
+        setAlerts((prev) => prev.filter((a) => a.id !== id));
+    }, []);
 
-    return { cameraData, alerts, acknowledgeAlert };
+    return { cameraData, alerts, connected, dismissAlert };
 }

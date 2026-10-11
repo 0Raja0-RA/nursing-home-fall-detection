@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, NavLink, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, History, Settings as SettingsIcon, Video, ShieldCheck, Sun, Moon, LogOut, Camera, Menu, X } from 'lucide-react';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
+import { LiveProvider } from './context/LiveContext';
+import AlertBanner from './components/AlertBanner';
 
 import LandingPage from './pages/LandingPage';
 import SimulationDashboard from './pages/SimulationDashboard';
@@ -12,7 +14,7 @@ import Login from './pages/Login';
 import LiveCamera from './pages/LiveCamera';
 
 // Komponen Sidebar untuk Dashboard Caregiver
-function DashboardLayout({ historyItems, onClearHistory }) {
+function DashboardLayout() {
   const { darkMode, setDarkMode } = useTheme();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false); // State untuk buka/tutup sidebar
@@ -26,6 +28,7 @@ function DashboardLayout({ historyItems, onClearHistory }) {
   ];
 
   return (
+    <LiveProvider>
     <div className="flex min-h-screen bg-slate-100 dark:bg-slate-950 text-slate-800 dark:text-slate-200 font-sans transition-colors overflow-x-hidden relative">
 
       {/* Tombol Hamburger Floating untuk Membuka Sidebar di Mobile */}
@@ -107,27 +110,21 @@ function DashboardLayout({ historyItems, onClearHistory }) {
 
       {/* Main Content Area dengan min-w-0 agar tidak meluber */}
       <main className="flex-1 min-w-0 overflow-y-auto pb-10 md:pb-0 pt-16 md:pt-0 bg-slate-100 dark:bg-slate-950">
+        <AlertBanner />
         <Routes>
-          <Route path="" element={<SimulationDashboard addHistoryItem={onClearHistory} />} />
-          <Route path="camera-test" element={<LiveCamera addHistoryItem={onClearHistory} />} />
+          <Route path="" element={<SimulationDashboard />} />
+          <Route path="camera-test" element={<LiveCamera />} />
           <Route path="cameras" element={<Cameras />} />
-          <Route path="history" element={<AlertHistory history={historyItems} />} />
+          <Route path="history" element={<AlertHistory />} />
           <Route path="settings" element={<Settings />} />
         </Routes>
       </main>
     </div>
+    </LiveProvider>
   );
 }
 
 export default function App() {
-  const [historyItems, setHistoryItems] = useState([
-    { id: 1, location: 'Kamar 01', time: '02/10/2026, 12:00:00', status: 'confirmed', note: 'Contoh: Lansia terpeleset saat bangun tidur.' }
-  ]);
-
-  const addHistoryItem = (newItem) => {
-    setHistoryItems(prev => [newItem, ...prev]);
-  };
-
   return (
     <ThemeProvider>
       <Router>
@@ -136,7 +133,7 @@ export default function App() {
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<Login />} />
           {/* Dashboard Area untuk Caregiver */}
-          <Route path="/dashboard/*" element={<DashboardLayout historyItems={historyItems} onClearHistory={addHistoryItem} />} />
+          <Route path="/dashboard/*" element={<DashboardLayout />} />
         </Routes>
       </Router>
     </ThemeProvider>
