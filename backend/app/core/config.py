@@ -94,6 +94,13 @@ class Settings(BaseSettings):
     # timer terus direset dan alarm tidak pernah berbunyi. Hanya postur lain
     # (normal) yang mereset.
     PAUSE_CLASSES: list[str] = ["transitional"]
+    # Berapa lama sesudah lying_on_ground terakhir terlihat, postur PAUSE_CLASSES
+    # masih dianggap "orang yang sama sedang berkedip" dan menahan timer. Lewat
+    # dari ini, ia dibaca seperti postur biasa. Tanpa batas waktu, orang yang
+    # duduk (terbaca transitional) menahan timer selamanya: kamera tersangkut di
+    # CONFIRMED_FALL, jatuh berikutnya tidak berbunyi, dan salah-baca lying yang
+    # tercecer berjam-jam terus terakumulasi sampai menembus ambang.
+    PAUSE_WINDOW_SEC: float = 3.0
     ALERT_COOLDOWN_SEC: float = 60.0
 
     # ---- Camera --------------------------------------------

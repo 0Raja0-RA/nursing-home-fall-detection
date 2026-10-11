@@ -213,3 +213,94 @@ async def test_postur_berkedip_tidak_membatalkan_alarm():
     # Enam frame transitional berturut-turut, lebih panjang dari debounce (5).
     alarm, _ = await _jalankan([_lying(0.8)] * 2 + [trans] * 6, durasi_uji=3.0, ambang_detik=0.4)
     assert len(alarm) == 1
+
+
+# ---- Banyak orang: timer milik orang yang memicunya -------------
+#
+# Tes di bawah ini gagal pada versi pilih_observasi sebelum perbaikan. Kotak A
+# adalah orang yang jatuh; kotak B orang lain di bagian ruangan yang berbeda.
+
+_KOTAK_A = [5, 30, 60, 46]
+_KOTAK_B = [40, 2, 62, 28]
+
+
+def _di(posture, conf, kotak):
+    return DetectionResult(posture=posture, confidence=conf, bbox=list(kotak))
+
+
+@pytest.fixture
+def jendela_pendek(monkeypatch):
+    """Perkecil jendela kedipan supaya tes tidak perlu menunggu 3 detik."""
+    from app.core.config import get_settings
+    monkeypatch.setattr(get_settings(), "PAUSE_WINDOW_SEC", 0.3)
+
+
+@pytest.mark.asyncio
+async def test_orang_duduk_tidak_membekukan_kamera_setelah_alarm(jendela_pendek):
+    """Setelah orang yang jatuh pergi, orang lain yang duduk (terbaca transitional)
+    tidak boleh menahan kamera di CONFIRMED_FALL selamanya."""
+    jatuh = [_di(PostureClass.LYING_ON_GROUND, 0.8, _KOTAK_A)]
+    duduk = [_di(PostureClass.TRANSITIONAL, 0.9, _KOTAK_B)]
+    alarm, fsm = await _jalankan([jatuh] * 12 + [duduk] * 300, durasi_uji=2.5,
+                                 ambang_detik=0.4, grace_period_sec=0.3)
+    assert len(alarm) == 1
+    assert fsm.state == FallState.MONITORING, (
+        f"kamera tersangkut di {fsm.state.value} dengan timer {fsm.fall_duration:.1f}s")
+
+
+@pytest.mark.asyncio
+async def test_jatuh_kedua_tetap_berbunyi(jendela_pendek):
+    """Akibat langsung dari kamera yang tersangkut: jatuh berikutnya diam."""
+    jatuh = [_di(PostureClass.LYING_ON_GROUND, 0.8, _KOTAK_A)]
+    duduk = [_di(PostureClass.TRANSITIONAL, 0.9, _KOTAK_B)]
+    satu_babak = [jatuh] * 12 + [duduk] * 20
+    alarm, _ = await _jalankan(satu_babak * 20, durasi_uji=3.5,
+                               ambang_detik=0.4, grace_period_sec=0.3)
+    assert len(alarm) >= 2, f"hanya {len(alarm)} alarm untuk dua kejadian jatuh"
+
+
+@pytest.mark.asyncio
+async def test_tertutup_selimut_tidak_direset_oleh_orang_lain_yang_berdiri():
+    """Orang yang tergeletak hilang dari deteksi sementara orang lain berdiri jelas:
+    itu PERSON_LOST (grace period berlaku), bukan tanda yang jatuh sudah bangun."""
+    jatuh = [_di(PostureClass.LYING_ON_GROUND, 0.8, _KOTAK_A)]
+    berdiri = [_di(PostureClass.NORMAL, 0.95, _KOTAK_B)]
+    alarm, fsm = await _jalankan([jatuh] * 6 + [berdiri] * 300, durasi_uji=1.2,
+                                 ambang_detik=5.0, grace_period_sec=5.0)
+    assert fsm.fall_duration > 0, "timer direset oleh orang lain sebelum grace period habis"
+
+
+@pytest.mark.asyncio
+async def test_salah_baca_lying_yang_tercecer_tidak_menumpuk(jendela_pendek):
+    """Orang duduk yang sesekali salah terbaca lying selama satu frame. Dulu
+    transitional menahan timer tanpa batas, jadi salah-baca yang tercecer terus
+    terakumulasi sampai menembus ambang dan memicu alarm palsu."""
+    salah_baca = [_di(PostureClass.LYING_ON_GROUND, 0.8, _KOTAK_B)]
+    duduk = [_di(PostureClass.TRANSITIONAL, 0.9, _KOTAK_B)]
+    alarm, _ = await _jalankan([salah_baca] + [duduk] * 12, durasi_uji=4.5,
+                               ambang_detik=0.15)
+    assert alarm == [], "salah-baca yang tercecer memicu alarm palsu"
+
+
+def test_jejak_mengabaikan_orang_di_tempat_lain():
+    from app.models.schemas import Observation
+    from app.runtime.detection_pipeline import JejakPemicu, pilih_observasi
+
+    jejak = JejakPemicu(waktu=100.0, bbox=_KOTAK_A)
+    berdiri_jauh = _di(PostureClass.NORMAL, 0.95, _KOTAK_B)
+    assert pilih_observasi([berdiri_jauh], _settings(), jejak, 100.1) == (Observation.PERSON_LOST, None)
+
+    # Orang yang sama bangun di tempatnya: itu memang tanda sudah bangun.
+    bangun = _di(PostureClass.NORMAL, 0.95, [20, 0, 40, 46])
+    assert pilih_observasi([bangun], _settings(), jejak, 100.1)[0] == Observation.NON_TRIGGER_POSTURE
+
+
+def test_kedipan_transitional_hanya_sebentar():
+    from app.models.schemas import Observation
+    from app.runtime.detection_pipeline import JejakPemicu, pilih_observasi
+
+    s = _settings()
+    jejak = JejakPemicu(waktu=100.0, bbox=_KOTAK_A)
+    trans = _di(PostureClass.TRANSITIONAL, 0.9, _KOTAK_A)
+    assert pilih_observasi([trans], s, jejak, 100.0 + s.PAUSE_WINDOW_SEC - 0.1)[0] == Observation.UNCERTAIN
+    assert pilih_observasi([trans], s, jejak, 100.0 + s.PAUSE_WINDOW_SEC + 0.1)[0] == Observation.NON_TRIGGER_POSTURE
