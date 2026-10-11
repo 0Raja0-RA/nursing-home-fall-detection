@@ -78,5 +78,9 @@ class AlertRecord(Base):
     # riwayatnya kehilangan nilai sebagai bukti. Penanda ini juga muncul sebagai
     # teks di pesan Telegram dan di dashboard, supaya tidak ada yang salah baca.
     simulated = Column(Boolean, default=False, nullable=False, server_default="0")
+    # Catatan perawat tentang tindakan yang diambil. Diisi saat menandai alert
+    # ditangani, atau belakangan dari halaman Riwayat Insiden -- dalam keadaan
+    # darurat perawat menolong dulu, baru menulis.
+    caregiver_note = Column(String, nullable=True)
     created_at = Column(DateTime, default=utc_now_naive)
     acknowledged_at = Column(DateTime, nullable=True)

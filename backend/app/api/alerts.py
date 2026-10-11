@@ -6,25 +6,43 @@ REST endpoints untuk manajemen alert (riwayat notifikasi jatuh).
 Endpoints:
     GET  /api/alerts/          — Ambil daftar alert (dengan pagination)
     GET  /api/alerts/{id}      — Detail satu alert
-    PUT  /api/alerts/{id}/ack  — Acknowledge (tandai sudah ditangani)
+    PUT  /api/alerts/{id}/ack  — Acknowledge (tandai sudah ditangani), catatan opsional
+    PUT  /api/alerts/{id}/note — Tambah atau ubah catatan perawat
 """
 
 from datetime import datetime
-from typing import Optional
+from typing import Annotated, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import get_logger, utc_now_naive
 from app.db.database import get_db
 from app.db.models import AlertRecord
-from app.models.schemas import AlertResponse, FallState, WSMessage
+from app.models.schemas import AckRequest, AlertResponse, FallState, NoteUpdate, WSMessage
 from app.websocket.ws_manager import manager
 
 router = APIRouter()
 
 log = get_logger("app.api.alerts")
+
+
+def _rapikan_catatan(teks: Optional[str]) -> Optional[str]:
+    """Spasi di tepi dibuang; catatan kosong disimpan sebagai NULL, bukan ''."""
+    if teks is None:
+        return None
+    teks = teks.strip()
+    return teks or None
+
+
+async def _ambil_alert(alert_id: int, db: AsyncSession) -> AlertRecord:
+    alert = (await db.execute(
+        select(AlertRecord).where(AlertRecord.id == alert_id)
+    )).scalar_one_or_none()
+    if not alert:
+        raise HTTPException(status_code=404, detail="Alert not found")
+    return alert
 
 
 async def _tutup_insiden(alert: AlertRecord, db: AsyncSession) -> bool:
@@ -120,6 +138,9 @@ async def get_alert(
 @router.put("/{alert_id}/ack", response_model=AlertResponse)
 async def acknowledge_alert(
     alert_id: int,
+    # Annotated, bukan `= Body(None)`: dengan begitu nilai bawaannya benar-benar
+    # None saat fungsi dipanggil langsung (di tes), bukan objek penanda FastAPI.
+    payload: Annotated[Optional[AckRequest], Body()] = None,
     db: AsyncSession = Depends(get_db),
 ):
     """Tandai alert sebagai sudah ditangani (acknowledged).
@@ -130,18 +151,37 @@ async def acknowledge_alert(
     alert yang ditangani dari halaman Riwayat Insiden, atau oleh perawat lain di
     perangkat berbeda, tetap menyala dan berbunyi sampai halamannya dimuat ulang.
     """
-    result = await db.execute(
-        select(AlertRecord).where(AlertRecord.id == alert_id)
-    )
-    alert = result.scalar_one_or_none()
-    if not alert:
-        raise HTTPException(status_code=404, detail="Alert not found")
+    alert = await _ambil_alert(alert_id, db)
 
     alert.acknowledged = True
     alert.acknowledged_at = utc_now_naive()
+    # Catatan opsional. Kalau tidak dikirim atau kosong, catatan yang sudah ada
+    # dibiarkan -- menandai ulang tidak boleh menghapus tulisan perawat.
+    catatan = _rapikan_catatan(payload.note if payload else None)
+    if catatan is not None:
+        alert.caregiver_note = catatan
     await db.commit()
     await db.refresh(alert)
 
     await _tutup_insiden(alert, db)
     await manager.broadcast(WSMessage(event="alert_ack", data={"id": alert.id}))
+    return alert
+
+
+@router.put("/{alert_id}/note", response_model=AlertResponse)
+async def update_note(
+    alert_id: int,
+    payload: NoteUpdate,
+    db: AsyncSession = Depends(get_db),
+):
+    """Tambah atau ubah catatan perawat untuk satu alert.
+
+    Terpisah dari /ack karena dalam keadaan darurat perawat menolong dulu dan
+    menandai alarm tanpa sempat menulis; catatannya menyusul dari halaman
+    Riwayat Insiden. Mengirim teks kosong menghapus catatan.
+    """
+    alert = await _ambil_alert(alert_id, db)
+    alert.caregiver_note = _rapikan_catatan(payload.note)
+    await db.commit()
+    await db.refresh(alert)
     return alert

@@ -64,6 +64,7 @@ _KOLOM_SUSULAN: dict[str, list[tuple[str, str]]] = {
     "alerts": [
         ("notified", "BOOLEAN DEFAULT 0"),
         ("simulated", "BOOLEAN NOT NULL DEFAULT 0"),
+        ("caregiver_note", "VARCHAR"),
     ],
 }
 

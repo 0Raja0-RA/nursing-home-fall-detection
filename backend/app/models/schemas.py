@@ -80,10 +80,27 @@ class AlertResponse(AlertBase):
     # Dipicu tombol simulasi, bukan deteksi sungguhan. Ikut dikembalikan supaya
     # riwayat insiden bisa dipercaya sebagai bukti.
     simulated: bool = False
+    caregiver_note: Optional[str] = None
     created_at: datetime
     acknowledged_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
+
+
+# Batas panjang catatan perawat. Cukup untuk beberapa kalimat tindakan, dan
+# mencegah teks raksasa masuk ke database lewat API.
+CATATAN_MAKS = 500
+
+
+class AckRequest(BaseModel):
+    """Body opsional untuk PUT /api/alerts/{id}/ack."""
+    note: Optional[str] = Field(None, max_length=CATATAN_MAKS,
+                                description="Tindakan yang diambil perawat")
+
+
+class NoteUpdate(BaseModel):
+    """Body untuk PUT /api/alerts/{id}/note."""
+    note: str = Field(..., max_length=CATATAN_MAKS)
 
 
 class TestNotificationResponse(BaseModel):

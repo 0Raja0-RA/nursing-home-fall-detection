@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Clock, MapPin, AlertTriangle, CheckCircle2, Send, SendHorizonal, FlaskConical } from 'lucide-react';
+import { Clock, MapPin, AlertTriangle, CheckCircle2, Send, SendHorizonal, FlaskConical, Pencil, Plus } from 'lucide-react';
 import { API_BASE } from '../config';
 
 export default function AlertHistory() {
     const [history, setHistory] = useState([]);
     const [galat, setGalat] = useState('');
+    // Catatan yang sedang disunting. Disimpan terpisah dari `history` supaya
+    // penyegaran otomatis tiap 5 detik tidak menghapus apa yang sedang diketik.
+    const [sunting, setSunting] = useState(null);   // { id, teks } | null
+    const [menyimpan, setMenyimpan] = useState(false);
 
     const ambil = useCallback(async () => {
         try {
@@ -30,6 +34,25 @@ export default function AlertHistory() {
             await ambil();
         } catch {
             setGalat('Gagal menandai alert. Periksa koneksi ke backend.');
+        }
+    };
+
+    const simpanCatatan = async () => {
+        if (!sunting) return;
+        setMenyimpan(true);
+        try {
+            const r = await fetch(`${API_BASE}/api/alerts/${sunting.id}/note`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ note: sunting.teks }),
+            });
+            if (!r.ok) throw new Error(String(r.status));
+            setSunting(null);
+            await ambil();
+        } catch {
+            setGalat('Gagal menyimpan catatan. Periksa koneksi ke backend; tulisanmu masih ada.');
+        } finally {
+            setMenyimpan(false);
         }
     };
 
@@ -123,7 +146,59 @@ export default function AlertHistory() {
                                             </span>
                                         )}
                                     </td>
-                                    <td className="p-4 text-sm text-slate-400">{item.message}</td>
+                                    <td className="p-4 text-sm min-w-[16rem]">
+                                        {sunting?.id === item.id ? (
+                                            <form
+                                                onSubmit={(e) => { e.preventDefault(); simpanCatatan(); }}
+                                                className="flex flex-col gap-2"
+                                            >
+                                                <textarea
+                                                    autoFocus
+                                                    rows={2}
+                                                    maxLength={500}
+                                                    value={sunting.teks}
+                                                    onChange={(e) => setSunting({ id: item.id, teks: e.target.value })}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Escape') setSunting(null);
+                                                        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); simpanCatatan(); }
+                                                    }}
+                                                    placeholder="Tindakan yang diambil..."
+                                                    className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-slate-200 text-sm focus:outline-none focus:border-blue-500 resize-y"
+                                                />
+                                                <div className="flex gap-2">
+                                                    <button type="submit" disabled={menyimpan}
+                                                        className="px-3 py-1 rounded-lg text-xs font-medium bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white">
+                                                        {menyimpan ? 'Menyimpan…' : 'Simpan'}
+                                                    </button>
+                                                    <button type="button" onClick={() => setSunting(null)}
+                                                        className="px-3 py-1 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-300">
+                                                        Batal
+                                                    </button>
+                                                </div>
+                                            </form>
+                                        ) : item.caregiver_note ? (
+                                            <div className="flex items-start gap-2 group">
+                                                <p className="text-slate-200 whitespace-pre-wrap break-words">{item.caregiver_note}</p>
+                                                <button
+                                                    onClick={() => setSunting({ id: item.id, teks: item.caregiver_note })}
+                                                    title="Ubah catatan"
+                                                    aria-label="Ubah catatan"
+                                                    className="shrink-0 p-1 rounded text-slate-500 hover:text-slate-200 hover:bg-slate-800"
+                                                >
+                                                    <Pencil className="w-3.5 h-3.5" />
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <button
+                                                onClick={() => setSunting({ id: item.id, teks: '' })}
+                                                className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-300"
+                                            >
+                                                <Plus className="w-3.5 h-3.5" /> Tambah catatan
+                                            </button>
+                                        )}
+                                        {/* Pesan sistem tetap ditampilkan: hanya di sini durasi jatuhnya tercatat. */}
+                                        <p className="mt-1 text-xs text-slate-500">{item.message}</p>
+                                    </td>
                                 </tr>
                             ))}
                         </tbody>

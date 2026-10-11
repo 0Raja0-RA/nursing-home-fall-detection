@@ -262,7 +262,7 @@ async def test_menandai_ditangani_disiarkan_ke_semua_dashboard():
             await sesi.commit()
 
             with patch("app.api.alerts.manager.broadcast", new=AsyncMock()) as siar:
-                hasil = await acknowledge_alert(1, sesi)
+                hasil = await acknowledge_alert(1, db=sesi)
 
         assert hasil.acknowledged
         pesan = siar.await_args.args[0]
@@ -332,7 +332,7 @@ async def test_ditangani_mengembalikan_kamera_ke_monitoring(db_alert):
     try:
         alert_id = await _tambah_alert(db_alert)
         with patch("app.api.alerts.manager.broadcast", new=AsyncMock()):
-            await acknowledge_alert(alert_id, db_alert)
+            await acknowledge_alert(alert_id, db=db_alert)
         assert fsm.state == FallState.MONITORING
         assert fsm.fall_duration == 0.0
         assert not registry.sedang_disimulasikan("cam-03"), "simulasi harus ikut berakhir"
@@ -356,7 +356,7 @@ async def test_alert_lama_tidak_mereset_kejadian_yang_sedang_berjalan(db_alert):
         lama = await _tambah_alert(db_alert)
         await _tambah_alert(db_alert)            # insiden yang sedang berjalan
         with patch("app.api.alerts.manager.broadcast", new=AsyncMock()):
-            await acknowledge_alert(lama, db_alert)
+            await acknowledge_alert(lama, db=db_alert)
         assert fsm.state == FallState.CONFIRMED_FALL
     finally:
         registry.state_machines.pop("cam-03", None)
@@ -376,7 +376,7 @@ async def test_jatuh_baru_yang_sedang_dihitung_tidak_ikut_terhapus(db_alert):
     try:
         alert_id = await _tambah_alert(db_alert)
         with patch("app.api.alerts.manager.broadcast", new=AsyncMock()):
-            await acknowledge_alert(alert_id, db_alert)
+            await acknowledge_alert(alert_id, db=db_alert)
         assert fsm.state == FallState.POSSIBLE_FALL
     finally:
         registry.state_machines.pop("cam-03", None)
