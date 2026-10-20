@@ -1,5 +1,9 @@
 # 🧹 Konsep & Pipeline Preprocessing Dataset UR Fall
 
+> **Catatan:** dokumen ini menjelaskan pipeline preprocessing **awal** (`prepare_urfall.py`: dedup pHash, UR Fall saja).
+> Dataset final sekarang dibuat dengan pipeline lima tahap (UR Fall + MCF, stride per kelas) yang didokumentasikan di
+> [`notebooks/preprocessing_pipeline.ipynb`](notebooks/preprocessing_pipeline.ipynb).
+
 Dokumen ini mendokumentasikan secara lengkap arsitektur dan metodologi pipeline preprocessing dataset **UR Fall Detection (Cam0 RGB)** yang diimplementasikan di [`ml/scripts/prepare_urfall.py`](scripts/prepare_urfall.py).
 
 Pipeline ini dirancang untuk mengatasi 3 tantangan utama dataset video medis:
