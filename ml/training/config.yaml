@@ -19,26 +19,30 @@ data: "../data/processed/data.yaml"
 #   yolo11s.pt  (small  - balance speed & accuracy)
 #   yolo11m.pt  (medium - akurasi lebih baik)
 #   yolo11l.pt  (large  - akurasi tinggi, lambat)
-model: "yolo11n.pt"
+model: "yolo11s.pt"
  
 # ---- Training Hyperparameters ------------------------------
-epochs: 60
-batch: 16
-imgsz: 640
-patience: 25        # early stopping patience dinaikkan
-optimizer: "AdamW"  # ganti ke optimizer AdamW
-lr0: 0.001          # initial learning rate lebih halus
-lrf: 0.01           # final learning rate (lr0 * lrf)
-cos_lr: true        # cosine learning rate schedule untuk konvergensi halus
+epochs: 70
+batch: 8              # batch 8 untuk aman di VRAM 4GB RTX 2050 (atau 16 di Kaggle)
+imgsz: 800            # resolusi tinggi untuk menangkap detail postur tubuh
+patience: 25          # early stopping patience
+optimizer: "AdamW"    # optimizer AdamW untuk presisi tinggi
+lr0: 0.001            # initial learning rate
+lrf: 0.01             # final learning rate (lr0 * lrf)
+cos_lr: true          # cosine learning rate schedule
+cls: 1.2              # bobot loss klasifikasi ditingkatkan untuk ketegasan kelas
+label_smoothing: 0.05 # meredam ambiguitas transitional vs normal/lying
 momentum: 0.937
 weight_decay: 0.0005
 warmup_epochs: 3
 warmup_momentum: 0.8
 
-# ---- Augmentation ------------------------------------------
+# ---- Augmentation (Simulasi Kondisi Nyata Panti Jompo) -----
 hsv_h: 0.015        # hue augmentation
 hsv_s: 0.7          # saturation augmentation
-hsv_v: 0.4          # value augmentation
+hsv_v: 0.6          # value/brightness augmentation (simulasi cahaya minim/malam hari)
+bgr: 0.2            # grayscale/infrared simulation (20% channel shift)
+erasing: 0.4        # random erasing (simulasi occlusion terhalang selimut/kursi)
 degrees: 0.0        # rotation (+/- degrees)
 translate: 0.1      # translation (+/- fraction)
 scale: 0.5          # scale (+/- gain)
@@ -48,7 +52,7 @@ mosaic: 1.0         # mosaic augmentation
 
 # ---- Output ------------------------------------------------
 project: "../models"
-name: "exp003_nano_adamw"
+name: "exp008_yolo11s_imgsz800"
 exist_ok: true
 save: true
 save_period: 10     # save checkpoint setiap N epochs

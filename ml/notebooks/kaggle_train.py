@@ -1,14 +1,15 @@
 """
 kaggle_train.py
 ===============
-Template script training YOLO11 untuk dijalankan di Kaggle Notebook (GPU T4 / P100).
+Template script training YOLO11 (EXP-008: Scale-Up Model Capacity & High Resolution)
+untuk dijalankan di Kaggle Notebook (GPU T4 x1 / P100).
 
-Cara Pakai di Kaggle:
----------------------
-1. Upload 'urfall_yolo_dataset.zip' ke Kaggle Datasets (beri nama misal: 'urfall-yolo-dataset').
-2. Buat Notebook baru di Kaggle, aktifkan GPU T4 di menu: Settings -> Accelerator -> GPU T4 x1.
-3. Tambahkan dataset tadi lewat menu: + Add Data -> Your Datasets -> urfall-yolo-dataset.
-4. Salin kode di bawah ini ke dalam cell Kaggle dan jalankan!
+Eksperimen : EXP-008
+Model      : yolo11s.pt (Small - 9.4M parameter)
+Resolusi   : imgsz=800 (Resolusi tinggi untuk menangkap postur halus)
+Hypothesis : Mengatasi kekeliruan postur (transitional vs normal/lying) dan
+             distraksi perabotan/cahaya ekstrem dengan kapasitas model lebih besar
+             serta resolusi piksel lebih detail.
 """
 
 # ============================================================
@@ -17,47 +18,58 @@ Cara Pakai di Kaggle:
 # !pip install -q ultralytics
 
 import os
-import shutil
-import zipfile
 from pathlib import Path
-from ultralytics import YOLO
-import yaml
-
-# Cek GPU
 import torch
-print(f"CUDA Available: {torch.cuda.is_available()}")
+import yaml
+from ultralytics import YOLO
+
+print(f"PyTorch Version : {torch.__version__}")
+print(f"CUDA Available  : {torch.cuda.is_available()}")
 if torch.cuda.is_available():
-    print(f"Device Name   : {torch.cuda.get_device_name(0)}")
+    print(f"Device Name     : {torch.cuda.get_device_name(0)}")
 
 # ============================================================
-# CELL 2: Ekstrak Dataset di Workspace Kaggle
+# CELL 2: Deteksi Lokasi Dataset (Direct Folder / Tanpa Unzip)
 # ============================================================
-# Path input dataset dari Kaggle (sesuaikan dengan nama dataset yang kamu buat)
-kaggle_input_dir = Path("/kaggle/input")
-work_dir = Path("/kaggle/working")
-dataset_dir = work_dir / "dataset"
+primary_dataset_path = Path("/kaggle/input/datasets/rajarahmanaziiz/fall-detection-dataset")
+fallback_candidates = [
+    primary_dataset_path,
+    Path("/kaggle/input/fall-detection-dataset"),
+    Path("/kaggle/input/urfall-yolo-dataset"),
+]
 
-# Cari file zip dataset di input
-zip_candidates = list(kaggle_input_dir.glob("*/*.zip")) + list(kaggle_input_dir.glob("*.zip"))
+dataset_dir = None
 
-if zip_candidates:
-    zip_path = zip_candidates[0]
-    print(f"Mengekstrak {zip_path} ke {dataset_dir}...")
-    with zipfile.ZipFile(zip_path, "r") as z:
-        z.extractall(dataset_dir)
-    print("Ekstraksi selesai!")
+for candidate in fallback_candidates:
+    if candidate.exists():
+        if (candidate / "images").exists():
+            dataset_dir = candidate
+            break
+        sub_images = list(candidate.glob("**/images"))
+        if sub_images:
+            dataset_dir = sub_images[0].parent
+            break
+
+if not dataset_dir:
+    kaggle_input = Path("/kaggle/input")
+    found_images = list(kaggle_input.glob("**/images"))
+    if found_images:
+        dataset_dir = found_images[0].parent
+
+if dataset_dir:
+    print(f"✅ Dataset berhasil ditemukan di: {dataset_dir}")
+    print(f"   Train images : {len(list((dataset_dir / 'images' / 'train').glob('*')))} file")
+    print(f"   Val images   : {len(list((dataset_dir / 'images' / 'val').glob('*')))} file")
+    print(f"   Test images  : {len(list((dataset_dir / 'images' / 'test').glob('*')))} file")
 else:
-    # Jika dataset di-upload sebagai folder tanpa zip
-    possible_dir = list(kaggle_input_dir.glob("*/images"))
-    if possible_dir:
-        dataset_dir = possible_dir[0].parent
-        print(f"Dataset ditemukan di: {dataset_dir}")
-    else:
-        print("[PERINGATAN] Dataset zip tidak ditemukan, periksa /kaggle/input!")
+    raise FileNotFoundError("❌ Folder dataset tidak ditemukan di /kaggle/input! Periksa input dataset Anda.")
 
 # ============================================================
-# CELL 3: Buat data.yaml dengan Path Kaggle
+# CELL 3: Buat data.yaml di /kaggle/working/data.yaml
 # ============================================================
+work_dir = Path("/kaggle/working")
+kaggle_yaml_path = work_dir / "data.yaml"
+
 data_yaml_content = {
     "path": str(dataset_dir.resolve()),
     "train": "images/train",
@@ -71,52 +83,82 @@ data_yaml_content = {
     }
 }
 
-kaggle_yaml_path = work_dir / "data.yaml"
 with open(kaggle_yaml_path, "w") as f:
     yaml.dump(data_yaml_content, f, default_flow_style=False)
 
-print(f"File data.yaml berhasil dibuat di: {kaggle_yaml_path}")
+print(f"\n✓ File data.yaml berhasil dibuat di: {kaggle_yaml_path}")
+print("-" * 35)
 print(open(kaggle_yaml_path).read())
+print("-" * 35)
 
 # ============================================================
-# CELL 4: Training Baseline YOLO11
+# CELL 4: Training EXP-008 (yolo11s.pt + imgsz=800 + Robust Augs)
 # ============================================================
-print("Memulai training baseline YOLO11...")
+# Fitur Utama EXP-008:
+# 1. Base Model: yolo11s.pt (Small - 9.4M params) -> 3.5x kapasitas dari Nano
+# 2. Input Size: 800x800 -> detail tubuh manusia saat berdiri/duduk lebih tajam
+# 3. Label Smoothing: 0.05 -> meredam keraguan model pada kelas 'transitional'
+# 4. Class Loss Weight (cls=1.2) -> fokus ekstra membedakan 3 kelas postur
+# 5. Night/Glare Augmentations: hsv_v=0.6, hsv_s=0.7, erasing=0.4, scale=0.5
 
-model = YOLO("yolo11n.pt")  # Base model nano
+print("🚀 [EXP-008] Memulai Training YOLO11s (Resolution 800x800)...")
+
+model = YOLO("yolo11s.pt")
 
 results = model.train(
     data=str(kaggle_yaml_path),
-    epochs=50,
-    batch=16,
-    imgsz=640,
-    patience=15,
-    lr0=0.01,
+    epochs=70,
+    patience=25,
+    batch=16,           # Sesuai kapasitas VRAM 16GB GPU T4 di resolusi 800
+    imgsz=800,          # Skala resolusi tinggi
+    optimizer="AdamW",
+    lr0=0.001,
     lrf=0.01,
-    optimizer="auto",
-    flipud=0.0,       # Matikan vertical flip untuk deteksi jatuh
-    fliplr=0.5,       # Mirror horizontal kiri-kanan
+    cos_lr=True,
+    cls=1.2,            # Bobot klasifikasi dinaikkan untuk ketepatan postur
+    label_smoothing=0.05, # Mengurangi ambiguitas transitional
+    # Robust augmentations (atasi silau, bayangan & background clutter):
+    hsv_v=0.6,          # Variasi kecerahan drastis (simulasi pencahayaan kamar/silau)
+    hsv_s=0.7,          # Variasi saturasi warna
+    hsv_h=0.015,
+    bgr=0.2,            # Channel flip simulasi tone IR / CCTV
+    erasing=0.4,        # Cutout sebagian tubuh (simulasi tertutup selimut/meja)
+    scale=0.5,          # Multi-scale zoom (orang dekat vs jauh dari kamera)
+    flipud=0.0,
+    fliplr=0.5,
     mosaic=1.0,
+    close_mosaic=10,
     project="/kaggle/working/models",
-    name="baseline_yolo11n",
+    name="exp008_yolo11s_imgsz800",
     exist_ok=True,
     save=True
 )
 
-print("\nTraining Baseline Selesai!")
-print(f"Hasil tersimpan di: {results.save_dir}")
+best_model_path = Path(results.save_dir) / "weights" / "best.pt"
+print(f"\n✅ Training selesai! Model terbaik disimpan di: {best_model_path}")
 
 # ============================================================
-# CELL 5: Evaluasi Test Set & Simpan Model
+# CELL 5: Evaluasi Test Set Model Akhir
 # ============================================================
-# Validasi akhir menggunakan test set
-metrics = model.val(data=str(kaggle_yaml_path), split="test")
+print("\n🔍 Menjalankan evaluasi pada Test Set untuk EXP-008...")
+eval_model = YOLO(str(best_model_path))
+metrics = eval_model.val(data=str(kaggle_yaml_path), split="test", imgsz=800)
 
-print("\n--- HASIL METRIK TEST SET ---")
-print(f"mAP50-95 : {metrics.box.map:.4f}")
-print(f"mAP50    : {metrics.box.map50:.4f}")
-print(f"Precision: {metrics.box.mp:.4f}")
-print(f"Recall   : {metrics.box.mr:.4f}")
+print("\n" + "=" * 55)
+print("📊 HASIL EVALUASI TEST SET EXP-008 (YOLO11s @ 800x800):")
+print("=" * 55)
+print(f"• Test mAP50        : {metrics.box.map50 * 100:.2f}%")
+print(f"• Test mAP50-95     : {metrics.box.map * 100:.2f}%")
+print(f"• Test Precision    : {metrics.box.mp * 100:.2f}%")
+print(f"• Test Recall       : {metrics.box.mr * 100:.2f}%")
+print("-" * 55)
 
-# Model terbaik siap di-download dari output Kaggle:
-# /kaggle/working/models/baseline_yolo11n/weights/best.pt
+# Tampilkan metrik per-kelas jika tersedia
+if hasattr(metrics.box, 'maps') and len(metrics.box.maps) == 3:
+    class_names = ["normal", "transitional", "lying_on_ground"]
+    for i, name in enumerate(class_names):
+        print(f"  - {name:<16}: mAP50-95 = {metrics.box.maps[i] * 100:.2f}%")
+
+print("=" * 55)
+print(f"\n📁 File bobot terbaik siap diunduh:")
+print(f"   {best_model_path}")

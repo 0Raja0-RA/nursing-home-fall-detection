@@ -1,26 +1,50 @@
 # Fall Detection System — Nursing Home Monitoring
 
-Sistem deteksi jatuh real-time untuk panti jompo menggunakan YOLO11 computer vision, FastAPI backend, dan React dashboard.
+Sistem deteksi jatuh real-time untuk panti jompo menggunakan **Dual-Engine Computer Vision** (Custom YOLO11 Bounding Box & YOLO11-Pose Kinematics), **FastAPI Backend** dengan Finite State Machine (FSM) 10-detik, dan **React Dashboard**.
 
 ---
 
-## Architecture
+## 🏗️ System Architecture
 
 ```
-Kamera (RTSP/Webcam)
-    │
-    ▼
-Camera Service ──▶ Inference Service (YOLO11) ──▶ State Machine
-                                                       │
-                              ┌─────────────────────────┤
-                              ▼                         ▼
-                    Telegram Notification        WebSocket Push
-                              │                         │
-                              ▼                         ▼
-                        📱 Penjaga               🖥️ Dashboard
+                  ┌─────────────────────────────────────────┐
+                  │          Kamera (RTSP / Webcam)         │
+                  └────────────────────┬────────────────────┘
+                                       │
+                                       ▼
+                  ┌─────────────────────────────────────────┐
+                  │       Camera Service (OpenCV Loop)      │
+                  └────────────────────┬────────────────────┘
+                                       │
+                    ┌──────────────────┴──────────────────┐
+                    ▼                                     ▼
+         [ Mode Bounding Box ]                  [ Mode Pose Estimation ]
+        Custom YOLO11n (EXP-006)               YOLO11n-Pose (17 Keypoints)
+       • Bounding box classification         • Sudut tulang belakang (θ < 20°)
+       • Super cepat (290+ FPS)              • Kebal false alarm kasur/sofa
+       • Cocok untuk koridor/lorong          • Cocok untuk kamar tidur
+                    │                                     │
+                    └──────────────────┬──────────────────┘
+                                       │ Posture: normal / trans / lying
+                                       ▼
+                  ┌─────────────────────────────────────────┐
+                  │   State Machine (FSM Timer 10 Detik)    │
+                  │  MONITORING ──▶ POSSIBLE ──▶ CONFIRMED  │
+                  └────────────────────┬────────────────────┘
+                                       │
+                     ┌─────────────────┴─────────────────┐
+                     ▼                                   ▼
+          📱 Telegram Alert Service             🖥️ WebSocket Push Service
+         (Foto Snapshot + Detail Durasi)          (Live Posture + Status)
 ```
 
-**Flow:** Kamera menangkap video → YOLO11 mendeteksi postur (normal/transitional/lying_on_ground) per frame → State machine menghitung durasi "lying_on_ground" → Jika melebihi threshold → Kirim alert Telegram + tampilkan di dashboard.
+**Alur Kerja (Flow):**
+1. **Capture:** Kamera menangkap video frame secara real-time.
+2. **Dual-Engine Inference:** Pengguna dapat memilih mesin deteksi:
+   - **Bounding Box:** Klasifikasi postur langsung dari deteksi kotak objek.
+   - **Pose Estimation:** Ekstraksi 17 titik sendi tubuh dan analisis sudut kemiringan tulang belakang terhadap bidang lantai ($\theta$).
+3. **State Machine (FSM):** Saat postur `lying_on_ground` terdeteksi, stopwatch aktif ke state `POSSIBLE_FALL`. Jika posisi terkapar bertahan selama $\ge 10$ detik, sistem mengonfirmasi ke `CONFIRMED_FALL`. Jika pasien bangkit sebelum 10 detik, timer di-reset.
+4. **Alerting:** Begitu `CONFIRMED_FALL` tercapai, sistem memicu notifikasi darurat Telegram kepada penjaga dan push update real-time ke web dashboard.
 
 Lihat detail lengkap di [docs/architecture.md](docs/architecture.md).
 
@@ -30,19 +54,25 @@ Lihat detail lengkap di [docs/architecture.md](docs/architecture.md).
 
 ```
 fall-detection/
-├── ml/                          # Data science & training
+├── ml/                          # Data science, modeling & training
 │   ├── data/
 │   │   ├── raw/                 # Video mentah (gitignored)
 │   │   ├── extracted_frames/    # Frame hasil ekstraksi (gitignored)
 │   │   └── processed/           # Dataset YOLO format + data.yaml
 │   ├── scripts/
 │   │   ├── extract_frames.py    # Ekstrak frame dari video
-│   │   └── dedup_check.py       # Deteksi & hapus frame duplikat
-│   ├── notebooks/               # Jupyter notebooks untuk eksplorasi
+│   │   ├── dedup_check.py       # Deteksi & hapus frame duplikat
+│   │   ├── demo_pose_fall.py    # Live demo kamera + visualisasi sudut skeleton
+│   │   └── tune_pose_fall.py    # Script grid search kinematic threshold
+│   ├── notebooks/
+│   │   └── pose_tuning.ipynb    # Notebook eksperimen EXP-009 (Pose Benchmark)
 │   ├── models/                  # File .pt hasil training (gitignored)
+│   ├── DATA_PREPROCESSING.md    # Dokumentasi lengkap pipeline & konsep preprocessing
 │   └── training/
 │       ├── config.yaml          # Hyperparameter training
-│       └── train.py             # Script training YOLO11
+│       ├── train.py             # Script training YOLO11
+│       ├── experiments.csv      # Riwayat metrik kuantitatif eksperimen
+│       └── EXPERIMENTS.md       # Laporan ilmiah mendalam (EXP-001 s.d. EXP-010)
 │
 ├── backend/                     # FastAPI backend
 │   ├── app/
@@ -171,18 +201,41 @@ Frontend akan berjalan di **http://localhost:5173**
 
 > Vite sudah dikonfigurasi untuk proxy `/api` dan `/ws` ke backend di port 8000.
 
-### 4. (Opsional) Training Model
+### 4. (Opsional) Menjalankan Model & Eksperimen
 
+#### A. Menjalankan Live Pose Demo (Webcam / Iriun Phone Camera):
 ```bash
-cd ml/training
+# Jalankan demo deteksi pose real-time dengan kamera bawaan / webcam
+python ml/scripts/demo_pose_fall.py --source 0
 
-# Pastikan sudah ada dataset di ml/data/processed/
-# dengan struktur YOLO format (images/ + labels/)
-
-python train.py --config config.yaml
+# Untuk kamera eksternal / Iriun Webcam:
+python ml/scripts/demo_pose_fall.py --source 1
 ```
 
+#### B. Menjalankan Training Bounding Box Custom (EXP-006):
+```bash
+cd ml/training
+python train.py --config config.yaml
+```
 Model `best.pt` akan tersimpan di `ml/models/fall_detection/weights/`.
+
+---
+
+## 🧠 Model Paradigms: Bounding Box vs Pose Estimation
+
+Sistem ini mengimplementasikan dua paradigma computer vision yang dapat disesuaikan dengan kebutuhan area pemantauan:
+
+| Parameter | **Bounding Box Detection (Custom YOLO11n)** | **Kinematic Pose Estimation (YOLO11n-Pose)** |
+| :--- | :--- | :--- |
+| **Model** | `best.pt` (EXP-006 Champion) | `yolo11n-pose.pt` (EXP-009) |
+| **Metode** | Klasifikasi kotak objek (x, y, w, h) | 17 Keypoints sendi + Sudut tulang belakang $\theta$ |
+| **Formula Deteksi** | Direct class probability: 0 (Normal), 1 (Trans), 2 (Lying) | $\theta = \arctan2(|\Delta y|, |\Delta x|) \times \frac{180}{\pi}$ |
+| **Batas Threshold** | Confidence $\ge 0.50$ | Fall: $\theta < 20.0^\circ$ \| Trans: $\theta < 60.0^\circ$ \| AR $> 1.15$ |
+| **Kecepatan** | **~290+ FPS** (3.4 ms/frame) | **~65+ FPS** (15.3 ms/frame) |
+| **Ketahanan Clutter** | Rentan false positive jika ada kasur/bantal rebah | **Kebal false positive** (wajib ada struktur sendi manusia) |
+| **Rekomendasi Area** | **Koridor & Lorong Bebas Furnitur** | **Kamar Tidur & Ruang Keluarga Panti Jompo** |
+
+Detail riwayat riset dari EXP-001 hingga EXP-009 dapat dilihat di [ml/training/EXPERIMENTS.md](ml/training/EXPERIMENTS.md).
 
 ---
 
