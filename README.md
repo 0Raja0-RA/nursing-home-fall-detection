@@ -83,6 +83,7 @@ fall-detection/
 │   │   └── occlusion_resistant_pose.py # Heuristik pose tahan oklusi (EXP-011)
 │   ├── notebooks/
 │   │   ├── preprocessing_pipeline.ipynb # Dokumentasi pipeline preprocessing final (Tahap 0-5)
+│   │   ├── eda_dataset.ipynb    # EDA dataset: integritas, duplikat, resolusi, review label, distribusi kelas
 │   │   ├── kaggle_training.ipynb # Training di Kaggle (versi skrip: kaggle_train.py)
 │   │   ├── pose_tuning.ipynb    # Notebook eksperimen EXP-009 (Pose Benchmark)
 │   │   ├── temporal_velocity.ipynb # Notebook EXP-010
@@ -237,7 +238,8 @@ python ml/scripts/demo_pose_fall.py --source 1
 #### B. Menyiapkan Dataset (Preprocessing UR Fall + MCF):
 Gambar dan label dataset tidak disimpan di git. Pipeline final terdiri dari lima skrip berurutan;
 penjelasan, parameter aktual, dan hasil tiap tahap ada di
-[ml/notebooks/preprocessing_pipeline.ipynb](ml/notebooks/preprocessing_pipeline.ipynb).
+[ml/notebooks/preprocessing_pipeline.ipynb](ml/notebooks/preprocessing_pipeline.ipynb). Analisis isi dataset
+(EDA) ada di [ml/notebooks/eda_dataset.ipynb](ml/notebooks/eda_dataset.ipynb).
 ```bash
 # 1. UR Fall: --raw-dir berisi csv/features/urfall-cam0-*.csv dan rgb_zip/*-cam0-rgb.zip
 python ml/scripts/prepare_dataset.py --raw-dir "<folder raw UR Fall>" --output-dir ml/data/processed
