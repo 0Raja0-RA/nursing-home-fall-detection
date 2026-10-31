@@ -60,7 +60,7 @@ fall-detection/
 │   │   ├── processed/           # UR Fall -> YOLO (Tahap 1)
 │   │   ├── processed_mcf/       # MCF -> YOLO (Tahap 2)
 │   │   ├── processed_v2/        # Gabungan UR Fall + MCF + frames_meta.csv (Tahap 3-4)
-│   │   └── processed_v2_3cls/   # Dataset training final 3 kelas (Tahap 5)
+│   │   └── processed_final/   # Dataset training final 3 kelas (Tahap 5)
 │   │                            #   images/ & labels/ di semua folder processed* gitignored;
 │   │                            #   yang di-track: data.yaml, dataset_manifest.json, preview
 │   ├── scripts/
@@ -242,15 +242,15 @@ penjelasan, parameter aktual, dan hasil tiap tahap ada di
 (EDA) ada di [ml/notebooks/eda_dataset.ipynb](ml/notebooks/eda_dataset.ipynb).
 ```bash
 # 1. UR Fall: --raw-dir berisi csv/features/urfall-cam0-*.csv dan rgb_zip/*-cam0-rgb.zip
-python ml/scripts/prepare_dataset.py --raw-dir "<folder raw UR Fall>" --output-dir ml/data/processed
+python ml/scripts/prepare_dataset.py --raw-dir "<folder raw UR Fall>" --output-dir ml/data/processed_urfall
 # 2. MCF: video chute01..chute24 di ml/data/mcf/dataset
 python ml/scripts/prepare_mcf.py --root ml/data/mcf/dataset --output-dir ml/data/processed_mcf --detector yolo11m.pt --imgsz 960
 # 3. Gabung (pembagian skenario MCF yang berlaku di processed_v2)
-python ml/scripts/merge_datasets.py --src ml/data/processed ml/data/processed_mcf --output-dir ml/data/processed_v2 --mcf-split "train=1-14,val=15-18,test=19-24"
+python ml/scripts/merge_datasets.py --src ml/data/processed_urfall ml/data/processed_mcf --output-dir ml/data/processed_v2 --mcf-split "train=1-14,val=15-18,test=19-24"
 # 4. Audit (menulis processed_v2/frames_meta.csv)
 python ml/scripts/audit_dataset.py --dataset ml/data/processed_v2
 # 5. Dataset training final 3 kelas
-python ml/scripts/make_training_set.py --dataset ml/data/processed_v2 --output-dir ml/data/processed_v2_3cls --keep-transitional --transitional-keep-frac 0.5 --adl-lying-normal adl-10 adl-11 --adl-lying-drop adl-21 adl-22 adl-23 adl-30 adl-32 adl-33 adl-34 adl-35 adl-36 adl-37 adl-38 adl-39 adl-40
+python ml/scripts/make_training_set.py --dataset ml/data/processed_v2 --output-dir ml/data/processed_final --keep-transitional --transitional-keep-frac 0.5 --adl-lying-normal adl-10 adl-11 --adl-lying-drop adl-21 adl-22 adl-23 adl-30 adl-32 adl-33 adl-34 adl-35 adl-36 adl-37 adl-38 adl-39 adl-40
 ```
 
 #### C. Menjalankan Training Bounding Box Custom (EXP-006):

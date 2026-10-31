@@ -5,12 +5,15 @@
 # ---- ML: Raw data, extracted frames, trained models --------
 ml/data/raw/
 ml/data/extracted_frames/
-# Gambar & label dataset YOLO di SEMUA folder processed* (processed, processed_mcf,
-# processed_v2, processed_v2_3cls): dibagikan lewat Kaggle/Drive, bukan git.
-# Metadata kecil tetap di-track: data.yaml, dataset_manifest.json, frames_meta.csv,
-# boxes.csv, dan gambar preview/sheet *.jpg.
+# Di git hanya 3 folder hasil: processed_urfall, processed_mcf, processed_final
+# (gabungan UR-Fall + MCF). Gambar & label dibagikan lewat Kaggle/Drive, bukan git;
+# metadata kecil (data.yaml, dataset_manifest.json, boxes.csv, preview *.jpg) di-track.
 ml/data/processed*/images/
 ml/data/processed*/labels/
+# Folder perantara & keluaran alat bantu: hanya lokal
+ml/data/processed_v2/
+ml/data/box_audit/
+ml/data/eval_*.csv
 ml/data/*.zip
 ml/data/mcf/dataset/
 # Keluaran uji sinkronisasi kamera: mcf_check.py sync --out sync_*.png

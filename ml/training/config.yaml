@@ -11,7 +11,7 @@
 # ---- Dataset -----------------------------------------------
 # Path ke file data.yaml yang mendefinisikan lokasi dataset
 # dan daftar kelas.
-data: "../data/processed/data.yaml"
+data: "../data/processed_urfall/data.yaml"
 
 # ---- Model -------------------------------------------------
 # Base model yang digunakan. Pilihan:

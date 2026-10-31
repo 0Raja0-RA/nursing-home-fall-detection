@@ -141,7 +141,7 @@ def main():
     parser.add_argument(
         "--output-dir",
         type=str,
-        default="ml/data/processed",
+        default="ml/data/processed_urfall",
         help="Direktori output dataset YOLO."
     )
     parser.add_argument(

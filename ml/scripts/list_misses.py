@@ -8,7 +8,7 @@ sebagai pembanding. Nama file diawali skor -> mudah diurutkan di File Explorer.
 
 Contoh (PowerShell, dari akar repo):
   python ml/scripts/list_misses.py --scores "C:\\path\\eval_3cls.scores.csv" ^
-      --dataset ml/data/processed_v2_3cls --videos mcf-s19 mcf-s22 --out diag/misses
+      --dataset ml/data/processed_final --videos mcf-s19 mcf-s22 --out diag/misses
 
 Keluaran: <out>/<video>/miss_<skor>_<stem>.jpg dan hit_<skor>_<stem>.jpg, serta ringkasan di layar.
 Tidak mengubah apa pun selain membuat folder <out>.
@@ -33,7 +33,7 @@ def pick_even(df, n):
 def main(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("--scores", required=True, type=Path, help="eval_3cls.scores.csv (kolom stem,gt,video,score)")
-    ap.add_argument("--dataset", required=True, type=Path, help="folder processed_v2_3cls (berisi images/test)")
+    ap.add_argument("--dataset", required=True, type=Path, help="folder processed_final (berisi images/test)")
     ap.add_argument("--videos", nargs="+", default=["mcf-s19", "mcf-s22"])
     ap.add_argument("--thr", type=float, default=0.1, help="skor < thr dianggap meleset")
     ap.add_argument("--n-miss", type=int, default=20, help="jumlah frame meleset per video")

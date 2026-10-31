@@ -2,7 +2,7 @@
 """
 box_audit.py  ->  ml/scripts/box_audit.py
 =========================================
-Audit manual kotak otomatis pada dataset training final (ml/data/processed_v2_3cls).
+Audit manual kotak otomatis pada dataset training final (ml/data/processed_final).
 
 Dua perintah:
   sample  : ambil sampel audit (seed tetap) -> sample.csv + audit.html (halaman penilaian lokal)
@@ -226,7 +226,7 @@ def cmd_report(a):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Audit manual kotak otomatis (sampel + laporan)")
-    ap.add_argument("--dataset", type=Path, default=Path("ml/data/processed_v2_3cls"))
+    ap.add_argument("--dataset", type=Path, default=Path("ml/data/processed_final"))
     ap.add_argument("--meta", type=Path, default=Path("ml/data/processed_v2/frames_meta.csv"))
     ap.add_argument("--out", type=Path, default=Path("ml/data/box_audit"))
     sub = ap.add_subparsers(dest="cmd", required=True)

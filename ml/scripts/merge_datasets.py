@@ -16,7 +16,7 @@ Aturan:
 
 Contoh (dari root repo):
   py ml/scripts/merge_datasets.py \
-      --src ml/data/processed ml/data/processed_mcf \
+      --src ml/data/processed_urfall ml/data/processed_mcf \
       --output-dir ml/data/processed_v2 --zip
 """
 from __future__ import annotations

@@ -163,7 +163,7 @@ def calculate_metrics(y_true: list[int], y_pred: list[int]):
 
 def main():
     parser = argparse.ArgumentParser(description="Tuning Pose Thresholds on UR Fall Dataset")
-    parser.add_argument("--data-dir", type=str, default="ml/data/processed", help="Path dataset processed")
+    parser.add_argument("--data-dir", type=str, default="ml/data/processed_urfall", help="Path dataset processed")
     parser.add_argument("--model", type=str, default="yolo11n-pose.pt", help="Base model pose")
     args = parser.parse_args()
 

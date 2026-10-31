@@ -24,7 +24,7 @@ Prasyarat: audit_dataset.py sudah dijalankan (menghasilkan frames_meta.csv).
 
 Contoh (dari root repo):
   py ml/scripts/make_training_set.py --dataset ml/data/processed_v2 \
-      --output-dir ml/data/processed_v2_3cls --keep-transitional \
+      --output-dir ml/data/processed_final --keep-transitional \
       --adl-lying-normal adl-10 adl-11 --adl-lying-drop adl-21 ... --zip
 """
 from __future__ import annotations

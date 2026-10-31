@@ -83,7 +83,7 @@ def draw_yolo_bbox(img: np.ndarray, label_file: Path) -> np.ndarray:
 
 
 def main():
-    base_dir = Path("ml/data/processed")
+    base_dir = Path("ml/data/processed_urfall")
     images_dir = base_dir / "images"
     labels_dir = base_dir / "labels"
 

@@ -153,9 +153,9 @@ def main():
     
     model = YOLO("yolo11n-pose.pt")
     
-    dataset_dir = Path("ml/data/processed")
+    dataset_dir = Path("ml/data/processed_urfall")
     if not dataset_dir.exists():
-        dataset_dir = Path("../data/processed")
+        dataset_dir = Path("../data/processed_urfall")
     test_img_dir = dataset_dir / "images" / "test"
     
     print(f"📁 Menguji pada Test Set: {test_img_dir}")

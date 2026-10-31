@@ -99,11 +99,11 @@ Kami membagi data berdasarkan **Nomor Urut Video (Sequence-Based Group Split)**:
 ## 6. Struktur Output Dataset Akhir
 
 Hasil akhir preprocessing tersimpan di:
-* Folder aktif: `ml/data/processed/`
+* Folder aktif: `ml/data/processed_urfall/`
 * Arsip terkompresi: `ml/data/urfall_yolo_dataset.zip` (109 MB)
 
 ```
-ml/data/processed/
+ml/data/processed_urfall/
 ├── data.yaml            # Konfigurasi path & 3 kelas YOLO
 ├── images/
 │   ├── train/          # 924 gambar (21 fall + 28 adl)

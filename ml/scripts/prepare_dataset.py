@@ -14,7 +14,7 @@ Preprocessing UR Fall Detection (cam0) -> format YOLO11.
 6. Simpan images/ + labels/ + data.yaml + dataset_manifest.json.
 
 Penggunaan:
-    python prepare_urfall.py --raw-dir "D:/.../Dataset/raw" --output-dir "D:/.../Dataset/processed"
+    python prepare_urfall.py --raw-dir "D:/.../Dataset/raw" --output-dir "D:/.../Dataset/processed_urfall"
 """
 import argparse
 import csv
@@ -94,7 +94,7 @@ def main():
     parser = argparse.ArgumentParser(description="Preprocessing UR Fall (cam0) ke format YOLO11.")
     parser.add_argument("--raw-dir", type=str, required=True,
                         help=r"Folder raw, mis. D:\PENS\Semester 5\projek sistem cerdas\Dataset\raw")
-    parser.add_argument("--output-dir", type=str, default="D:\PENS\Semester 5\projek sistem cerdas\nursing-home-fall-detection\ml\data\processed")
+    parser.add_argument("--output-dir", type=str, default="D:\PENS\Semester 5\projek sistem cerdas\nursing-home-fall-detection\ml\data\processed_urfall")
     parser.add_argument("--normal-stride", type=int, default=5,
                         help="Ambil 1 dari tiap N frame normal (default 5).")
     parser.add_argument("--lying-stride", type=int, default=3,
