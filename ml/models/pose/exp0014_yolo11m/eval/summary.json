@@ -1,0 +1,498 @@
+{
+  "complete": false,
+  "seeds": [
+    0,
+    1,
+    2
+  ],
+  "recipe": {
+    "epochs": 70,
+    "patience": 30,
+    "batch": 16,
+    "imgsz": 640,
+    "optimizer": "AdamW",
+    "lr0": 0.001,
+    "cos_lr": true,
+    "cls": 1.0,
+    "deterministic": true,
+    "hsv_h": 0.015,
+    "hsv_s": 0.7,
+    "hsv_v": 0.4,
+    "translate": 0.1,
+    "scale": 0.5,
+    "fliplr": 0.5,
+    "flipud": 0.0,
+    "degrees": 0.0,
+    "mosaic": 1.0
+  },
+  "teacher": "yolo11m-pose.pt",
+  "per_run": [
+    {
+      "sel": "m-det",
+      "seed": 0,
+      "ap_val": 0.7368961560335484,
+      "ap_test": 0.6213107672951903,
+      "ap_test_ci": "[0.211, 0.924]",
+      "ambang_val": 0.0,
+      "recall_test": 0.7537878787878788,
+      "precision_test": 0.5,
+      "alarm_palsu": 199,
+      "alarm_palsu_s23": 187,
+      "trans_jadi_lying": 0.1684931506849315,
+      "kejadian": "5/6",
+      "kejadian_n": 5
+    },
+    {
+      "sel": "m-det",
+      "seed": 1,
+      "ap_val": 0.6951925423551994,
+      "ap_test": 0.572844964222451,
+      "ap_test_ci": "[0.127, 0.930]",
+      "ambang_val": 0.2148,
+      "recall_test": 0.6818181818181818,
+      "precision_test": 0.4017857142857143,
+      "alarm_palsu": 268,
+      "alarm_palsu_s23": 255,
+      "trans_jadi_lying": 0.19452054794520549,
+      "kejadian": "5/6",
+      "kejadian_n": 5
+    },
+    {
+      "sel": "m-pose",
+      "seed": 0,
+      "ap_val": 0.7857953960082137,
+      "ap_test": 0.6673683035866318,
+      "ap_test_ci": "[0.306, 0.904]",
+      "ambang_val": 0.0,
+      "recall_test": 0.7689393939393939,
+      "precision_test": 0.5867052023121387,
+      "alarm_palsu": 143,
+      "alarm_palsu_s23": 140,
+      "trans_jadi_lying": 0.15205479452054796,
+      "kejadian": "5/6",
+      "kejadian_n": 5
+    },
+    {
+      "sel": "m-pose",
+      "seed": 1,
+      "ap_val": 0.7682973526811128,
+      "ap_test": 0.6645226183779154,
+      "ap_test_ci": "[0.303, 0.913]",
+      "ambang_val": 0.0,
+      "recall_test": 0.8068181818181818,
+      "precision_test": 0.6068376068376068,
+      "alarm_palsu": 138,
+      "alarm_palsu_s23": 119,
+      "trans_jadi_lying": 0.2363013698630137,
+      "kejadian": "6/6",
+      "kejadian_n": 6
+    },
+    {
+      "sel": "n-det",
+      "seed": 0,
+      "ap_val": 0.523979837724456,
+      "ap_test": 0.5189086341621182,
+      "ap_test_ci": "[0.110, 0.926]",
+      "ambang_val": 0.0,
+      "recall_test": 0.7348484848484849,
+      "precision_test": 0.327150084317032,
+      "alarm_palsu": 399,
+      "alarm_palsu_s23": 386,
+      "trans_jadi_lying": 0.14931506849315068,
+      "kejadian": "5/6",
+      "kejadian_n": 5
+    },
+    {
+      "sel": "n-det",
+      "seed": 1,
+      "ap_val": 0.6799367496195114,
+      "ap_test": 0.5469555031776583,
+      "ap_test_ci": "[0.129, 0.925]",
+      "ambang_val": 0.1476,
+      "recall_test": 0.6931818181818182,
+      "precision_test": 0.452970297029703,
+      "alarm_palsu": 221,
+      "alarm_palsu_s23": 217,
+      "trans_jadi_lying": 0.17534246575342466,
+      "kejadian": "5/6",
+      "kejadian_n": 5
+    },
+    {
+      "sel": "n-det",
+      "seed": 2,
+      "ap_val": 0.6797362032373568,
+      "ap_test": 0.6866458054293633,
+      "ap_test_ci": "[0.275, 0.934]",
+      "ambang_val": 0.1595,
+      "recall_test": 0.6477272727272727,
+      "precision_test": 0.7037037037037037,
+      "alarm_palsu": 72,
+      "alarm_palsu_s23": 65,
+      "trans_jadi_lying": 0.09452054794520548,
+      "kejadian": "4/6",
+      "kejadian_n": 4
+    },
+    {
+      "sel": "n-pose",
+      "seed": 0,
+      "ap_val": 0.6580339090727971,
+      "ap_test": 0.7724791376470477,
+      "ap_test_ci": "[0.458, 0.948]",
+      "ambang_val": 0.2318,
+      "recall_test": 0.8484848484848485,
+      "precision_test": 0.7225806451612903,
+      "alarm_palsu": 86,
+      "alarm_palsu_s23": 84,
+      "trans_jadi_lying": 0.1404109589041096,
+      "kejadian": "6/6",
+      "kejadian_n": 6
+    },
+    {
+      "sel": "n-pose",
+      "seed": 1,
+      "ap_val": 0.7325714008631582,
+      "ap_test": 0.7839037005649426,
+      "ap_test_ci": "[0.401, 0.985]",
+      "ambang_val": 0.0803,
+      "recall_test": 0.946969696969697,
+      "precision_test": 0.4699248120300752,
+      "alarm_palsu": 282,
+      "alarm_palsu_s23": 212,
+      "trans_jadi_lying": 0.18835616438356165,
+      "kejadian": "6/6",
+      "kejadian_n": 6
+    },
+    {
+      "sel": "n-pose",
+      "seed": 2,
+      "ap_val": 0.6696573180871026,
+      "ap_test": 0.8174829979279782,
+      "ap_test_ci": "[0.387, 0.995]",
+      "ambang_val": 0.1276,
+      "recall_test": 0.9507575757575758,
+      "precision_test": 0.5823665893271461,
+      "alarm_palsu": 180,
+      "alarm_palsu_s23": 169,
+      "trans_jadi_lying": 0.15684931506849314,
+      "kejadian": "6/6",
+      "kejadian_n": 6
+    }
+  ],
+  "per_arm": [
+    {
+      "sel": "n-det",
+      "seed_n": 3,
+      "ap_test": 0.5841699809230466,
+      "ap_test_sd": 0.08984780281999548,
+      "ap_val": 0.6278842635271081,
+      "ap_val_sd": 0.08998392818024213,
+      "recall_test": 0.6919191919191919,
+      "alarm_palsu": 230.66666666666666,
+      "alarm_palsu_s23": 222.66666666666666,
+      "kejadian": 4.666666666666667
+    },
+    {
+      "sel": "n-pose",
+      "seed_n": 3,
+      "ap_test": 0.7912886120466561,
+      "ap_test_sd": 0.02339315173808221,
+      "ap_val": 0.6867542093410193,
+      "ap_val_sd": 0.04010220927219254,
+      "recall_test": 0.9154040404040403,
+      "alarm_palsu": 182.66666666666666,
+      "alarm_palsu_s23": 155.0,
+      "kejadian": 6.0
+    },
+    {
+      "sel": "m-det",
+      "seed_n": 2,
+      "ap_test": 0.5970778657588207,
+      "ap_test_sd": 0.0342704980083858,
+      "ap_val": 0.716044349194374,
+      "ap_val_sd": 0.02948890803194465,
+      "recall_test": 0.7178030303030303,
+      "alarm_palsu": 233.5,
+      "alarm_palsu_s23": 221.0,
+      "kejadian": 5.0
+    },
+    {
+      "sel": "m-pose",
+      "seed_n": 2,
+      "ap_test": 0.6659454609822736,
+      "ap_test_sd": 0.002012203308205636,
+      "ap_val": 0.7770463743446632,
+      "ap_val_sd": 0.01237298509408904,
+      "recall_test": 0.7878787878787878,
+      "alarm_palsu": 140.5,
+      "alarm_palsu_s23": 129.5,
+      "kejadian": 5.5
+    }
+  ],
+  "contrasts": [
+    {
+      "id": "C1",
+      "perbandingan": "m-det \u2212 n-det",
+      "arti": "skala, detect",
+      "data": "test",
+      "seed": "2 vs 3",
+      "dAP": 0.013,
+      "ci95": "[-0.163, +0.201]",
+      "p_lebih_baik": 0.52,
+      "status": "TIDAK KONKLUSIF"
+    },
+    {
+      "id": "C1",
+      "perbandingan": "m-det \u2212 n-det",
+      "arti": "skala, detect",
+      "data": "val+test",
+      "seed": "2 vs 3",
+      "dAP": 0.045,
+      "ci95": "[-0.100, +0.196]",
+      "p_lebih_baik": 0.73,
+      "status": "TIDAK KONKLUSIF"
+    },
+    {
+      "id": "C2",
+      "perbandingan": "n-pose \u2212 n-det",
+      "arti": "kepala pose, n",
+      "data": "test",
+      "seed": "3 vs 3",
+      "dAP": 0.207,
+      "ci95": "[-0.015, +0.381]",
+      "p_lebih_baik": 0.97,
+      "status": "TIDAK KONKLUSIF"
+    },
+    {
+      "id": "C2",
+      "perbandingan": "n-pose \u2212 n-det",
+      "arti": "kepala pose, n",
+      "data": "val+test",
+      "seed": "3 vs 3",
+      "dAP": 0.162,
+      "ci95": "[+0.008, +0.310]",
+      "p_lebih_baik": 0.98,
+      "status": "LEBIH BAIK"
+    },
+    {
+      "id": "C3",
+      "perbandingan": "m-pose \u2212 m-det",
+      "arti": "kepala pose, m",
+      "data": "test",
+      "seed": "2 vs 2",
+      "dAP": 0.069,
+      "ci95": "[-0.118, +0.216]",
+      "p_lebih_baik": 0.72,
+      "status": "TIDAK KONKLUSIF"
+    },
+    {
+      "id": "C3",
+      "perbandingan": "m-pose \u2212 m-det",
+      "arti": "kepala pose, m",
+      "data": "val+test",
+      "seed": "2 vs 2",
+      "dAP": 0.073,
+      "ci95": "[-0.050, +0.197]",
+      "p_lebih_baik": 0.84,
+      "status": "TIDAK KONKLUSIF"
+    },
+    {
+      "id": "C4",
+      "perbandingan": "m-pose \u2212 n-pose",
+      "arti": "skala, pose",
+      "data": "test",
+      "seed": "2 vs 3",
+      "dAP": -0.125,
+      "ci95": "[-0.207, -0.031]",
+      "p_lebih_baik": 0.01,
+      "status": "LEBIH BURUK"
+    },
+    {
+      "id": "C4",
+      "perbandingan": "m-pose \u2212 n-pose",
+      "arti": "skala, pose",
+      "data": "val+test",
+      "seed": "2 vs 3",
+      "dAP": -0.044,
+      "ci95": "[-0.140, +0.082]",
+      "p_lebih_baik": 0.22,
+      "status": "TIDAK KONKLUSIF"
+    }
+  ],
+  "overfit": [
+    {
+      "sel": "m-pose",
+      "seed": 0,
+      "epoch_jalan": 70,
+      "epoch_terbaik": 47,
+      "val_cls_akhir_per_min": 1.323,
+      "train_cls_turun": true,
+      "tanda_overfit": true
+    },
+    {
+      "sel": "m-det",
+      "seed": 0,
+      "epoch_jalan": 69,
+      "epoch_terbaik": 39,
+      "val_cls_akhir_per_min": 1.265,
+      "train_cls_turun": true,
+      "tanda_overfit": true
+    },
+    {
+      "sel": "n-pose",
+      "seed": 0,
+      "epoch_jalan": 70,
+      "epoch_terbaik": 27,
+      "val_cls_akhir_per_min": 1.129,
+      "train_cls_turun": true,
+      "tanda_overfit": true
+    },
+    {
+      "sel": "n-det",
+      "seed": 0,
+      "epoch_jalan": 70,
+      "epoch_terbaik": 53,
+      "val_cls_akhir_per_min": 1.192,
+      "train_cls_turun": true,
+      "tanda_overfit": true
+    },
+    {
+      "sel": "m-pose",
+      "seed": 1,
+      "epoch_jalan": 70,
+      "epoch_terbaik": 53,
+      "val_cls_akhir_per_min": 1.38,
+      "train_cls_turun": true,
+      "tanda_overfit": true
+    },
+    {
+      "sel": "m-det",
+      "seed": 1,
+      "epoch_jalan": 70,
+      "epoch_terbaik": 40,
+      "val_cls_akhir_per_min": 1.367,
+      "train_cls_turun": true,
+      "tanda_overfit": true
+    },
+    {
+      "sel": "n-pose",
+      "seed": 1,
+      "epoch_jalan": 70,
+      "epoch_terbaik": 49,
+      "val_cls_akhir_per_min": 1.149,
+      "train_cls_turun": true,
+      "tanda_overfit": true
+    },
+    {
+      "sel": "n-det",
+      "seed": 1,
+      "epoch_jalan": 59,
+      "epoch_terbaik": 29,
+      "val_cls_akhir_per_min": 1.121,
+      "train_cls_turun": true,
+      "tanda_overfit": true
+    },
+    {
+      "sel": "n-pose",
+      "seed": 2,
+      "epoch_jalan": 70,
+      "epoch_terbaik": 43,
+      "val_cls_akhir_per_min": 1.288,
+      "train_cls_turun": true,
+      "tanda_overfit": true
+    },
+    {
+      "sel": "n-det",
+      "seed": 2,
+      "epoch_jalan": 68,
+      "epoch_terbaik": 38,
+      "val_cls_akhir_per_min": 1.163,
+      "train_cls_turun": true,
+      "tanda_overfit": true
+    }
+  ],
+  "efficiency": [
+    {
+      "sel": "n-det",
+      "ms_batch1": 13.7,
+      "fps": 73,
+      "params_M": 2.59,
+      "gflops": 6.5,
+      "berkas_MB": 5.5,
+      "memenuhi_target": true
+    },
+    {
+      "sel": "n-pose",
+      "ms_batch1": 14.2,
+      "fps": 70,
+      "params_M": 2.87,
+      "gflops": 7.6,
+      "berkas_MB": 6.1,
+      "memenuhi_target": true
+    },
+    {
+      "sel": "m-det",
+      "ms_batch1": 20.4,
+      "fps": 49,
+      "params_M": 20.06,
+      "gflops": 68.3,
+      "berkas_MB": 40.5,
+      "memenuhi_target": true
+    },
+    {
+      "sel": "m-pose",
+      "ms_batch1": 21.7,
+      "fps": 46,
+      "params_M": 20.91,
+      "gflops": 72.1,
+      "berkas_MB": 42.2,
+      "memenuhi_target": true
+    }
+  ],
+  "events": [
+    {
+      "kejadian lying (test)": "mcf-s19",
+      "n-det": 0.4947916666666667,
+      "n-pose": 0.9375,
+      "m-det": 0.8125,
+      "m-pose": 0.9140625
+    },
+    {
+      "kejadian lying (test)": "mcf-s20",
+      "n-det": 0.7716049382716049,
+      "n-pose": 0.9876543209876543,
+      "m-det": 0.9074074074074074,
+      "m-pose": 0.75
+    },
+    {
+      "kejadian lying (test)": "mcf-s21",
+      "n-det": 0.9451476793248945,
+      "n-pose": 0.9535864978902954,
+      "m-det": 0.8227848101265822,
+      "m-pose": 0.8544303797468354
+    },
+    {
+      "kejadian lying (test)": "mcf-s22",
+      "n-det": 0.4121212121212121,
+      "n-pose": 0.7454545454545455,
+      "m-det": 0.20909090909090908,
+      "m-pose": 0.5363636363636364
+    },
+    {
+      "kejadian lying (test)": "urfall-fall-26",
+      "n-det": 1.0,
+      "n-pose": 1.0,
+      "m-det": 1.0,
+      "m-pose": 1.0
+    },
+    {
+      "kejadian lying (test)": "urfall-fall-30",
+      "n-det": 1.0,
+      "n-pose": 1.0,
+      "m-det": 1.0,
+      "m-pose": 1.0
+    }
+  ],
+  "usulan": "n-det",
+  "gpu": "Tesla T4",
+  "ultralytics": "8.4.171"
+}

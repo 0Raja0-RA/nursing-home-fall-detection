@@ -1,0 +1,9 @@
+id,perbandingan,arti,data,seed,dAP,ci95,p_lebih_baik,status
+C1,m-det − n-det,"skala, detect",test,2 vs 3,0.013,"[-0.163, +0.201]",0.52,TIDAK KONKLUSIF
+C1,m-det − n-det,"skala, detect",val+test,2 vs 3,0.045,"[-0.100, +0.196]",0.73,TIDAK KONKLUSIF
+C2,n-pose − n-det,"kepala pose, n",test,3 vs 3,0.207,"[-0.015, +0.381]",0.97,TIDAK KONKLUSIF
+C2,n-pose − n-det,"kepala pose, n",val+test,3 vs 3,0.162,"[+0.008, +0.310]",0.98,LEBIH BAIK
+C3,m-pose − m-det,"kepala pose, m",test,2 vs 2,0.069,"[-0.118, +0.216]",0.72,TIDAK KONKLUSIF
+C3,m-pose − m-det,"kepala pose, m",val+test,2 vs 2,0.073,"[-0.050, +0.197]",0.84,TIDAK KONKLUSIF
+C4,m-pose − n-pose,"skala, pose",test,2 vs 3,-0.125,"[-0.207, -0.031]",0.01,LEBIH BURUK
+C4,m-pose − n-pose,"skala, pose",val+test,2 vs 3,-0.044,"[-0.140, +0.082]",0.22,TIDAK KONKLUSIF
