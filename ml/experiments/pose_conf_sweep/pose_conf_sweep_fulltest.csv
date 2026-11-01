@@ -1,0 +1,7 @@
+weights,imgsz,conf,aturan,lying_terdeteksi,recall,precision,TP,FP,recall_urfall,recall_mcf
+yolo11m-pose.pt,1280,0.25,20/1.15 (lama),0.83,0.481,0.366,127,220,0.583,0.476
+yolo11m-pose.pt,1280,0.25,40/1.25 (grid data baru),0.83,0.561,0.225,148,511,0.667,0.556
+yolo11m-pose.pt,1280,0.1,20/1.15 (lama),0.92,0.504,0.357,133,240,0.583,0.5
+yolo11m-pose.pt,1280,0.1,40/1.25 (grid data baru),0.92,0.61,0.229,161,541,0.667,0.607
+yolo11m-pose.pt,1280,0.05,20/1.15 (lama),0.973,0.504,0.352,133,245,0.583,0.5
+yolo11m-pose.pt,1280,0.05,40/1.25 (grid data baru),0.973,0.617,0.229,163,548,0.667,0.615

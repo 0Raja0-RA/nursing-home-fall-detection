@@ -1,0 +1,10 @@
+mode,weights,imgsz,conf,terdeteksi,sendi_terbaca,sudut_lt40,n,ms_per_gambar
+pose,yolo11n-pose.pt,640,0.25,113,106,60,264,16.6
+pose,yolo11n-pose.pt,640,0.1,187,172,89,264,16.6
+pose,yolo11n-pose.pt,640,0.05,236,215,104,264,16.6
+pose,yolo26n-pose.pt,640,0.25,74,74,39,264,19.5
+pose,yolo26n-pose.pt,640,0.1,139,133,77,264,19.5
+pose,yolo26n-pose.pt,640,0.05,188,180,100,264,19.5
+pose,yolo26m-pose.pt,640,0.25,92,92,84,264,34.0
+pose,yolo26m-pose.pt,640,0.1,124,124,106,264,34.0
+pose,yolo26m-pose.pt,640,0.05,134,133,113,264,34.0

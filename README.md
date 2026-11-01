@@ -54,48 +54,18 @@ Lihat detail lengkap di [docs/architecture.md](docs/architecture.md).
 
 ```
 fall-detection/
-├── ml/                          # Data science, modeling & training
-│   ├── data/
-│   │   ├── mcf/                 # Tabel anotasi, delay & label_map MCF (video di mcf/dataset/, gitignored)
-│   │   ├── processed/           # UR Fall -> YOLO (Tahap 1)
-│   │   ├── processed_mcf/       # MCF -> YOLO (Tahap 2)
-│   │   ├── processed_v2/        # Gabungan UR Fall + MCF + frames_meta.csv (Tahap 3-4)
-│   │   └── processed_final/   # Dataset training final 3 kelas (Tahap 5)
-│   │                            #   images/ & labels/ di semua folder processed* gitignored;
-│   │                            #   yang di-track: data.yaml, dataset_manifest.json, preview
-│   ├── scripts/
-│   │   ├── prepare_dataset.py   # [Tahap 1] UR Fall -> YOLO: stride per kelas + bbox otomatis
-│   │   ├── prepare_mcf.py       # [Tahap 2] MCF -> YOLO: guard band, stride, sinkronisasi 8 kamera
-│   │   ├── merge_datasets.py    # [Tahap 3] Gabung UR Fall + MCF tanpa mengacak ulang split
-│   │   ├── audit_dataset.py     # [Tahap 4] Audit read-only sebelum training (frames_meta.csv)
-│   │   ├── make_training_set.py # [Tahap 5] Koreksi label ADL + subsampling -> dataset final
-│   │   ├── extract_mcf_tables.py # Ekstrak tabel anotasi & delay MCF dari technical report (PDF)
-│   │   ├── mcf_check.py         # Verifikasi video MCF & uji sinkronisasi kamera
-│   │   ├── eval_lying.py        # Evaluasi lying vs bukan-lying (uji A/B model 2 vs 3 kelas)
-│   │   ├── list_misses.py       # Salin frame lying yang meleset untuk dicek visual
-│   │   ├── preview_dataset.py   # Grid preview anotasi per kelas
-│   │   ├── prepare_urfall.py    # Pipeline AWAL UR Fall (dedup pHash), digantikan prepare_dataset.py
-│   │   ├── extract_frames.py    # Ekstrak frame dari video
-│   │   ├── dedup_check.py       # Deteksi & hapus frame duplikat (tidak dipakai pipeline final)
-│   │   ├── demo_pose_fall.py    # Live demo kamera + visualisasi sudut skeleton
-│   │   ├── tune_pose_fall.py    # Grid search kinematic threshold (EXP-009)
-│   │   ├── temporal_fall_velocity.py   # Analisis kecepatan jatuh temporal (EXP-010)
-│   │   └── occlusion_resistant_pose.py # Heuristik pose tahan oklusi (EXP-011)
-│   ├── notebooks/
-│   │   ├── preprocessing_pipeline.ipynb # Dokumentasi pipeline preprocessing final (Tahap 0-5)
-│   │   ├── eda_dataset.ipynb    # EDA dataset: integritas, duplikat, resolusi, review label, distribusi kelas
-│   │   ├── kaggle_training.ipynb # Training di Kaggle (versi skrip: kaggle_train.py)
-│   │   ├── pose_tuning.ipynb    # Notebook eksperimen EXP-009 (Pose Benchmark)
-│   │   ├── temporal_velocity.ipynb # Notebook EXP-010
-│   │   └── occlusion_pose.ipynb # Notebook EXP-011
-│   ├── models/                  # Hasil per eksperimen (results.csv, kurva); file .pt gitignored
-│   ├── DATA_PREPROCESSING.md    # Dokumentasi pipeline preprocessing AWAL (prepare_urfall.py)
-│   └── training/
-│       ├── config.yaml          # Hyperparameter training
-│       ├── train.py             # Script training YOLO11
-│       ├── experiments.csv      # Riwayat metrik kuantitatif eksperimen
-│       ├── curves/              # Kurva eksperimen
-│       └── EXPERIMENTS.md       # Laporan ilmiah mendalam (EXP-001 s.d. EXP-010)
+├── ml/                          # Data science, modeling & training (lihat ml/README.md)
+│   ├── common/                  # Fungsi bersama: label, pose, gambar skeleton
+│   ├── data_pipeline/           # Tahap 1-5 preprocessing + alat audit
+│   ├── training/                # train.py, config.yaml, kaggle_train.py
+│   ├── evaluation/              # Evaluasi model dan visualisasi pose
+│   ├── demo/                    # Demo kamera langsung
+│   ├── notebooks/               # Preprocessing, EDA, training, ringkasan hasil
+│   ├── experiments/             # Indeks + satu folder per eksperimen
+│   ├── archive/                 # Skrip dan notebook yang tidak aktif
+│   ├── data/                    # processed_urfall, processed_mcf, processed_final; gambar gitignored
+│   ├── models/                  # Hasil training; file .pt gitignored
+│   └── outputs/                 # Output mentah, gitignored
 │
 ├── backend/                     # FastAPI backend
 │   ├── app/
@@ -229,10 +199,10 @@ Frontend akan berjalan di **http://localhost:5173**
 #### A. Menjalankan Live Pose Demo (Webcam / Iriun Phone Camera):
 ```bash
 # Jalankan demo deteksi pose real-time dengan kamera bawaan / webcam
-python ml/scripts/demo_pose_fall.py --source 0
+python ml/demo/demo_pose_fall.py --source 0
 
 # Untuk kamera eksternal / Iriun Webcam:
-python ml/scripts/demo_pose_fall.py --source 1
+python ml/demo/demo_pose_fall.py --source 1
 ```
 
 #### B. Menyiapkan Dataset (Preprocessing UR Fall + MCF):
@@ -242,15 +212,15 @@ penjelasan, parameter aktual, dan hasil tiap tahap ada di
 (EDA) ada di [ml/notebooks/eda_dataset.ipynb](ml/notebooks/eda_dataset.ipynb).
 ```bash
 # 1. UR Fall: --raw-dir berisi csv/features/urfall-cam0-*.csv dan rgb_zip/*-cam0-rgb.zip
-python ml/scripts/prepare_dataset.py --raw-dir "<folder raw UR Fall>" --output-dir ml/data/processed_urfall
+python ml/data_pipeline/prepare_dataset.py --raw-dir "<folder raw UR Fall>" --output-dir ml/data/processed_urfall
 # 2. MCF: video chute01..chute24 di ml/data/mcf/dataset
-python ml/scripts/prepare_mcf.py --root ml/data/mcf/dataset --output-dir ml/data/processed_mcf --detector yolo11m.pt --imgsz 960
+python ml/data_pipeline/prepare_mcf.py --root ml/data/mcf/dataset --output-dir ml/data/processed_mcf --detector yolo11m.pt --imgsz 960
 # 3. Gabung (pembagian skenario MCF yang berlaku di processed_v2)
-python ml/scripts/merge_datasets.py --src ml/data/processed_urfall ml/data/processed_mcf --output-dir ml/data/processed_v2 --mcf-split "train=1-14,val=15-18,test=19-24"
+python ml/data_pipeline/merge_datasets.py --src ml/data/processed_urfall ml/data/processed_mcf --output-dir ml/data/processed_v2 --mcf-split "train=1-14,val=15-18,test=19-24"
 # 4. Audit (menulis processed_v2/frames_meta.csv)
-python ml/scripts/audit_dataset.py --dataset ml/data/processed_v2
+python ml/data_pipeline/audit_dataset.py --dataset ml/data/processed_v2
 # 5. Dataset training final 3 kelas
-python ml/scripts/make_training_set.py --dataset ml/data/processed_v2 --output-dir ml/data/processed_final --keep-transitional --transitional-keep-frac 0.5 --adl-lying-normal adl-10 adl-11 --adl-lying-drop adl-21 adl-22 adl-23 adl-30 adl-32 adl-33 adl-34 adl-35 adl-36 adl-37 adl-38 adl-39 adl-40
+python ml/data_pipeline/make_training_set.py --dataset ml/data/processed_v2 --output-dir ml/data/processed_final --keep-transitional --transitional-keep-frac 0.5 --adl-lying-normal adl-10 adl-11 --adl-lying-drop adl-21 adl-22 adl-23 adl-30 adl-32 adl-33 adl-34 adl-35 adl-36 adl-37 adl-38 adl-39 adl-40
 ```
 
 #### C. Menjalankan Training Bounding Box Custom (EXP-006):
@@ -276,7 +246,7 @@ Sistem ini mengimplementasikan dua paradigma computer vision yang dapat disesuai
 | **Ketahanan Clutter** | Rentan false positive jika ada kasur/bantal rebah | **Kebal false positive** (wajib ada struktur sendi manusia) |
 | **Rekomendasi Area** | **Koridor & Lorong Bebas Furnitur** | **Kamar Tidur & Ruang Keluarga Panti Jompo** |
 
-Detail riwayat riset dari EXP-001 hingga EXP-010 dapat dilihat di [ml/training/EXPERIMENTS.md](ml/training/EXPERIMENTS.md).
+Detail riwayat riset dari EXP-001 hingga EXP-010 dapat dilihat di [ml/experiments/EXPERIMENTS.md](ml/experiments/EXPERIMENTS.md).
 
 ---
 

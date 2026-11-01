@@ -1,0 +1,32 @@
+{
+ "surv": {
+  "normal": [
+   1410,
+   210
+  ],
+  "transitional": [
+   949,
+   949
+  ],
+  "lying": [
+   209,
+   13
+  ]
+ },
+ "det": {
+  "lying": [
+   209,
+   30
+  ],
+  "normal": [
+   300,
+   0
+  ],
+  "transitional": [
+   300,
+   26
+  ]
+ },
+ "lying_after_dedup": 13,
+ "lying_after_dedup_and_det": 11
+}

@@ -113,7 +113,7 @@ def train(config_path: str = "config.yaml", resume: bool = False, run_id: str = 
     if run_id:
         try:
             import datetime
-            csv_path = cfg_path.parent / "experiments.csv"
+            csv_path = Path(__file__).resolve().parents[1] / "experiments" / "experiments.csv"
             date_str = datetime.date.today().isoformat()
             
             # Ekstrak data epoch run dari results secara aman

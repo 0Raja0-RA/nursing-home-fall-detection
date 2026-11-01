@@ -63,8 +63,8 @@ graph LR
 ```
 
 1. **Data Collection**: Download UR Fall Detection Dataset.
-2. **Frame Extraction**: `ml/scripts/extract_frames.py` → frame individual.
-3. **Dedup**: `ml/scripts/dedup_check.py` → hapus frame redundan.
+2. **Frame Extraction**: `ml/archive/scripts/extract_frames.py` → frame individual.
+3. **Dedup**: `ml/archive/scripts/dedup_check.py` → hapus frame redundan.
 4. **Label Conversion**: Convert UR Fall labels (-1/0/1) ke YOLO format (0/1/2).
 5. **Training**: `ml/training/train.py` dengan config di `config.yaml`.
 6. **Export**: Model `best.pt` tersimpan di `ml/models/`.

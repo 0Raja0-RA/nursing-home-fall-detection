@@ -1,7 +1,7 @@
 # ============================================================
 # label_map.yaml  ->  ml/data/mcf/label_map.yaml
 # Pemetaan kode anotasi MCF (Multiple Cameras Fall Dataset) ke 3 kelas YOLO proyek.
-# Dibaca oleh: ml/scripts/prepare_mcf.py
+# Dibaca oleh: ml/data_pipeline/prepare_mcf.py
 #
 # Keputusan tim:
 #   - kode 3 (lying on the ground)  -> lying_on_ground

@@ -1,0 +1,7 @@
+weights,imgsz,terdeteksi,sendi_terbaca,sudut_lt40,n
+yolo11n-pose.pt,640,114,105,58,264
+yolo11n-pose.pt,960,134,106,50,264
+yolo11n-pose.pt,1280,177,159,35,264
+yolo11m-pose.pt,640,135,131,91,264
+yolo11m-pose.pt,960,177,164,112,264
+yolo11m-pose.pt,1280,221,192,119,264

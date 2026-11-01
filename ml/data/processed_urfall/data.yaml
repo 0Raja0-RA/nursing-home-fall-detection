@@ -1,4 +1,4 @@
-# Dataset YOLO11: UR Fall (cam0). Dibuat oleh ml/scripts/prepare_urfall.py
+# Dataset YOLO11: UR Fall (cam0). Dibuat oleh ml/archive/scripts/prepare_urfall.py
 train: images/train
 val: images/val
 test: images/test
