@@ -119,9 +119,35 @@ class Settings(BaseSettings):
     # ---- Telegram Notification -----------------------------
     TELEGRAM_BOT_TOKEN: str = ""
     TELEGRAM_CHAT_ID: str = ""
+    # Alamat dashboard untuk tombol "Buka dashboard" di pesan alarm, mis.
+    # http://192.168.1.10:5173/dashboard. Kosong = tombolnya tidak ditampilkan.
+    # Alamat yang ditolak Telegram tidak menggagalkan alarm: tombolnya dibuang.
+    DASHBOARD_URL: str = ""
+    # Kamera dianggap terputus dan dikabarkan ke grup setelah selama ini tanpa gambar.
+    CAMERA_OFFLINE_NOTIFY_SEC: float = 30.0
 
     # ---- CORS ----------------------------------------------
     ALLOWED_ORIGINS: str = "http://localhost:5173,http://localhost:3000"
+
+    # ---- Dashboard disajikan backend (pameran) -------------
+    # Folder hasil `npm run build`. Kalau berisi index.html, backend ikut menyajikan
+    # dashboard, sehingga dashboard dan API berada di satu host. Itu syarat cookie
+    # sesi (SameSite=Lax) tetap terkirim saat dibuka lewat tunnel. Path relatif
+    # dihitung dari folder backend. Kosong = tidak menyajikan dashboard.
+    FRONTEND_DIST: str = "../frontend/dist"
+
+    # Token akses lihat-saja untuk pengunjung yang scan QR di stand. Dibuat baru oleh
+    # run-pameran.bat setiap kali dijalankan. Kosong = akses pengunjung mati.
+    VISITOR_TOKEN: str = ""
+
+    # ---- Akun demo -----------------------------------------
+    # Satu akun untuk tim, dibuat (atau disamakan) otomatis setiap backend menyala,
+    # berperan pengelola. Isi di backend/.env, jangan di kode: dashboard pameran bisa
+    # dibuka dari internet lewat tunnel, dan isi kode frontend terbaca semua orang.
+    # Kosong = tidak ada akun yang dibuat; halaman Login menjelaskan cara mengisinya.
+    DEMO_USERNAME: str = ""
+    DEMO_PASSWORD: str = ""
+    DEMO_NAME: str = "Tim FallDetect"
 
     model_config = {
         "env_file": ".env",

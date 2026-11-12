@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { FlaskConical, Send, Video, VideoOff, Volume2, VolumeX, X } from 'lucide-react';
+import { api, bacaGalat, PESAN_TERPUTUS } from '../api';
 import { API_BASE } from '../config';
+import { usePengunjung } from '../context/auth';
 import { useLive } from '../context/LiveContext';
 import { aktifkanSuara, bunyikan, useStatusSuara } from '../hooks/useAlarmSound';
 import { usePengaturan } from '../hooks/usePengaturan';
@@ -17,7 +19,7 @@ import { bacaStatus, jamDari } from '../statusKamera';
  * koneksi per host milik Chrome habis -- fetch berikutnya menggantung dan seluruh
  * dashboard terlihat membeku, padahal backend baik-baik saja.
  */
-function StreamImg({ src, alt }) {
+function StreamImg({ src, alt, kunci, onUkuran }) {
     const ref = useRef(null);
     useEffect(() => {
         const el = ref.current;
@@ -28,13 +30,32 @@ function StreamImg({ src, alt }) {
         // pernah memasangnya kembali karena prop-nya dianggap tidak berubah. Akibatnya
         // gambar kosong selamanya dengan net::ERR_ABORTED.
         el.src = src;
-        return () => { el.src = ''; };
-    }, [src]);
+        // Ukuran gambar dibaca berkala, bukan dari onload: MJPEG tidak selalu memicu
+        // onload, dan ukurannya berubah bila rotasi kamera diganti. Sampai ukurannya
+        // diketahui dibaca tiap 0,3 detik, supaya kartu cepat berhenti berubah tinggi;
+        // sesudahnya cukup tiap 2 detik. Efek ini hanya bergantung pada nilai yang
+        // stabil, supaya aliran videonya tidak diulang.
+        let t = null;
+        const baca = (selang) => {
+            t = setTimeout(() => {
+                const ada = el.naturalWidth && el.naturalHeight;
+                if (ada) onUkuran?.(kunci, el.naturalWidth, el.naturalHeight);
+                baca(ada ? 2000 : 300);
+            }, selang);
+        };
+        baca(300);
+        return () => { clearTimeout(t); el.src = ''; };
+    }, [src, kunci, onUkuran]);
     return <img ref={ref} alt={alt} className="absolute inset-0 w-full h-full object-contain" />;
 }
 
 const CHIP = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs whitespace-nowrap';
 const CHIP_TENANG = `${CHIP} bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300`;
+
+// Rasio video tiap kamera, disimpan di luar komponen supaya kartu langsung berukuran
+// benar saat halaman ini dibuka lagi. Tanpa itu kartu melompat begitu video termuat,
+// dan "Lihat kamera" bisa berhenti di posisi yang sudah bergeser.
+const rasioTersimpan = {};
 
 function bacaDetailAI() {
     try { return localStorage.getItem('detailAI') === '1'; } catch { return false; }
@@ -49,20 +70,33 @@ export default function SimulationDashboard() {
     // Nama kelas dan keyakinan model berguna untuk tim, bukan untuk perawat,
     // jadi disembunyikan kecuali dinyalakan.
     const [detailAI, setDetailAI] = useState(bacaDetailAI);
+    // Rasio lebar/tinggi video per kamera. Tile mengikutinya supaya tidak ada pita
+    // hitam di atas-bawah atau kiri-kanan, termasuk untuk kamera HP yang tegak.
+    const [rasio, setRasio] = useState(() => ({ ...rasioTersimpan }));
+    // Pilihan "kirim latihan ke Telegram" yang baru diubah di halaman ini; selama
+    // belum diubah, nilai dari pengaturan backend yang dipakai.
+    const [kirimLatihan, setKirimLatihan] = useState(null);
 
     const { cameraData, alerts } = useLive();
+    // Pengunjung pameran hanya menonton: tanpa Mode latihan dan tanpa kontrol suara.
+    const pengunjung = usePengunjung();
     const suara = useStatusSuara();
     const pengaturan = usePengaturan();
     const lokasi = useLocation();
     const fokusSelesai = useRef(null);
 
     // Daftar kamera diambil dari backend, jadi kamera yang didaftarkan di halaman
-    // "Kelola Kamera" langsung muncul di sini tanpa menyunting kode.
+    // "Daftar Kamera" langsung muncul di sini tanpa menyunting kode.
     const ambilDaftar = useCallback(async () => {
         try {
-            const r = await fetch(`${API_BASE}/api/cameras/`);
+            const r = await api('/api/cameras/');
             if (r.ok) setCameras(await r.json());
         } catch { /* backend belum jalan; grid tampil kosong dengan petunjuk */ }
+    }, []);
+
+    const catatRasio = useCallback((id, w, h) => {
+        rasioTersimpan[id] = w / h;
+        setRasio((r) => (r[id] === w / h ? r : { ...r, [id]: w / h }));
     }, []);
 
     useEffect(() => {
@@ -86,12 +120,32 @@ export default function SimulationDashboard() {
     // "Lihat kamera" di banner membawa id kamera. Gulir ke kartunya begitu daftar kamera ada.
     useEffect(() => {
         const id = lokasi.state?.fokus;
-        if (!id || fokusSelesai.current === lokasi.key || !cameras.length) return;
+        if (!id || fokusSelesai.current === lokasi.key || !cameras.length) return undefined;
         const el = document.getElementById(`kamera-${id}`);
-        if (!el) return;
+        if (!el) return undefined;
         fokusSelesai.current = lokasi.key;
         const halus = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-        el.scrollIntoView({ behavior: halus ? 'smooth' : 'auto', block: 'start' });
+        // Berhenti tepat di bawah banner alarm yang menempel di atas layar (di HP
+        // ditambah bilah atas), supaya kartu kameranya tidak tertutup banner itu.
+        const tujuan = () => {
+            const bawahBanner = document.getElementById('banner-alarm')?.getBoundingClientRect().bottom ?? 0;
+            return el.getBoundingClientRect().top + window.scrollY - bawahBanner - 12;
+        };
+        window.scrollTo({ top: tujuan(), behavior: halus ? 'smooth' : 'auto' });
+
+        // Video yang baru termuat bisa mengubah tinggi kartu di atasnya. Selama pengguna
+        // belum menggulir sendiri, posisinya disamakan lagi sampai tata letaknya tenang.
+        let disentuh = false;
+        const sentuh = () => { disentuh = true; };
+        const tanda = ['wheel', 'touchstart', 'keydown'];
+        tanda.forEach((n) => window.addEventListener(n, sentuh, { passive: true }));
+        const timer = [700, 1500, 3000].map((ms) => setTimeout(() => {
+            if (!disentuh && Math.abs(tujuan() - window.scrollY) > 8) window.scrollTo({ top: tujuan(), behavior: 'auto' });
+        }, ms));
+        return () => {
+            timer.forEach(clearTimeout);
+            tanda.forEach((n) => window.removeEventListener(n, sentuh));
+        };
     }, [lokasi.key, lokasi.state, cameras.length]);
 
     const ubahDetailAI = (nyala) => {
@@ -101,6 +155,18 @@ export default function SimulationDashboard() {
 
     const tesSuara = async () => {
         if (await aktifkanSuara()) bunyikan();
+    };
+
+    const latihanKeTelegram = kirimLatihan ?? Boolean(pengaturan?.telegram?.send_drills);
+    const ubahKirimLatihan = async (nyala) => {
+        setKirimLatihan(nyala);
+        try {
+            const r = await api('/api/settings/telegram', { method: 'PUT', json: { send_drills: nyala } });
+            if (!r.ok) throw new Error(await bacaGalat(r));
+        } catch (err) {
+            setKirimLatihan(!nyala);
+            setGalat(err instanceof TypeError ? PESAN_TERPUTUS : `Pilihan Telegram gagal disimpan: ${err.message}`);
+        }
     };
 
     /**
@@ -116,18 +182,14 @@ export default function SimulationDashboard() {
         setMemulai(true);
         setGalat('');
         try {
-            const r = await fetch(
-                `${API_BASE}/api/cameras/${kameraLatihanId}/simulate-fall`,
-                { method: 'POST' },
-            );
+            const r = await api(`/api/cameras/${kameraLatihanId}/simulate-fall`, { method: 'POST' });
             if (r.ok) {
                 setPanelLatihan(false);
             } else {
-                const b = await r.json().catch(() => ({}));
-                setGalat(typeof b.detail === 'string' ? b.detail : `Backend menjawab ${r.status}`);
+                setGalat(await bacaGalat(r));
             }
         } catch {
-            setGalat(`Tidak bisa menghubungi backend di ${API_BASE}.`);
+            setGalat(PESAN_TERPUTUS);
         } finally {
             setMemulai(false);
         }
@@ -145,14 +207,14 @@ export default function SimulationDashboard() {
                     <h1 className="text-xl md:text-2xl font-bold">Pemantauan Kamera</h1>
                     <p className="text-xs md:text-sm text-slate-500">Status setiap kamera, diperbarui langsung.</p>
                 </div>
-                <button
+                {!pengunjung && <button
                     type="button"
                     onClick={() => setPanelLatihan((b) => !b)}
                     aria-expanded={panelLatihan}
                     className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition-colors"
                 >
                     <FlaskConical className="w-4 h-4" aria-hidden="true" /> Mode latihan
-                </button>
+                </button>}
             </div>
 
             {/* Ringkasan: perawat tahu keadaan semua kamera tanpa memindai tiap kartu. */}
@@ -170,7 +232,7 @@ export default function SimulationDashboard() {
                 <span className={alerts.length ? `${CHIP} bg-red-600 text-white font-semibold` : CHIP_TENANG}>
                     <b className="font-semibold tabular-nums">{alerts.length}</b> alarm
                 </span>
-                <span className={CHIP_TENANG}>
+                {!pengunjung && <span className={CHIP_TENANG}>
                     {suara === 'aktif'
                         ? <><Volume2 className="w-3.5 h-3.5" aria-hidden="true" /> Suara aktif</>
                         : <><VolumeX className="w-3.5 h-3.5" aria-hidden="true" /> Suara belum aktif</>}
@@ -181,8 +243,8 @@ export default function SimulationDashboard() {
                     >
                         Tes suara
                     </button>
-                </span>
-                {pengaturan && (
+                </span>}
+                {pengaturan && !pengunjung && (
                     <span className={CHIP_TENANG}>
                         <Send className="w-3.5 h-3.5" aria-hidden="true" />
                         {pengaturan.telegram_configured ? 'Telegram aktif' : 'Telegram belum dikonfigurasi'}
@@ -206,15 +268,15 @@ export default function SimulationDashboard() {
                 </div>
             )}
 
-            {panelLatihan && (
+            {panelLatihan && !pengunjung && (
                 <div className="mb-6 rounded-2xl border border-blue-500/30 bg-blue-50 dark:bg-blue-950/40 p-4">
                     <div className="flex items-start justify-between gap-3">
                         <div>
                             <h2 className="font-semibold text-sm">Mode latihan</h2>
                             <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 max-w-2xl">
                                 Latihan menjalankan alur alarm sungguhan di satu kamera: hitungan, banner,
-                                riwayat, dan pesan Telegram. Semuanya bertanda SIMULASI, jadi tidak tertukar
-                                dengan kejadian nyata.
+                                Saya ke sana, dan riwayat. Semuanya bertanda latihan, jadi tidak tertukar
+                                dengan kejadian nyata, dan tidak ikut dihitung sebagai alarm benar atau palsu.
                             </p>
                         </div>
                         <button
@@ -251,6 +313,20 @@ export default function SimulationDashboard() {
                             {memulai ? 'Memulai…' : 'Mulai latihan'}
                         </button>
                     </div>
+                    {pengaturan?.telegram_configured && (
+                        <label className="mt-3 flex items-start gap-2 text-xs cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={latihanKeTelegram}
+                                onChange={(e) => ubahKirimLatihan(e.target.checked)}
+                                className="mt-0.5 accent-blue-600"
+                            />
+                            <span>
+                                Kirim juga ke grup Telegram, bertanda LATIHAN. Bawaannya mati, supaya grup tidak
+                                terbiasa mengabaikan pesan alarm.
+                            </span>
+                        </label>
+                    )}
                 </div>
             )}
 
@@ -262,10 +338,10 @@ export default function SimulationDashboard() {
 
             {/* Grid kamera. Kamera yang alarm naik ke depan lewat CSS order, bukan
                 menyusun ulang DOM, supaya aliran MJPEG-nya tidak terputus. */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full items-start">
                 {cameras.length === 0 && (
                     <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-10 text-center text-sm text-slate-500 shadow-sm">
-                        Belum ada kamera yang terdaftar. Tambahkan di halaman <strong>Kelola Kamera</strong>,
+                        Belum ada kamera yang terdaftar. Tambahkan di halaman <strong>Daftar Kamera</strong>,
                         dan kamera itu akan langsung muncul di sini.
                     </div>
                 )}
@@ -314,9 +390,17 @@ export default function SimulationDashboard() {
                                 <StatusKamera status={status} />
                             </header>
 
-                            <div className="aspect-video bg-slate-950 relative flex items-center justify-center text-slate-300">
+                            <div
+                                className="bg-slate-950 relative flex items-center justify-center text-slate-300 max-h-[75vh] mx-auto"
+                                style={{ aspectRatio: (aktif && rasio[cam.camera_id]) || 16 / 9 }}
+                            >
                                 {aktif ? (
-                                    <StreamImg src={`${API_BASE}${cam.stream_url}`} alt={`Video ${cam.name}`} />
+                                    <StreamImg
+                                        src={`${API_BASE}${cam.stream_url}`}
+                                        alt={`Video ${cam.name}`}
+                                        kunci={cam.camera_id}
+                                        onUkuran={catatRasio}
+                                    />
                                 ) : (
                                     <div className="px-6 text-center flex flex-col items-center gap-2">
                                         <p className="text-sm font-semibold text-slate-100">{cam.name} tidak terpantau</p>
@@ -325,7 +409,7 @@ export default function SimulationDashboard() {
                                             to="/dashboard/cameras"
                                             className="mt-1 text-xs font-medium px-3 py-1.5 rounded-lg border border-slate-600 text-slate-200 hover:bg-slate-800"
                                         >
-                                            Buka Kelola Kamera
+                                            Buka Daftar Kamera
                                         </Link>
                                     </div>
                                 )}

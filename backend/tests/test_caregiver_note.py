@@ -9,6 +9,7 @@ body yang OPSIONAL: tombol "Tandai Ditangani" di tabel Riwayat Insiden tetap
 mengirim PUT tanpa body sama sekali.
 """
 
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -21,6 +22,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.api import alerts as api_alerts
+from app.api.auth import wajib_login
 from app.db.database import get_db
 from app.db.models import AlertRecord, Base
 
@@ -47,9 +49,12 @@ def klien():
     app = FastAPI()
     app.include_router(api_alerts.router, prefix="/api/alerts")
     app.dependency_overrides[get_db] = db_uji
+    # Seolah sudah masuk; aturan login diuji terpisah di test_auth.py.
+    app.dependency_overrides[wajib_login] = lambda: SimpleNamespace(
+        id=1, display_name="Perawat Uji", role="perawat", active=True)
 
     with TestClient(app) as c, \
-            patch("app.api.alerts.manager.broadcast", new=AsyncMock()):
+            patch("app.services.insiden_service.manager.broadcast", new=AsyncMock()):
         c.portal.call(siapkan)
         yield c
 

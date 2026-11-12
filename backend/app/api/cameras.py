@@ -11,6 +11,7 @@ Endpoints:
     PATCH  /api/cameras/{id}          — Ubah nama/sumber/rotasi/enabled
     DELETE /api/cameras/{id}          — Hapus kamera
     POST   /api/cameras/{id}/simulate-fall — Paksa simulasi jatuh (untuk demo)
+    GET    /api/cameras/{id}/snapshot — Satu gambar terakhir (JPEG), untuk gambar mini
     GET    /api/cameras/{id}/stream   — Video MJPEG dengan bounding box tergambar
 
 Daftar kamera disimpan di database, bukan environment variable, supaya alamat IP
@@ -40,7 +41,7 @@ from app.models.schemas import (
 )
 from app.runtime import camera_manager
 from app.runtime.registry import registry
-from app.services.camera_service import validasi_sumber
+from app.services.camera_service import samarkan_sumber, validasi_sumber
 
 log = get_logger("app.api.cameras")
 
@@ -65,7 +66,8 @@ def _gabung(record: CameraRecord) -> CameraInfo:
     return CameraInfo(
         **dasar,
         name=record.name,
-        source=record.source,
+        # Kata sandi kamera tidak ikut dikirim ke browser.
+        source=samarkan_sumber(record.source),
         rotate=record.rotate,
         enabled=record.enabled,
         stream_url=f"/api/cameras/{record.id}/stream",
@@ -173,6 +175,10 @@ async def ubah_kamera(camera_id: str, payload: CameraUpdate, db: AsyncSession = 
     if record is None:
         raise HTTPException(status_code=404, detail="Camera not found")
 
+    # Alamat tersamar yang dikirim balik apa adanya berarti "tidak diubah", bukan
+    # alamat baru berisi kata sandi "***".
+    if payload.source is not None and payload.source == samarkan_sumber(record.source):
+        payload.source = None
     sumber_baru = payload.source is not None and payload.source != record.source
 
     if sumber_baru:
@@ -266,6 +272,21 @@ async def simulasi_jatuh(camera_id: str):
         pesan=f"Simulasi berjalan {durasi:.0f} detik. Alert muncul setelah "
               f"{settings.FALL_DURATION_THRESHOLD:.0f} detik.",
     )
+
+
+@router.get("/{camera_id}/snapshot")
+async def gambar_terakhir(camera_id: str):
+    """Satu gambar terakhir kamera ini (JPEG), untuk gambar mini di Daftar Kamera.
+
+    Gambar diam, bukan stream: daftar kamera tidak perlu ikut membuka koneksi MJPEG
+    yang tidak pernah selesai, yang jumlahnya dibatasi browser per alamat.
+    """
+    from fastapi import Response
+
+    jpeg = registry.latest_jpeg.get(camera_id)
+    if jpeg is None:
+        raise HTTPException(status_code=404, detail="Kamera ini belum mengirim gambar.")
+    return Response(content=jpeg, media_type="image/jpeg", headers={"Cache-Control": "no-store"})
 
 
 @router.get("/{camera_id}/stream")

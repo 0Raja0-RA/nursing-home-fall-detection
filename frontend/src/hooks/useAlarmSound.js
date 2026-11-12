@@ -64,17 +64,25 @@ export function bunyikan(latihan = false) {
     return true;
 }
 
-/** Status suara yang ikut berubah. Interaksi pertama di halaman membuka suaranya. */
+/**
+ * Status suara yang ikut berubah. Interaksi pertama di halaman membuka suaranya.
+ *
+ * Didengarkan pada `click`, bukan `pointerdown`. Begitu suara aktif, strip
+ * "Suara alarm belum aktif" hilang dan banner di bawahnya naik. Kalau itu terjadi
+ * di antara tekan dan lepas, klik pertama perawat (sering kali tepat di "Saya ke
+ * sana") jatuh di luar tombol dan hilang. Pada `click`, klik itu sudah sampai ke
+ * tombolnya; izin memutar suara masih berlaku karena tekanan tombol barusan.
+ */
 export function useStatusSuara() {
     const [status, setStatus] = useState(statusSuara);
     useEffect(() => {
         pendengar.add(setStatus);
         const buka = () => { aktifkanSuara(); };
-        document.addEventListener('pointerdown', buka);
+        document.addEventListener('click', buka);
         document.addEventListener('keydown', buka);
         return () => {
             pendengar.delete(setStatus);
-            document.removeEventListener('pointerdown', buka);
+            document.removeEventListener('click', buka);
             document.removeEventListener('keydown', buka);
         };
     }, []);

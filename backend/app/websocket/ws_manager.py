@@ -84,8 +84,20 @@ async def websocket_endpoint(websocket: WebSocket):
     Frontend connect ke ws://host:8000/ws dan akan menerima:
     - status_update setiap kali ada frame baru diproses
     - alert saat fall dikonfirmasi
+    - alert_update saat ada yang menekan "Saya ke sana" atau mengubah putusan
+    - alert_ack saat alert ditandai ditangani
     - heartbeat setiap 30 detik
+
+    Wajib login, sama seperti REST: cookie sesi tim atau cookie pengunjung ikut
+    terkirim saat jabat tangan WebSocket. Tanpa sesi yang sah, koneksi ditolak
+    sebelum diterima. Pengunjung boleh tersambung karena siaran ini hanya dibaca.
     """
+    from app.api.auth import pengguna_dari_kuki
+
+    if await pengguna_dari_kuki(websocket.cookies) is None:
+        await websocket.close(code=4401)
+        return
+
     await manager.connect(websocket)
 
     try:

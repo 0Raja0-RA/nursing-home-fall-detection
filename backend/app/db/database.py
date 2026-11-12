@@ -66,6 +66,18 @@ _KOLOM_SUSULAN: dict[str, list[tuple[str, str]]] = {
         ("simulated", "BOOLEAN NOT NULL DEFAULT 0"),
         ("caregiver_note", "VARCHAR"),
         ("camera_name", "VARCHAR"),
+        ("claimed_by", "VARCHAR"),
+        ("claimed_at", "DATETIME"),
+        ("acknowledged_by", "VARCHAR"),
+        ("verdict", "VARCHAR"),
+        ("verdict_reason", "VARCHAR"),
+        ("verdict_by", "VARCHAR"),
+        ("verdict_at", "DATETIME"),
+        ("threshold_sec", "FLOAT"),
+        ("detection_mode", "VARCHAR"),
+        ("telegram_status", "VARCHAR"),
+        ("telegram_message_id", "INTEGER"),
+        ("telegram_foto", "BOOLEAN"),
     ],
 }
 

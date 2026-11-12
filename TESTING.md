@@ -19,9 +19,15 @@ Lalu buka di browser:
 
 | Yang mau dilihat | Alamat |
 |---|---|
-| **Video + bounding box** | <http://127.0.0.1:8000/api/cameras/cam-01/stream> |
-| Dokumentasi API | <http://127.0.0.1:8000/docs> |
 | Dashboard | <http://localhost:5173> |
+| **Video + bounding box** | <http://localhost:8000/api/cameras/cam-01/stream>, setelah masuk di dashboard |
+| Dokumentasi API | <http://localhost:8000/docs> |
+
+Masuk dengan **akun demo** dari `DEMO_USERNAME` dan `DEMO_PASSWORD` di `backend/.env`
+(salin dari `backend/.env.example`). Backend membuat akun itu setiap kali menyala; kalau
+keduanya kosong, halaman Login memberi tahu dan tidak ada yang bisa masuk. API, video, dan
+WebSocket hanya bisa dibuka setelah masuk, dari browser yang sama. Pakai `localhost` untuk keduanya: sesi disimpan di cookie, dan cookie `localhost`
+tidak terkirim ke `127.0.0.1`.
 
 `cam-01` adalah kamera pertama pada database baru. Nomor kamera yang dihapus tidak dipakai lagi, jadi kalau kamera pernah dihapus, lihat nomornya di `GET /api/cameras/`.
 
@@ -81,7 +87,7 @@ Ada dua jalur, dan untuk pemakaian sehari-hari **jalur dashboard yang dipakai**:
 
 | Jalur | Kapan dipakai |
 |---|---|
-| **Dashboard → Kelola Kamera** | Mengganti alamat kamera, menambah kamera, memutar gambar. Tidak perlu me-restart server. |
+| **Dashboard → Daftar Kamera** | Mengganti alamat kamera, menambah kamera, memutar gambar. Tidak perlu me-restart server. |
 | `run-backend.bat` | Hanya menentukan kamera **bawaan** saat database masih kosong. |
 
 Daftar kamera disimpan di database (`backend/fall_detection.db`), jadi tetap ada setelah
@@ -90,21 +96,25 @@ tabel kameranya masih kosong.
 
 ### Mengelola kamera dari dashboard
 
-Buka **Kelola Kamera** di sidebar.
+Buka **Daftar Kamera** di sidebar.
 
-- **Tambah** — isi nama dan sumber, tekan **Tambah Kamera**. Backend mencoba menghubungi
-  sumbernya lebih dulu (maksimal 3 detik). Kalau tidak terjangkau, kamera **tidak jadi
-  ditambahkan** dan alasannya ditampilkan, jadi salah ketik alamat langsung ketahuan.
-- **Pindai** — tombol di sebelah Tambah Kamera memindai jaringan lokal untuk mencari
-  perangkat yang menyiarkan kamera (port 8080, 4747, 8081, 554). Satu subnet /24 selesai
-  dalam 1–3 detik, dan hasilnya tinggal diklik untuk mengisi kolom alamat. Ini
-  menghilangkan keharusan membaca alamat IP dari layar HP setiap kali berpindah WiFi.
-- **Rotasi** — dropdown di tiap baris (0/90/180/270, searah jarum jam). Nilainya **per
-  kamera**, jadi kamera HP bisa 90° sementara webcam laptop tetap 0°.
-- **Hapus** — ikon tempat sampah. Kamera langsung dimatikan. Nomornya tidak dipakai lagi, supaya riwayat alert lama tetap menunjuk kamera yang benar.
+- **Tambah** — isi nama ruang dan alamat kamera, tekan **Tambah kamera**. Untuk alamat
+  `rtsp://` atau `http://` muncul kolom nama pengguna dan kata sandi kamera; sandinya
+  tidak pernah ditampilkan lagi. Backend mencoba menghubungi sumbernya lebih dulu
+  (maksimal 3 detik). Kalau tidak terjangkau, kamera **tidak jadi ditambahkan** dan
+  alasannya ditampilkan, jadi salah ketik alamat langsung ketahuan.
+- **Cari kamera** — memindai jaringan lokal untuk mencari perangkat yang menyiarkan kamera
+  (port 8080, 4747, 8081, 554), sekaligus kamera yang terpasang di laptop. Satu subnet /24
+  selesai dalam 1–3 detik, dan hasilnya tinggal diklik untuk mengisi kolom alamat.
+- **Atur** — panel per kamera: rotasi (0/90/180/270, searah jarum jam) tepat di bawah
+  pratinjau, ganti nama, ganti alamat, matikan atau nyalakan. Rotasi yang salah membuat
+  orang berdiri terbaca berbaring dan memicu alarm palsu, jadi cek pratinjaunya.
+- **Hapus** — ikon tempat sampah, dengan konfirmasi. Kamera langsung dimatikan. Nomornya
+  tidak dipakai lagi, supaya riwayat alert lama tetap menunjuk kamera yang benar.
 
-Kamera yang terdaftar otomatis muncul di halaman **Simulasi Live**, lengkap dengan stream
-dan bounding box-nya.
+Tiap kamera menampilkan statusnya beserta alasan: **Terhubung** dengan fps dan jam
+gambar terakhir, atau **Terputus sejak** jam tertentu. Kamera yang terdaftar otomatis
+muncul di halaman **Pemantauan**, lengkap dengan stream dan bounding box-nya.
 
 **Batas 4 kamera.** Inference berjalan di CPU, jadi setiap kamera menambah beban secara
 linear. Batasnya bisa dinaikkan lewat `MAX_CAMERAS`, tapi ukur dulu FPS-nya. Catatan
@@ -125,7 +135,7 @@ set "CONFIDENCE_THRESHOLD=0.25"
 
 ### Pilihan sumber kamera
 
-Nilai yang sama berlaku baik di form **Kelola Kamera** maupun di `run-backend.bat`.
+Nilai yang sama berlaku baik di form **Daftar Kamera** maupun di `run-backend.bat`.
 
 | Sumber | Nilai sumber | Rotasi |
 |---|---|---|
@@ -140,7 +150,7 @@ Keduanya harus berada di WiFi yang sama.
 
 1. Pasang aplikasi **IP Webcam** (Android), lalu tekan **Start server**.
 2. Catat alamat yang muncul di layar HP, misalnya `http://10.252.129.120:8080` — atau
-   lewati langkah ini dan tekan **Pindai** di halaman Kelola Kamera.
+   lewati langkah ini dan tekan **Cari kamera** di halaman Daftar Kamera.
 3. Isi kolom alamat dengan alamat itu **ditambah `/video`**.
 
 > **Supaya alamatnya berhenti berubah-ubah.** Alamat IP HP berganti setiap kali pindah
@@ -199,14 +209,28 @@ Hentikan keduanya dengan **Ctrl+C**.
 
 ### a. Video bergerak, bukan gambar beku
 
-Buka <http://127.0.0.1:8000/api/cameras/cam-01/stream>. Gambar harus **bergerak**.
+Masuk ke dashboard, lalu buka <http://localhost:8000/api/cameras/cam-01/stream> di
+browser yang sama. Gambar harus **bergerak**. Di halaman **Daftar Kamera**, jam
+"gambar terakhir" tiap kamera juga harus terus maju.
 
-Kalau diam total, jalankan ini untuk memastikan — perintah ini menghitung berapa frame
-yang benar-benar berbeda dalam 10 detik:
+Kalau diam total, jalankan ini untuk memastikan. Skrip ini meminta nama pengguna dan
+kata sandi (tidak disimpan), lalu menghitung berapa frame yang benar-benar berbeda dalam
+10 detik:
 
 ```powershell
-curl.exe -s -m 10 http://127.0.0.1:8000/api/cameras/cam-01/stream -o s.bin
-.venv\Scripts\python.exe -c "import hashlib; d=open('s.bin','rb').read(); f=d.split(b'--frame')[1:]; h=[hashlib.md5(x).hexdigest() for x in f]; print('frame:', len(f), '| unik:', len(set(h)))"
+.venv\Scripts\python.exe -c @'
+import getpass, hashlib, time, httpx
+with httpx.Client(base_url="http://localhost:8000", timeout=15) as c:
+    c.post("/api/auth/login", json={"username": input("Nama pengguna: "), "password": getpass.getpass("Kata sandi: ")}).raise_for_status()
+    data, akhir = b"", time.time() + 10
+    with c.stream("GET", "/api/cameras/cam-01/stream") as r:
+        for potong in r.iter_bytes():
+            data += potong
+            if time.time() > akhir:
+                break
+f = data.split(b"--frame")[1:]
+print("frame:", len(f), "| unik:", len({hashlib.md5(x).hexdigest() for x in f}))
+'@
 ```
 
 Sehat kalau jumlah **unik** jauh lebih dari 1. Kalau unik = 1, koneksi kamera putus.
@@ -227,12 +251,11 @@ Kotak abu-abu itu disengaja. Tanpa itu, layar terlihat kosong dan kita tidak bis
 
 ### c. Status mengalir
 
-```powershell
-curl.exe -s http://127.0.0.1:8000/api/cameras/
-```
-
-Nilai `fps`, `confidence`, dan `current_posture` harus **berubah** tiap kali dipanggil.
-Kalau angkanya persis sama terus, kamera sedang membeku.
+Buka <http://localhost:8000/docs>, jalankan `POST /api/auth/login`, lalu
+`GET /api/cameras/` di halaman yang sama. Nilai `fps`, `confidence`, `current_posture`,
+dan `last_frame_at` harus **berubah** tiap kali dipanggil. Kalau angkanya persis sama
+terus, kamera sedang membeku. Di dashboard, nyalakan **Tampilkan detail AI** di
+Pemantauan untuk melihat keluaran model yang sama.
 
 ### d. State machine berpindah
 
@@ -245,13 +268,18 @@ monitoring  →  possible_fall  →  confirmed_fall
 Dengan pengaturan bawaan, `possible_fall` muncul setelah 0,5 detik dan `confirmed_fall`
 setelah 3 detik. Untuk produksi, nilai aslinya 2 detik dan 10 detik.
 
-### e. Alert tersimpan
+### e. Alert tersimpan dan ditangani
 
-```powershell
-curl.exe -s http://127.0.0.1:8000/api/alerts/
-```
+Banner merah muncul di semua halaman dashboard dan bunyi berulang tiap 4 detik.
 
-Perhatikan kolom `notified` — itu status pengiriman Telegram untuk alert tersebut.
+1. Tekan **Saya ke sana**: banner berubah amber dengan nama Anda, dan bunyi berhenti di
+   semua dashboard yang terbuka.
+2. Tekan **Tandai Ditangani**, jawab **Apakah ini benar jatuh?** (alarm palsu wajib
+   beralasan), isi catatan bila perlu, lalu simpan.
+3. Buka **Riwayat Insiden**. Insiden tadi tercatat lengkap dengan penangan, waktu
+   respons, putusan, status Telegram, dan foto kejadian di laci **Detail**.
+
+Memuat ulang halaman tidak menghilangkan alarm yang belum ditangani.
 
 ---
 
@@ -296,29 +324,13 @@ Perhatikan kolom `notified` — itu status pengiriman Telegram untuk alert terse
 
 ### Menguji koneksinya
 
-```powershell
-curl.exe -s -X POST http://127.0.0.1:8000/api/settings/test-telegram
-```
+Masuk ke dashboard, buka **Pengaturan → Telegram**, lalu tekan **Kirim pesan uji**.
+Yang diharapkan: tulisan "Pesan uji terkirim. Cek grup Telegram-mu." dan satu pesan masuk
+ke grup. Kalau statusnya **Belum diatur**, token atau `chat_id`-nya belum terbaca —
+periksa nama variabelnya di `backend/.env` dan jalankan ulang backend.
 
-> **Pakai `curl.exe`, bukan `curl`.** Di Windows PowerShell, `curl` adalah alias untuk
-> `Invoke-WebRequest`, yang tidak mengenal `-X` dan akan menolak dengan
-> *"A parameter cannot be found that matches parameter name 'X'"*. Menulis `.exe` memaksa
-> PowerShell memakai curl yang sesungguhnya.
->
-> Cara asli PowerShell juga bisa:
->
-> ```powershell
-> Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/api/settings/test-telegram
-> ```
-
-Yang diharapkan:
-
-```json
-{"terkirim":true,"dikonfigurasi":true,"pesan":"Pesan uji terkirim. Cek grup Telegram-mu."}
-```
-
-disertai satu pesan masuk ke grup. Kalau `dikonfigurasi` bernilai `false`, token atau
-`chat_id`-nya belum terbaca — periksa nama variabelnya di `backend/.env`.
+Lewat API: buka <http://localhost:8000/docs>, jalankan `POST /api/auth/login`, lalu
+`POST /api/settings/test-telegram` di halaman yang sama.
 
 ### Uji sungguhan
 
@@ -326,9 +338,15 @@ Berbaringlah di depan kamera lebih lama dari `FALL_DURATION_THRESHOLD`. Yang seh
 terjadi, berurutan:
 
 1. Dashboard menyala **seketika** lewat WebSocket
-2. Beberapa detik kemudian, **foto** kejadian masuk ke grup Telegram, lengkap dengan
-   bounding box, nama kamar, durasi, dan jam
-3. `GET /api/alerts/` menunjukkan `notified: true`
+2. Beberapa detik kemudian, pesan **Kemungkinan jatuh** masuk ke grup Telegram dengan foto
+   yang diburamkan, nama ruang, lama terbaca berbaring, jam, dan tombol **Saya ke sana**
+   serta **Alarm palsu**
+3. Menekan **Saya ke sana** di Telegram mengubah banner di dashboard menjadi amber dengan
+   nama Anda berakhiran "(Telegram)", dan pesan di grup ikut disunting
+4. Riwayat Insiden menunjukkan Telegram **Terkirim**
+
+Hanya satu backend yang bisa menerima tombol untuk satu token bot. Kalau dua laptop
+menjalankan backend dengan token yang sama, tombol dilayani salah satunya saja.
 
 Urutan itu disengaja: Telegram dikirim setelah dashboard diberi tahu, jadi gangguan
 jaringan tidak pernah menunda peringatan di layar.
@@ -363,7 +381,7 @@ Pastikan alamat yang dibuka benar. Ini kekeliruan yang paling sering:
 | Alamat | Isi |
 |---|---|
 | `10.252.129.120:**8080**/video` | siaran mentah dari HP, **tanpa** kotak |
-| `127.0.0.1:**8000**/api/cameras/cam-01/stream` | hasil olahan backend, **dengan** kotak |
+| `localhost:**8000**/api/cameras/cam-01/stream` | hasil olahan backend, **dengan** kotak (setelah masuk) |
 
 Singkatnya: port **8080** itu HP, port **8000** itu backend.
 
@@ -463,7 +481,7 @@ cd backend
 ..\.venv\Scripts\python.exe -m pytest tests\ -q
 ```
 
-Saat ini **13 test** dan semuanya harus lulus.
+Saat ini **190 test** dan semuanya harus lulus. Tidak ada yang menghubungi Telegram, kamera, atau internet sungguhan: semuanya memakai server tiruan dan database di memori.
 
 ---
 
@@ -473,9 +491,9 @@ Supaya tidak ada yang mengira ini bug baru:
 
 | Bagian | Status |
 |---|---|
-| Tombol "Sudah ditangani" di Telegram | Belum ada. Alert hanya bisa ditutup dari dashboard |
-| Riwayat alert di WebSocket | Alert lama tidak dikirim ulang ke klien baru. Ambil lewat `GET /api/alerts/` |
-| Kolom `notified` di dashboard | Sudah dikembalikan API, tapi belum ditampilkan di halaman Riwayat Insiden |
+| Peran perawat | Hanya pengelolaan akun yang dibatasi. Perawat masih bisa mengubah kamera dan pengaturan |
+| Tombol Buka dashboard di Telegram | Hanya muncul kalau `DASHBOARD_URL` diisi dengan alamat yang bisa dibuka dari HP |
+| Alarm lama di banner | Hanya alarm 24 jam terakhir yang muncul lagi setelah dimuat ulang; yang lebih tua ada di antrean Riwayat Insiden |
 
 Akurasi prediksi postur juga masih rendah di luar dataset URFD. Itu keterbatasan dataset,
 bukan kesalahan backend.

@@ -12,7 +12,7 @@ from datetime import datetime
 from typing import Optional
 
 from app.core.config import get_settings
-from app.core.logging import get_logger, utc_now_naive
+from app.core.logging import get_logger
 from app.models.schemas import DetectionResult, Observation, CameraStatus, WSMessage
 from app.services.camera_service import CameraService
 from app.runtime.registry import registry
@@ -151,7 +151,9 @@ async def camera_pipeline(camera: CameraService, fsm: FallStateMachine):
                 is_active=False,
                 fall_state=fsm.state,
                 fall_duration=0.0,
-                last_frame_at=utc_now_naive()
+                # Jam frame terakhir yang benar-benar diterima, bukan jam sekarang,
+                # supaya dashboard bisa menulis sejak kapan kamera terputus.
+                last_frame_at=camera.waktu_frame_terakhir,
             )
             registry.latest_detection[camera.camera_id] = []
             registry.latest_status[camera.camera_id] = status
@@ -208,7 +210,7 @@ async def camera_pipeline(camera: CameraService, fsm: FallStateMachine):
             fall_duration=fsm.fall_duration,
             confidence=result.confidence if result else 0.0,
             fps=camera.fps,
-            last_frame_at=utc_now_naive(),
+            last_frame_at=camera.waktu_frame_terakhir,
             simulated=registry.sedang_disimulasikan(camera.camera_id),
         )
         # Simpan untuk dipakai endpoint stream (menggambar kotak) dan GET /api/cameras/.

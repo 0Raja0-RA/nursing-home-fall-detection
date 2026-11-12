@@ -51,7 +51,7 @@ diuji pada clone baru.
 
 > Pakai branch **`integration`** kalau ingin menjalankan sistemnya. Branch `backend`
 > hanya memuat sisi backend; frontend di dalamnya versi lama dan belum punya halaman
-> Kelola Kamera maupun Simulasi Live.
+> Daftar Kamera maupun Pemantauan.
 
 ### Yang harus terpasang lebih dulu
 
@@ -156,14 +156,24 @@ Di terminal lain:
 | Alamat | Isi |
 |---|---|
 | http://localhost:5173 | Dashboard |
-| http://127.0.0.1:8000/docs | Dokumentasi API interaktif |
+| http://localhost:8000/docs | Dokumentasi API interaktif |
 
 Saat pertama dijalankan, satu kamera dibuat otomatis dari `CAMERA_SOURCE` di
 `run-backend.bat` (bawaannya `0`, webcam laptop). Selanjutnya kamera diatur dari
 dashboard — lihat [Mengelola Kamera](#mengelola-kamera).
 
-Akun demo untuk halaman Login tertulis di `frontend/src/pages/Login.jsx`. Login ini baru
-pemeriksaan di browser, belum melindungi dashboard maupun API.
+**Akun.** Salin `backend\.env.example` menjadi `backend\.env`, lalu isi `DEMO_USERNAME`
+(mis. sebuah email) dan `DEMO_PASSWORD`. Setiap kali menyala, backend membuat satu akun demo
+untuk tim dari keduanya; tanpa itu tidak ada yang bisa masuk. Akun dan sandinya tidak ditulis di
+kode, karena dashboard pameran bisa dibuka dari internet lewat tunnel. Semua API, video kamera,
+dan WebSocket wajib login. Pengunjung pameran masuk lewat QR di stand (lihat
+[Pameran](#pameran-dashboard-dari-hp-pengunjung)); mereka hanya bisa melihat.
+
+> Buka dashboard dan backend lewat **nama host yang sama**. Sesi disimpan di cookie,
+> dan cookie `localhost` tidak terkirim ke `127.0.0.1`. Dashboard di
+> `http://localhost:5173` otomatis memanggil backend di `http://localhost:8000`; dari HP
+> di jaringan yang sama, `http://IP-LAPTOP:5173` memanggil `http://IP-LAPTOP:8000`
+> (backend harus dijalankan dengan `HOST=0.0.0.0`).
 
 ### 5. (Opsional) Notifikasi Telegram
 
@@ -181,18 +191,21 @@ ambil `chat_id` tujuannya:
 .venv\Scripts\python.exe tools\get_chat_id.py --simpan <chat_id>
 ```
 
-Jalankan ulang backend, lalu uji:
+Jalankan ulang backend, masuk ke dashboard, lalu uji lewat **Pengaturan → Telegram →
+Kirim pesan uji**.
 
-```powershell
-curl.exe -s -X POST http://127.0.0.1:8000/api/settings/test-telegram
-```
+Saat ada alarm, grup menerima satu pesan per insiden: nama ruang, lama terbaca
+berbaring, jam, dan foto kejadian yang **diburamkan** (bisa diganti di **Pengaturan →
+Privasi**). Pesannya membawa tombol **Saya ke sana** dan **Alarm palsu**; begitu ada yang
+menekan, di Telegram atau di dashboard, pesan yang sama disunting supaya seluruh grup
+melihat siapa yang menuju lokasi. Latihan tidak dikirim ke grup kecuali dinyalakan di
+Pengaturan, dan grup juga dikabari bila kamera terputus lebih dari 30 detik.
 
-> Tulis `curl.exe`, bukan `curl` — di PowerShell `curl` adalah alias `Invoke-WebRequest`
-> yang tidak mengenal `-X`.
+Kegagalan kirim tidak membatalkan alert: statusnya tercatat (`telegram_status: gagal`)
+dan bisa dikirim ulang dari detail insiden di Riwayat Insiden.
 
-Saat ada yang jatuh, grup menerima foto kejadian beserta bounding box, nama kamar,
-durasi, dan jam. Kegagalan kirim tidak membatalkan alert: barisnya tetap tersimpan
-dengan `notified: false`.
+Tombol **Buka dashboard** di pesan hanya muncul kalau `DASHBOARD_URL` diisi di
+`backend/.env` dengan alamat yang bisa dibuka dari HP perawat.
 
 ### 6. (Opsional) Training ulang model
 
@@ -207,6 +220,16 @@ ter-commit; kirimkan langsung ke anggota tim lain kalau perlu.
 > `ml/data/processed/data.yaml` sengaja memakai `path:` kosong supaya berfungsi di
 > komputer siapa pun. **Jangan mengisinya dengan path absolut** — berkas itu akan rusak
 > untuk semua orang selain pengisinya.
+
+---
+
+
+## Pameran (dashboard dari HP pengunjung)
+
+Jalankan `run-pameran.bat`. Launcher ini membangun dashboard, membuka Cloudflare quick tunnel,
+menyalakan backend dengan token pengunjung baru, lalu menampilkan QR untuk pengunjung. Dashboard
+disajikan oleh backend sendiri, bukan oleh Vercel, supaya cookie login ikut terkirim. Persiapan dan
+alasannya ada di [docs/deploy-pameran.md](docs/deploy-pameran.md).
 
 ---
 
@@ -229,29 +252,52 @@ docker compose up --build
 
 ## API Endpoints
 
+Semua endpoint wajib login, kecuali health check, `/api/auth/status`, `/api/auth/login`,
+`/api/auth/pengunjung`, dan `/api/auth/logout`. Pengunjung hanya boleh memakai GET. Rincian parameter dan contoh jawaban ada di
+[docs/api.md](docs/api.md).
+
 | Method | Endpoint                     | Description                                        |
 | ------ | ---------------------------- | -------------------------------------------------- |
 | GET    | `/`                          | Health check                                        |
-| GET    | `/api/alerts/`               | Daftar alert (pagination)                           |
+| GET    | `/api/auth/status`           | Ada akun atau belum, dan akses pengunjung aktif     |
+| POST   | `/api/auth/pengunjung`       | Tukar token QR dengan sesi lihat-saja (12 jam)      |
+| POST   | `/api/auth/login`            | Masuk; sesi disimpan di cookie HttpOnly             |
+| POST   | `/api/auth/logout`           | Keluar dari perangkat ini                           |
+| GET    | `/api/auth/me`               | Akun yang sedang masuk                              |
+| PUT    | `/api/auth/password`         | Ganti kata sandi sendiri                            |
+| GET    | `/api/users/`                | Daftar akun (pengelola; belum dipakai dashboard)    |
+| POST   | `/api/users/`                | Tambah akun (pengelola)                             |
+| PATCH  | `/api/users/{id}`            | Ubah, nonaktifkan, atau atur ulang sandi (pengelola) |
+| GET    | `/api/alerts/`               | Daftar alert, dengan filter antrean                 |
+| GET    | `/api/alerts/ringkasan`      | Jumlah per kelompok untuk tab dan lencana           |
 | GET    | `/api/alerts/count`          | Hitung total alert                                  |
 | GET    | `/api/alerts/{id}`           | Detail satu alert                                   |
-| PUT    | `/api/alerts/{id}/ack`       | Acknowledge alert                                   |
+| GET    | `/api/alerts/{id}/snapshot`  | Foto kejadian                                       |
+| PUT    | `/api/alerts/{id}/claim`     | "Saya ke sana"                                      |
+| PUT    | `/api/alerts/{id}/ack`       | "Tandai Ditangani", dengan putusan dan catatan      |
+| PUT    | `/api/alerts/{id}/verdict`   | Isi atau ubah putusan belakangan                    |
+| PUT    | `/api/alerts/{id}/note`      | Tambah atau ubah catatan perawat                    |
+| POST   | `/api/alerts/{id}/telegram`  | Kirim ulang pesan Telegram yang gagal               |
 | GET    | `/api/cameras/`              | Daftar kamera + status runtime-nya                  |
 | POST   | `/api/cameras/`              | Daftarkan kamera baru (sumber divalidasi dulu)      |
 | GET    | `/api/cameras/{id}`          | Satu kamera                                         |
 | PATCH  | `/api/cameras/{id}`          | Ubah nama/sumber/rotasi/enabled, pipeline restart   |
 | DELETE | `/api/cameras/{id}`          | Matikan dan hapus kamera                            |
 | GET    | `/api/cameras/{id}/stream`   | Video MJPEG dengan bounding box tergambar           |
+| GET    | `/api/cameras/{id}/snapshot` | Satu gambar terakhir, untuk gambar mini             |
 | GET    | `/api/cameras/devices`       | Kamera lokal (webcam, Iriun) beserta namanya        |
 | POST   | `/api/cameras/scan`          | Pindai subnet lokal untuk mencari kamera IP         |
 | GET    | `/api/settings/`             | Konfigurasi aktif + daftar model yang tersedia      |
 | PUT    | `/api/settings/threshold`    | Update threshold durasi (disimpan, diteruskan ke kamera) |
 | PUT    | `/api/settings/mode`         | Ganti model detektor (`bbox` / `pose`)              |
+| PUT    | `/api/settings/telegram`     | Foto Telegram, kirim latihan, kabar kamera putus    |
 | POST   | `/api/cameras/{id}/simulate-fall` | Paksa simulasi jatuh (untuk demo)              |
 | POST   | `/api/settings/test-telegram`| Kirim notifikasi uji ke Telegram                    |
 | WS     | `/ws`                        | WebSocket live updates                              |
 
-Dokumentasi interaktif tersedia di `http://127.0.0.1:8000/docs` saat server berjalan.
+Dokumentasi interaktif tersedia di `http://localhost:8000/docs` saat server berjalan.
+Jalankan `POST /api/auth/login` di halaman itu dulu; endpoint lain di halaman yang sama
+lalu ikut memakai sesinya.
 
 ### Kapan tiap endpoint dipanggil
 
@@ -267,14 +313,14 @@ apa dan respons gagal apa saja yang mungkin muncul.
 ## Mengelola Kamera
 
 Daftar kamera disimpan di database, **bukan** di environment variable, dan diatur lewat
-halaman **Kelola Kamera** di dashboard. Alasannya praktis: alamat IP kamera HP berubah
+halaman **Daftar Kamera** di dashboard. Alasannya praktis: alamat IP kamera HP berubah
 setiap kali berpindah jaringan WiFi, dan mengubahnya tidak boleh berarti menyunting kode
 lalu me-restart server.
 
 | Jenis sumber | Nilai | Catatan |
 | --- | --- | --- |
 | Webcam laptop | `0` | |
-| Iriun (kamera HP sebagai webcam) | `1`, `2`, `3`, `4` | tekan **Pindai** untuk melihat namanya |
+| Iriun (kamera HP sebagai webcam) | `1`, `2`, `3`, `4` | tekan **Cari kamera** untuk melihat namanya |
 | IP Webcam (Android) | `http://IP-HP:8080/video` | jangan lupa `/video` di belakang |
 | RTSP / CCTV | `rtsp://IP:554/...` | |
 | File video | path ke `.mp4` | untuk uji ulang yang bisa diulang persis |
@@ -284,8 +330,12 @@ Hal yang perlu diketahui:
 - **Sumber divalidasi sebelum disimpan.** Alamat yang tidak bisa dihubungi, atau yang
   mengembalikan halaman web alih-alih aliran video, ditolak berikut alasannya.
 - **Rotasi diatur per kamera**, bukan global — kamera HP sering butuh 90°, webcam tidak.
-- **Tombol Pindai** mencari dua-duanya sekaligus: perangkat lokal dan perangkat di subnet
-  jaringan, lalu alamatnya tinggal diklik.
+  Tombolnya ada di panel **Atur** tiap kamera, tepat di bawah pratinjau. Rotasi yang salah
+  membuat orang yang berdiri terbaca berbaring dan memicu alarm palsu.
+- **Kata sandi kamera** diisi di kolom terpisah dan tidak pernah ditampilkan lagi: API
+  mengembalikan alamatnya dengan sandi tersamar (`rtsp://admin:***@...`).
+- **Tombol Cari kamera** mencari dua-duanya sekaligus: perangkat lokal dan perangkat di
+  subnet jaringan, lalu alamatnya tinggal diklik.
 - **Batas 4 kamera** (`MAX_CAMERAS`). Inference berjalan di CPU, jadi tiap kamera menambah
   beban secara linear.
 - `CAMERA_SOURCE` di `run-backend.bat` hanya dipakai untuk membuat kamera **pertama** saat

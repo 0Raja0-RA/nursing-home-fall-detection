@@ -9,6 +9,7 @@ Jalankan dengan:
 """
 
 from contextlib import asynccontextmanager
+from pathlib import Path
 import asyncio
 import sys
 
@@ -16,10 +17,11 @@ import sys
 if sys.stdout.encoding != 'utf-8':
     sys.stdout.reconfigure(encoding='utf-8')
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 
-from app.api import alerts, cameras, settings
+from app.api import alerts, auth, cameras, settings
 from app.core.config import get_settings
 from app.db.database import init_db
 from app.websocket.ws_manager import router as ws_router
@@ -44,6 +46,8 @@ async def lifespan(app: FastAPI):
 
     async with get_session_factory()() as session:
         await muat_pengaturan(session)
+        # Akun demo tim dari backend/.env, disamakan setiap backend menyala.
+        await auth.siapkan_akun_demo(session)
 
     # Import saat runtime untuk menghindari circular dependency
     from app.runtime import camera_manager
@@ -53,9 +57,20 @@ async def lifespan(app: FastAPI):
     # lama tetap bekerja tanpa harus mendaftar lewat dashboard dulu.
     await camera_manager.muat_dari_db()
 
+    # Dua pekerja latar: penerima tombol di pesan Telegram, dan pemantau yang
+    # mengabari grup saat kamera terputus. Keduanya diam kalau Telegram belum diisi.
+    from app.runtime.pemantau_kamera import jalankan_pemantau
+    from app.services.telegram_bot import jalankan_penerima
+
+    pekerja = [asyncio.create_task(jalankan_penerima()), asyncio.create_task(jalankan_pemantau())]
+
     yield
     # --- Shutdown ---
     log.info("🛑 Shutting down Fall Detection Backend")
+
+    for task in pekerja:
+        task.cancel()
+    await asyncio.gather(*pekerja, return_exceptions=True)
 
     await camera_manager.hentikan_semua()
 
@@ -72,18 +87,33 @@ app = FastAPI(
 )
 
 # ---- CORS (izinkan frontend dev server) --------------------
+# Dashboard memakai cookie sesi, jadi asal permintaan harus disebut satu per satu,
+# bukan "*". Yang diizinkan: alamat di ALLOWED_ORIGINS, ditambah localhost dan
+# alamat jaringan lokal (10.x, 172.16-31.x, 192.168.x) di port mana pun, supaya
+# dashboard tetap bisa dibuka dari HP di WiFi atau hotspot yang sama.
+_ASAL_LOKAL = (
+    r"^https?://(localhost|127\.0\.0\.1|\[::1\]|10(\.\d{1,3}){3}|192\.168(\.\d{1,3}){2}"
+    r"|172\.(1[6-9]|2\d|3[01])(\.\d{1,3}){2})(:\d+)?$"
+)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # TODO: batasi di production
+    allow_origins=[a.strip() for a in get_settings().ALLOWED_ORIGINS.split(",") if a.strip()],
+    allow_origin_regex=_ASAL_LOKAL,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # ---- Mount Routers -----------------------------------------
-app.include_router(alerts.router, prefix="/api/alerts", tags=["Alerts"])
-app.include_router(cameras.router, prefix="/api/cameras", tags=["Cameras"])
-app.include_router(settings.router, prefix="/api/settings", tags=["Settings"])
+# Semua API wajib login, kecuali /api/auth (status, masuk, pengunjung, keluar) dan
+# health check. Video kamera ikut terlindungi karena berada di bawah /api/cameras.
+# Pengunjung dari QR stand boleh membaca semuanya, tetapi tidak bisa mengubah apa pun.
+_login = [Depends(auth.wajib_login), Depends(auth.tolak_perubahan_pengunjung)]
+app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
+app.include_router(auth.router_akun, prefix="/api/users", tags=["Users"])
+app.include_router(alerts.router, prefix="/api/alerts", tags=["Alerts"], dependencies=_login)
+app.include_router(cameras.router, prefix="/api/cameras", tags=["Cameras"], dependencies=_login)
+app.include_router(settings.router, prefix="/api/settings", tags=["Settings"], dependencies=_login)
 app.include_router(ws_router, tags=["WebSocket"])
 
 
@@ -91,3 +121,33 @@ app.include_router(ws_router, tags=["WebSocket"])
 async def health_check():
     """Health check endpoint."""
     return {"status": "ok", "service": "fall-detection-backend"}
+
+
+# ---- Dashboard (build frontend) ---------------------------
+# Untuk pameran, backend ikut menyajikan hasil `npm run build`, supaya dashboard dan
+# API berada di satu host saat dibuka lewat tunnel. Hanya dengan begitu cookie sesi
+# (SameSite=Lax) ikut terkirim. Didaftarkan paling akhir: /api, /ws, /docs, dan
+# health check di atas tetap didahulukan.
+_dist_setel = get_settings().FRONTEND_DIST.strip()
+_DIST = (Path(__file__).resolve().parents[1] / _dist_setel).resolve() if _dist_setel else None
+
+if _DIST is not None and (_DIST / "index.html").is_file():
+    _INDEX = _DIST / "index.html"
+
+    @app.api_route("/{jalur:path}", methods=["GET", "HEAD"], include_in_schema=False)
+    async def sajikan_dashboard(jalur: str):
+        """Berkas statis dari build, atau index.html untuk rute SPA (/login, /lihat, ...)."""
+        # Alamat API yang tidak dikenal tetap dijawab 404 JSON, bukan halaman dashboard.
+        if jalur == "api" or jalur.startswith(("api/", "ws")):
+            raise HTTPException(status_code=404, detail="Not Found")
+        if jalur:
+            berkas = (_DIST / jalur).resolve()
+            # Tolak jalur yang keluar dari folder build (mis. ../../backend/.env).
+            if berkas.is_file() and berkas.is_relative_to(_DIST):
+                # Nama berkas di assets/ memuat hash isi, jadi aman disimpan lama.
+                simpan = "public, max-age=31536000, immutable" if jalur.startswith("assets/") else "no-cache"
+                return FileResponse(berkas, headers={"Cache-Control": simpan})
+        # index.html selalu diperiksa ulang, supaya build baru langsung terpakai.
+        return FileResponse(_INDEX, headers={"Cache-Control": "no-cache"})
+
+    log.info(f"🖥️  Dashboard disajikan dari {_DIST}")

@@ -19,6 +19,7 @@ import sys
 import ssl
 import threading
 import time
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
 from urllib.parse import urlparse
@@ -28,7 +29,7 @@ import numpy as np
 
 from app.core.config import get_settings
 
-from app.core.logging import get_logger
+from app.core.logging import get_logger, utc_now_naive
 log = get_logger("app.services.camera_service")
 
 
@@ -42,6 +43,23 @@ _ROTATE_CODES = {
 
 
 # ---- Helper sumber kamera (dipakai juga oleh endpoint sebelum menyimpan) ----
+
+def samarkan_sumber(source: str) -> str:
+    """Sembunyikan kata sandi di alamat kamera sebelum ditampilkan.
+
+    rtsp://admin:rahasia@10.0.0.5:554/s menjadi rtsp://admin:***@10.0.0.5:554/s.
+    Alamat lengkapnya tetap tersimpan di database dan dipakai untuk membuka kamera;
+    yang disamarkan hanya jawaban API, supaya sandi CCTV tidak terpampang di layar.
+    """
+    try:
+        u = urlparse(source)
+        if not u.password:
+            return source
+        host = u.netloc.rsplit("@", 1)[1]
+    except ValueError:
+        return source
+    return u._replace(netloc=f"{u.username}:***@{host}").geturl()
+
 
 def sumber_adalah_file(source: str) -> bool:
     """True kalau sumber menunjuk file video yang ada di disk."""
@@ -301,6 +319,20 @@ class CameraService:
     def fps(self) -> float:
         """FPS aktual dari capture loop."""
         return self._actual_fps
+
+    @property
+    def waktu_frame_terakhir(self) -> Optional[datetime]:
+        """Jam (UTC tanpa zona) saat frame terakhir berhasil dibaca; None kalau belum pernah.
+
+        Ini yang dilaporkan sebagai last_frame_at. Sebelumnya kolom itu diisi jam saat
+        status dibuat, sehingga kamera yang terputus tetap tampak baru saja mengirim
+        gambar dan dashboard tidak bisa menulis "Terputus sejak 14.01".
+        """
+        with self._lock:
+            if self._latest_frame is None:
+                return None
+            umur = time.monotonic() - self._last_frame_at
+        return utc_now_naive() - timedelta(seconds=umur)
 
     def tunggu_frame_pertama(self, batas: float = 2.0) -> bool:
         """Tunggu sampai frame pertama masuk, maksimal `batas` detik.

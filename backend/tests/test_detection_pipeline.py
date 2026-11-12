@@ -27,6 +27,7 @@ def _make_camera(camera_id: str = "cam-test") -> MagicMock:
     cam.camera_id = camera_id
     cam.is_active = True
     cam.fps = 0.0
+    cam.waktu_frame_terakhir = None
     return cam
 
 

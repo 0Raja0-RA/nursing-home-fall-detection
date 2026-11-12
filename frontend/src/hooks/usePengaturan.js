@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { API_BASE } from '../config';
+import { api } from '../api';
 
 /**
  * Pengaturan yang sedang berlaku di backend: ambang durasi jatuh dan status Telegram.
@@ -11,7 +11,7 @@ export function usePengaturan() {
     const [pengaturan, setPengaturan] = useState(null);
     useEffect(() => {
         let batal = false;
-        fetch(`${API_BASE}/api/settings/`)
+        api('/api/settings/')
             .then((r) => (r.ok ? r.json() : null))
             .then((d) => { if (!batal && d) setPengaturan(d); })
             .catch(() => { /* backend belum jalan; label tampil tanpa ambang */ });

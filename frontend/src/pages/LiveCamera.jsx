@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { RefreshCw, FlaskConical } from 'lucide-react';
 
+import { api, bacaGalat, PESAN_TERPUTUS } from '../api';
 import { API_BASE } from '../config';
 import { useLive } from '../context/LiveContext';
 import { usePengaturan } from '../hooks/usePengaturan';
@@ -31,7 +32,7 @@ export default function LiveCamera() {
         let batal = false;
         const ambil = async () => {
             try {
-                const r = await fetch(`${API_BASE}/api/cameras/`);
+                const r = await api('/api/cameras/');
                 if (!r.ok || batal) return;
                 const d = await r.json();
                 setDaftarKamera(d);
@@ -61,7 +62,7 @@ export default function LiveCamera() {
     }, [kameraId]);
 
     // Memutar tampilan 90 derajat setiap kali ditekan. Ini hanya memutar gambar di layar;
-    // rotasi yang dipakai model diatur per kamera di halaman Kelola Kamera.
+    // rotasi yang dipakai model diatur per kamera di halaman Daftar Kamera.
     const switchCamera = () => setRotasi((prev) => (prev + 90) % 360);
 
     const live = cameraData?.[kameraId];
@@ -81,19 +82,16 @@ export default function LiveCamera() {
     const mulaiLatihan = async () => {
         if (!kameraId || memulai) return;
         const setuju = window.confirm(
-            `Mulai latihan jatuh di ${kamera?.name || kameraId}? Banner, riwayat, dan pesan Telegram akan bertanda SIMULASI.`,
+            `Mulai latihan jatuh di ${kamera?.name || kameraId}? Banner dan riwayat akan bertanda latihan.`,
         );
         if (!setuju) return;
         setMemulai(true);
         setErrorMsg('');
         try {
-            const r = await fetch(`${API_BASE}/api/cameras/${kameraId}/simulate-fall`, { method: 'POST' });
-            if (!r.ok) {
-                const b = await r.json().catch(() => ({}));
-                setErrorMsg(typeof b.detail === 'string' ? b.detail : `Backend menjawab ${r.status}`);
-            }
+            const r = await api(`/api/cameras/${kameraId}/simulate-fall`, { method: 'POST' });
+            if (!r.ok) setErrorMsg(await bacaGalat(r));
         } catch {
-            setErrorMsg(`Tidak bisa menghubungi backend di ${API_BASE}.`);
+            setErrorMsg(PESAN_TERPUTUS);
         } finally {
             setMemulai(false);
         }

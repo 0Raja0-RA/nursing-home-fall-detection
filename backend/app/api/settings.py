@@ -7,9 +7,10 @@ Endpoints:
     GET  /api/settings/            — Ambil konfigurasi aktif
     PUT  /api/settings/threshold   — Update threshold durasi falling
     PUT  /api/settings/mode        — Ganti model detektor (bbox / pose)
+    PUT  /api/settings/telegram    — Foto Telegram, kirim latihan, kabar kamera putus
     POST /api/settings/test-telegram — Kirim notifikasi uji ke Telegram
 
-Perubahan dari kedua PUT di atas disimpan ke tabel app_settings, bukan hanya ke
+Semua endpoint wajib login. Perubahan dari ketiga PUT di atas disimpan ke tabel app_settings, bukan hanya ke
 memori. Kalau hanya di memori, satu kali restart backend mengembalikannya ke
 bawaan tanpa pemberitahuan -- dan saat demo, yang berjalan bukan pengaturan yang
 dikira sedang dipakai.
@@ -20,10 +21,20 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.db.database import get_db
-from app.db.repository import SettingRepository
+from app.db.repository import (
+    KUNCI_TG_FOTO,
+    KUNCI_TG_KAMERA,
+    KUNCI_TG_LATIHAN,
+    SettingRepository,
+)
 from app.models.schemas import (
+    ALASAN_PALSU,
+    LABEL_PUTUSAN,
+    MODE_FOTO_TELEGRAM,
     ModeUpdate,
+    Pilihan,
     SettingsResponse,
+    TelegramSettingsUpdate,
     TestNotificationResponse,
     ThresholdUpdate,
 )
@@ -39,8 +50,8 @@ KUNCI_MODE = "detection_mode"
 KUNCI_THRESHOLD = "fall_duration_threshold"
 
 
-def _jawaban() -> SettingsResponse:
-    """Potret konfigurasi aktif. Satu tempat, supaya ketiga endpoint sepakat."""
+async def _jawaban(db: AsyncSession) -> SettingsResponse:
+    """Potret konfigurasi aktif. Satu tempat, supaya semua endpoint sepakat."""
     settings = get_settings()
     return SettingsResponse(
         fall_duration_threshold=settings.FALL_DURATION_THRESHOLD,
@@ -50,6 +61,10 @@ def _jawaban() -> SettingsResponse:
         detection_mode=inference_service.mode_aktif(),
         available_modes=inference_service.MODE_INFO,
         telegram_configured=bool(settings.TELEGRAM_BOT_TOKEN and settings.TELEGRAM_CHAT_ID),
+        telegram=await SettingRepository(db).telegram(),
+        photo_modes=[Pilihan(id=k, label=v) for k, v in MODE_FOTO_TELEGRAM.items()],
+        verdicts=[Pilihan(id=k, label=v) for k, v in LABEL_PUTUSAN.items()],
+        false_alarm_reasons=[Pilihan(id=k, label=v) for k, v in ALASAN_PALSU.items()],
     )
 
 
@@ -72,9 +87,9 @@ async def muat_dari_db(session: AsyncSession) -> None:
 
 
 @router.get("/", response_model=SettingsResponse)
-async def get_current_settings():
+async def get_current_settings(db: AsyncSession = Depends(get_db)):
     """Ambil konfigurasi aktif saat ini, beserta daftar mode yang tersedia."""
-    return _jawaban()
+    return await _jawaban(db)
 
 
 @router.put("/threshold", response_model=SettingsResponse)
@@ -100,7 +115,7 @@ async def update_threshold(payload: ThresholdUpdate, db: AsyncSession = Depends(
         f"⚙️  Threshold durasi jatuh jadi {payload.fall_duration_threshold} detik "
         f"({len(registry.state_machines)} kamera diperbarui)"
     )
-    return _jawaban()
+    return await _jawaban(db)
 
 
 @router.put("/mode", response_model=SettingsResponse)
@@ -134,7 +149,21 @@ async def update_mode(payload: ModeUpdate, db: AsyncSession = Depends(get_db)):
         f"🔀 Mode deteksi jadi '{payload.detection_mode}' "
         f"({len(registry.state_machines)} state machine direset)"
     )
-    return _jawaban()
+    return await _jawaban(db)
+
+
+@router.put("/telegram", response_model=SettingsResponse)
+async def update_telegram(payload: TelegramSettingsUpdate, db: AsyncSession = Depends(get_db)):
+    """Ubah cara pesan Telegram dikirim. Token dan chat id tetap hanya di server."""
+    repo = SettingRepository(db)
+    if payload.photo_mode is not None:
+        await repo.simpan(KUNCI_TG_FOTO, payload.photo_mode)
+    if payload.send_drills is not None:
+        await repo.simpan(KUNCI_TG_LATIHAN, "1" if payload.send_drills else "0")
+    if payload.camera_offline is not None:
+        await repo.simpan(KUNCI_TG_KAMERA, "1" if payload.camera_offline else "0")
+    log.info(f"⚙️  Pengaturan Telegram diubah: {payload.model_dump(exclude_none=True)}")
+    return await _jawaban(db)
 
 
 @router.post("/test-telegram", response_model=TestNotificationResponse)
@@ -154,8 +183,8 @@ async def test_telegram():
         return TestNotificationResponse(
             terkirim=False,
             dikonfigurasi=False,
-            pesan="TELEGRAM_BOT_TOKEN atau TELEGRAM_CHAT_ID belum diisi di backend/.env. "
-                  "Ambil chat_id dengan: python tools/get_chat_id.py",
+            pesan="Telegram belum dikonfigurasi di server. Pengelola sistem perlu mengisi "
+                  "token bot dan ID grup; lihat bagian Telegram di README.",
         )
 
     terkirim = await send_test_notification()

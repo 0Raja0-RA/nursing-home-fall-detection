@@ -6,7 +6,7 @@ SQLAlchemy declarative models.
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, Column, DateTime, Float, Integer, String
+from sqlalchemy import Boolean, Column, DateTime, Float, Integer, LargeBinary, String
 from sqlalchemy.orm import DeclarativeBase
 
 from app.core.logging import utc_now_naive
@@ -88,3 +88,82 @@ class AlertRecord(Base):
     camera_name = Column(String, nullable=True)
     created_at = Column(DateTime, default=utc_now_naive)
     acknowledged_at = Column(DateTime, nullable=True)
+
+    # ---- Penanganan oleh manusia --------------------------------------
+    # Nama disalin, bukan dirujuk ke tabel users, karena riwayat harus tetap
+    # menyebut siapa yang menangani walau akunnya dinonaktifkan atau diganti nama.
+    # Lewat Telegram, namanya nama Telegram orang itu dengan akhiran "(Telegram)".
+    #
+    # Klaim ("Saya ke sana") memberi tahu perawat lain bahwa sudah ada yang menuju
+    # lokasi, dan menghentikan bunyi alarm di semua dashboard.
+    claimed_by = Column(String, nullable=True)
+    claimed_at = Column(DateTime, nullable=True)
+    # Siapa yang menandai ditangani; waktunya ada di acknowledged_at.
+    acknowledged_by = Column(String, nullable=True)
+    # Putusan manusia: jatuh | palsu | belum_yakin. NULL = belum dinilai.
+    # Dipisah dari status penanganan: alarm bisa sudah ditangani tapi belum dinilai,
+    # misalnya ditutup dari Telegram tanpa memilih putusan.
+    verdict = Column(String, nullable=True)
+    verdict_reason = Column(String, nullable=True)     # kode alasan, hanya untuk palsu
+    verdict_by = Column(String, nullable=True)
+    verdict_at = Column(DateTime, nullable=True)
+
+    # ---- Keadaan sistem saat kejadian ----------------------------------
+    # Tanpa ambang dan mode saat itu, angka alarm palsu tidak bisa ditafsirkan:
+    # alarm palsu pada ambang 3 detik dan pada ambang 10 detik bukan hal yang sama.
+    threshold_sec = Column(Float, nullable=True)
+    detection_mode = Column(String, nullable=True)
+
+    # ---- Telegram -------------------------------------------------------
+    # mengirim | terkirim | gagal | mati (belum dikonfigurasi) | dilewati (latihan).
+    # NULL pada alert lama; untuk itu kolom notified yang berlaku.
+    telegram_status = Column(String, nullable=True)
+    # Dipakai untuk menyunting pesan yang sama saat ada yang menekan tombol, supaya
+    # satu insiden tetap satu pesan.
+    telegram_message_id = Column(Integer, nullable=True)
+    telegram_foto = Column(Boolean, nullable=True)     # pesan berupa foto (caption) atau teks
+
+
+class AlertSnapshot(Base):
+    """Foto kejadian, satu per alert.
+
+    Tabel terpisah supaya daftar riwayat tidak ikut memuat puluhan kilobyte gambar
+    per baris. Fotonya frame yang sama dengan yang dikirim ke Telegram, lengkap dengan
+    kotak deteksi, dan hanya bisa dibuka lewat API yang wajib login.
+    """
+
+    __tablename__ = "alert_snapshots"
+
+    alert_id = Column(Integer, primary_key=True)
+    jpeg = Column(LargeBinary, nullable=False)
+    created_at = Column(DateTime, default=utc_now_naive)
+
+
+class UserRecord(Base):
+    """Akun perawat dan pengelola.
+
+    Akun per orang, bukan satu akun bersama, karena tombol "Saya ke sana" harus
+    menyebut siapa yang menuju lokasi. Kata sandi disimpan sebagai hash scrypt.
+    """
+
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    username = Column(String, nullable=False, unique=True, index=True)   # huruf kecil
+    display_name = Column(String, nullable=False)
+    password_hash = Column(String, nullable=False)
+    role = Column(String, nullable=False, default="perawat")             # pengelola | perawat
+    # Akun dinonaktifkan, bukan dihapus, supaya nama di riwayat tetap bermakna.
+    active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime, default=utc_now_naive)
+
+
+class SessionRecord(Base):
+    """Sesi masuk. Yang disimpan hanya hash token; tokennya sendiri ada di cookie."""
+
+    __tablename__ = "sessions"
+
+    token_hash = Column(String, primary_key=True)
+    user_id = Column(Integer, nullable=False, index=True)
+    created_at = Column(DateTime, default=utc_now_naive)
+    expires_at = Column(DateTime, nullable=False)

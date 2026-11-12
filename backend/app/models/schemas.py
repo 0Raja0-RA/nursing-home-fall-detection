@@ -9,7 +9,9 @@ from datetime import datetime
 from enum import Enum
 from typing import Optional
 
-from pydantic import BaseModel, Field, field_validator
+import re
+
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 # Pilihan rotasi yang didukung (derajat, searah jarum jam).
 ROTATE_CHOICES = (0, 90, 180, 270)
@@ -53,6 +55,32 @@ class AlertSeverity(str, Enum):
     CRITICAL = "critical"
 
 
+class Putusan(str, Enum):
+    """Putusan perawat setelah memeriksa: apakah alarm ini benar jatuh."""
+    JATUH = "jatuh"
+    PALSU = "palsu"
+    BELUM_YAKIN = "belum_yakin"
+
+
+# Label putusan untuk ditampilkan. Satu sumber untuk dashboard dan Telegram.
+LABEL_PUTUSAN = {
+    Putusan.JATUH.value: "Jatuh sungguhan",
+    Putusan.PALSU.value: "Alarm palsu",
+    Putusan.BELUM_YAKIN.value: "Belum yakin",
+}
+
+# Alasan alarm palsu. Wajib dipilih saat putusannya palsu: tanpa alasan, angka
+# alarm palsu tidak bisa dipakai untuk memperbaiki model atau ambang. Labelnya
+# pendek karena juga menjadi tombol Telegram.
+ALASAN_PALSU = {
+    "berbaring_sengaja": "Berbaring sengaja",
+    "duduk_membungkuk": "Duduk atau membungkuk",
+    "bukan_orang": "Bukan orang",
+    "orang_lain": "Orang lain di lantai",
+    "lainnya": "Lainnya",
+}
+
+
 # ---- Alert -------------------------------------------------
 
 class AlertBase(BaseModel):
@@ -69,6 +97,9 @@ class AlertCreate(AlertBase):
     """Schema untuk membuat alert baru (internal use)."""
     fall_duration: float = Field(..., description="Durasi falling dalam detik")
     simulated: bool = Field(False, description="Dipicu tombol simulasi, bukan deteksi sungguhan")
+    threshold_sec: Optional[float] = Field(None, description="Ambang yang berlaku saat kejadian")
+    detection_mode: Optional[str] = Field(None, description="Mode detektor saat kejadian")
+    telegram_status: Optional[str] = None
 
 
 class AlertResponse(AlertBase):
@@ -87,6 +118,20 @@ class AlertResponse(AlertBase):
     created_at: datetime
     acknowledged_at: Optional[datetime] = None
 
+    # Penanganan oleh manusia. Lihat AlertRecord untuk alasan tiap kolom.
+    claimed_by: Optional[str] = None
+    claimed_at: Optional[datetime] = None
+    acknowledged_by: Optional[str] = None
+    verdict: Optional[Putusan] = Field(None, description="NULL = belum dinilai")
+    verdict_reason: Optional[str] = None
+    verdict_by: Optional[str] = None
+    verdict_at: Optional[datetime] = None
+    # Keadaan sistem saat kejadian. Kosong pada alert lama.
+    threshold_sec: Optional[float] = None
+    detection_mode: Optional[str] = None
+    # mengirim | terkirim | gagal | mati | dilewati. Kosong pada alert lama: pakai notified.
+    telegram_status: Optional[str] = None
+
     model_config = {"from_attributes": True}
 
 
@@ -95,10 +140,50 @@ class AlertResponse(AlertBase):
 CATATAN_MAKS = 500
 
 
-class AckRequest(BaseModel):
-    """Body opsional untuk PUT /api/alerts/{id}/ack."""
+class _DenganPutusan(BaseModel):
+    """Aturan putusan yang sama untuk menutup alarm dan untuk mengubah putusan."""
+    verdict: Optional[Putusan] = None
+    reason: Optional[str] = Field(None, description="Kode alasan, wajib bila verdict = palsu")
+
+    @model_validator(mode="after")
+    def _alasan_sesuai_putusan(self):
+        if self.verdict == Putusan.PALSU:
+            if not self.reason:
+                raise ValueError("Alasan alarm palsu wajib dipilih.")
+            if self.reason not in ALASAN_PALSU:
+                raise ValueError(f"Alasan tidak dikenal. Pilihan: {', '.join(ALASAN_PALSU)}.")
+        else:
+            # Alasan hanya bermakna untuk alarm palsu; jangan simpan sisa pilihan lama.
+            self.reason = None
+        return self
+
+
+class AckRequest(_DenganPutusan):
+    """Body opsional untuk PUT /api/alerts/{id}/ack.
+
+    Putusan boleh kosong (API lama tetap bekerja), tetapi alert tanpa putusan tetap
+    berada di antrean "Perlu tindakan" sampai ada yang menilainya.
+    """
     note: Optional[str] = Field(None, max_length=CATATAN_MAKS,
                                 description="Tindakan yang diambil perawat")
+
+
+class VerdictUpdate(_DenganPutusan):
+    """Body untuk PUT /api/alerts/{id}/verdict: mengisi atau mengubah putusan belakangan."""
+    verdict: Putusan
+
+
+class AlertSummary(BaseModel):
+    """Jumlah per kelompok, untuk tab dan lencana di dashboard."""
+    perlu_tindakan: int = Field(..., description="Belum ditangani, ditambah yang belum dinilai")
+    belum_ditangani: int
+    sedang_ditangani: int = Field(..., description="Sudah ada yang menuju lokasi, belum ditutup")
+    belum_dinilai: int = Field(..., description="Sudah ditangani, putusannya kosong atau belum yakin")
+    total: int = Field(..., description="Semua alert sungguhan (tanpa latihan)")
+    jatuh: int
+    palsu: int
+    latihan: int
+    telegram_gagal: int
 
 
 class NoteUpdate(BaseModel):
@@ -257,6 +342,45 @@ class ModeInfo(BaseModel):
     recommended: bool
 
 
+class Pilihan(BaseModel):
+    """Satu pilihan berlabel, untuk tombol atau dropdown di dashboard."""
+    id: str
+    label: str
+
+
+# Cara foto kejadian dikirim ke Telegram. Bawaannya buram: foto penghuni yang
+# tergeletak adalah data kesehatan, dan pesan grup mudah diteruskan.
+MODE_FOTO_TELEGRAM = {
+    "buram": "Foto diburamkan (bawaan)",
+    "utuh": "Foto utuh, tertutup sampai diketuk",
+    "tanpa": "Tanpa foto, hanya teks",
+}
+
+
+class TelegramSettings(BaseModel):
+    """Pengaturan Telegram yang bisa diubah dari dashboard. Token dan chat id tidak."""
+    photo_mode: str = Field("buram", description="buram | utuh | tanpa")
+    # Latihan tidak dikirim secara bawaan, supaya grup perawat tidak terbiasa
+    # mengabaikan pesan alarm.
+    send_drills: bool = False
+    # Kabari grup bila kamera terputus lebih dari 30 detik, dan saat pulih.
+    camera_offline: bool = True
+
+
+class TelegramSettingsUpdate(BaseModel):
+    """Body untuk PUT /api/settings/telegram. Field yang tidak dikirim tidak berubah."""
+    photo_mode: Optional[str] = None
+    send_drills: Optional[bool] = None
+    camera_offline: Optional[bool] = None
+
+    @field_validator("photo_mode")
+    @classmethod
+    def _mode_foto_valid(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and v not in MODE_FOTO_TELEGRAM:
+            raise ValueError(f"harus salah satu dari {list(MODE_FOTO_TELEGRAM)}")
+        return v
+
+
 class SettingsResponse(BaseModel):
     """Response berisi konfigurasi aktif."""
     fall_duration_threshold: float
@@ -266,6 +390,109 @@ class SettingsResponse(BaseModel):
     detection_mode: str
     available_modes: list[ModeInfo]
     telegram_configured: bool
+    telegram: TelegramSettings = Field(default_factory=TelegramSettings)
+    photo_modes: list[Pilihan] = Field(default_factory=list)
+    # Pilihan putusan dan alasan alarm palsu, supaya dashboard tidak menyalin daftarnya.
+    verdicts: list[Pilihan] = Field(default_factory=list)
+    false_alarm_reasons: list[Pilihan] = Field(default_factory=list)
+
+
+# ---- Akun ----------------------------------------------------
+
+PERAN = ("pengelola", "perawat")
+_POLA_USERNAME = re.compile(r"^[a-z0-9._-]{3,32}$")
+SANDI_MIN = 8
+
+
+def _username_valid(v: str) -> str:
+    v = v.strip().lower()
+    if not _POLA_USERNAME.fullmatch(v):
+        raise ValueError("3 sampai 32 karakter: huruf kecil, angka, titik, garis bawah, atau tanda hubung")
+    return v
+
+
+def _nama_valid(v: str) -> str:
+    v = " ".join(v.split())
+    if not v:
+        raise ValueError("tidak boleh kosong")
+    return v
+
+
+class LoginRequest(BaseModel):
+    username: str = Field(..., max_length=64)
+    password: str = Field(..., max_length=200)
+
+
+class AkunBaru(BaseModel):
+    """Membuat akun: pengelola pertama lewat /api/auth/setup, sisanya lewat /api/users."""
+    display_name: str = Field(..., min_length=1, max_length=60, description="Nama yang tampil saat menangani alarm")
+    username: str
+    password: str = Field(..., min_length=SANDI_MIN, max_length=200)
+    role: str = "perawat"
+
+    @field_validator("username")
+    @classmethod
+    def _username(cls, v: str) -> str:
+        return _username_valid(v)
+
+    @field_validator("display_name")
+    @classmethod
+    def _nama(cls, v: str) -> str:
+        return _nama_valid(v)
+
+    @field_validator("role")
+    @classmethod
+    def _peran_valid(cls, v: str) -> str:
+        if v not in PERAN:
+            raise ValueError(f"harus salah satu dari {list(PERAN)}")
+        return v
+
+
+class AkunUbah(BaseModel):
+    """Body untuk PATCH /api/users/{id}. Field yang tidak dikirim tidak berubah."""
+    display_name: Optional[str] = Field(None, min_length=1, max_length=60)
+    role: Optional[str] = None
+    active: Optional[bool] = None
+    password: Optional[str] = Field(None, min_length=SANDI_MIN, max_length=200)
+
+    @field_validator("display_name")
+    @classmethod
+    def _nama(cls, v: Optional[str]) -> Optional[str]:
+        return None if v is None else _nama_valid(v)
+
+    @field_validator("role")
+    @classmethod
+    def _peran_valid(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and v not in PERAN:
+            raise ValueError(f"harus salah satu dari {list(PERAN)}")
+        return v
+
+
+class GantiSandi(BaseModel):
+    password_lama: str = Field(..., max_length=200)
+    password_baru: str = Field(..., min_length=SANDI_MIN, max_length=200)
+
+
+class AkunResponse(BaseModel):
+    id: int
+    username: str
+    display_name: str
+    role: str
+    active: bool
+    created_at: Optional[datetime] = None
+
+    model_config = {"from_attributes": True}
+
+
+class StatusAuth(BaseModel):
+    """Dipakai halaman Login untuk memberi petunjuk sebelum ada yang masuk."""
+    ada_akun: bool = Field(..., description="Ada akun aktif; kalau tidak, akun demo belum diatur di backend/.env")
+    pengunjung_aktif: bool = Field(..., description="Akses lihat-saja lewat QR sedang dinyalakan")
+
+
+class TokenPengunjung(BaseModel):
+    """Body untuk POST /api/auth/pengunjung: token dari QR di stand."""
+    token: str = Field(..., min_length=1, max_length=200)
 
 
 # ---- Detection Result (internal) --------------------------

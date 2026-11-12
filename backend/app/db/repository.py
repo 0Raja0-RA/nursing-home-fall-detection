@@ -13,12 +13,23 @@ from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import utc_now_naive
-from app.db.models import AlertRecord, AppSetting, CameraRecord
-from app.models.schemas import AlertCreate, CameraCreate, CameraUpdate
+from app.db.models import AlertRecord, AlertSnapshot, AppSetting, CameraRecord
+from app.models.schemas import (
+    MODE_FOTO_TELEGRAM,
+    AlertCreate,
+    CameraCreate,
+    CameraUpdate,
+    TelegramSettings,
+)
 
 # Nomor kamera tertinggi yang pernah dipakai. Disimpan di app_settings karena harus
 # bertahan walaupun semua kamera dihapus, dan tabel itu sudah ada di setiap database.
 KUNCI_NOMOR_KAMERA = "camera_last_number"
+
+# Pengaturan Telegram yang bisa diubah dari dashboard.
+KUNCI_TG_FOTO = "telegram_photo_mode"
+KUNCI_TG_LATIHAN = "telegram_send_drills"
+KUNCI_TG_KAMERA = "telegram_camera_offline"
 
 
 def _nomor_kamera(camera_id: str) -> int:
@@ -33,8 +44,8 @@ class AlertRepository:
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    async def create_alert(self, data: AlertCreate) -> AlertRecord:
-        """Buat record alert baru."""
+    async def create_alert(self, data: AlertCreate, foto: bytes | None = None) -> AlertRecord:
+        """Buat record alert baru, beserta foto kejadiannya bila ada, dalam satu transaksi."""
         db_obj = AlertRecord(
             camera_id=data.camera_id,
             camera_name=data.camera_name,
@@ -42,8 +53,14 @@ class AlertRepository:
             message=data.message,
             fall_duration=data.fall_duration,
             simulated=data.simulated,
+            threshold_sec=data.threshold_sec,
+            detection_mode=data.detection_mode,
+            telegram_status=data.telegram_status,
         )
         self.session.add(db_obj)
+        if foto:
+            await self.session.flush()      # butuh id alert untuk baris fotonya
+            self.session.add(AlertSnapshot(alert_id=db_obj.id, jpeg=foto))
         await self.session.commit()
         await self.session.refresh(db_obj)
         return db_obj
@@ -199,3 +216,13 @@ class SettingRepository:
         else:
             baris.value = value
         await self.session.commit()
+
+    async def telegram(self) -> TelegramSettings:
+        """Pengaturan Telegram tersimpan, dengan bawaan yang aman bila belum pernah diubah."""
+        s = await self.semua()
+        foto = s.get(KUNCI_TG_FOTO)
+        return TelegramSettings(
+            photo_mode=foto if foto in MODE_FOTO_TELEGRAM else "buram",
+            send_drills=s.get(KUNCI_TG_LATIHAN) == "1",
+            camera_offline=s.get(KUNCI_TG_KAMERA, "1") == "1",
+        )

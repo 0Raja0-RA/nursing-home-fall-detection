@@ -10,6 +10,7 @@ diganti fungsi tiruan yang mencatat apa yang diterimanya.
 
 import asyncio
 import time
+import types
 
 import pytest
 import pytest_asyncio
@@ -20,6 +21,9 @@ from app.db.models import Base
 from app.db.repository import AlertRepository, CameraRepository
 from app.models.schemas import AlertResponse, CameraCreate, CameraUpdate
 from app.services import alert_service as mod
+
+# Pengganti akun yang sedang masuk, untuk memanggil endpoint langsung.
+PERAWAT = types.SimpleNamespace(id=1, display_name="Perawat Uji", role="perawat", active=True)
 
 
 @pytest_asyncio.fixture
@@ -45,27 +49,36 @@ async def lingkungan(monkeypatch):
         urutan.append("websocket")
         ws_pesan.append(msg)
 
-    async def telegram_palsu(camera_name, fall_duration, foto=None, waktu=None,
-                             message=None, simulasi=False):
+    from app.services import notification_service as ns
+
+    async def telegram_palsu(alert, foto=None, mode_foto="buram"):
         urutan.append("telegram")
         tg_panggilan.append({
-            "camera_name": camera_name, "fall_duration": fall_duration,
-            "foto": foto, "simulasi": simulasi,
+            "camera_name": alert["camera_name"], "fall_duration": alert["fall_duration"],
+            "foto": foto, "simulasi": alert["simulated"], "mode_foto": mode_foto,
         })
-        return hasil_telegram["ok"]
+        ok = hasil_telegram["ok"]
+        return ns.HasilKirim(ok, 501 if ok else None, bool(foto))
+
+    disunting: list[dict] = []
+
+    async def sunting_palsu(alert, message_id, dengan_foto, tahap=None):
+        disunting.append({"alert": alert, "message_id": message_id})
+        return True
 
     monkeypatch.setattr(mod, "get_session_factory", lambda: factory)
     monkeypatch.setattr(mod.manager, "broadcast", broadcast_palsu)
-    monkeypatch.setattr(
-        "app.services.notification_service.send_telegram_alert", telegram_palsu
-    )
+    monkeypatch.setattr(ns, "kirim_alert", telegram_palsu)
+    monkeypatch.setattr(ns, "perbarui_pesan", sunting_palsu)
+    # Seolah token dan chat id sudah diisi; pengirimnya tetap tiruan di atas.
+    monkeypatch.setattr(ns, "dikonfigurasi", lambda: True)
 
     from app.runtime.registry import registry
     registry.latest_jpeg["cam-01"] = b"\xff\xd8potret-palsu\xff\xd9"
 
     yield {
         "factory": factory, "urutan": urutan, "ws": ws_pesan,
-        "telegram": tg_panggilan, "hasil_telegram": hasil_telegram,
+        "telegram": tg_panggilan, "hasil_telegram": hasil_telegram, "disunting": disunting,
     }
 
     registry.latest_jpeg.pop("cam-01", None)
@@ -211,6 +224,11 @@ async def test_alert_simulasi_ditandai_dan_diberi_awalan(lingkungan):
 
     from app.runtime.registry import registry
 
+    from app.db.repository import KUNCI_TG_LATIHAN, SettingRepository
+
+    async with lingkungan["factory"]() as s:
+        await SettingRepository(s).simpan(KUNCI_TG_LATIHAN, "1")   # latihan ikut dikirim
+
     registry.simulasi_sampai["cam-01"] = time.monotonic() + 30
     try:
         await _service().process_confirmed_fall("cam-01", 10.0)
@@ -224,6 +242,25 @@ async def test_alert_simulasi_ditandai_dan_diberi_awalan(lingkungan):
     assert alerts[0].message.startswith("[SIMULASI]")
     assert lingkungan["telegram"][0]["simulasi"] is True
     assert lingkungan["ws"][0].data["simulated"] is True
+
+
+@pytest.mark.asyncio
+async def test_latihan_tidak_dikirim_ke_telegram_secara_bawaan(lingkungan):
+    """Grup perawat yang sering menerima pesan latihan belajar mengabaikan pesan alarm."""
+    from app.runtime.registry import registry
+
+    registry.simulasi_sampai["cam-01"] = time.monotonic() + 30
+    try:
+        await _service().process_confirmed_fall("cam-01", 10.0)
+    finally:
+        registry.simulasi_sampai.pop("cam-01", None)
+
+    async with lingkungan["factory"]() as s:
+        alerts = await AlertRepository(s).get_recent_alerts()
+
+    assert lingkungan["telegram"] == []
+    assert alerts[0].telegram_status == "dilewati"
+    assert len(lingkungan["ws"]) == 1, "dashboard tetap menampilkan latihannya"
 
 
 @pytest.mark.asyncio
@@ -291,12 +328,14 @@ async def test_menandai_ditangani_disiarkan_ke_semua_dashboard():
             sesi.add(AlertRecord(camera_id="cam-01", message="uji", fall_duration=10.0))
             await sesi.commit()
 
-            with patch("app.api.alerts.manager.broadcast", new=AsyncMock()) as siar:
-                hasil = await acknowledge_alert(1, db=sesi)
+            with patch("app.services.insiden_service.manager.broadcast", new=AsyncMock()) as siar:
+                hasil = await acknowledge_alert(1, user=PERAWAT, db=sesi)
 
         assert hasil.acknowledged
+        assert hasil.acknowledged_by == "Perawat Uji"
         pesan = siar.await_args.args[0]
-        assert pesan.event == "alert_ack" and pesan.data == {"id": 1}
+        assert pesan.event == "alert_ack"
+        assert pesan.data["id"] == 1 and pesan.data["acknowledged"] is True
     finally:
         await engine.dispose()
 
@@ -361,8 +400,8 @@ async def test_ditangani_mengembalikan_kamera_ke_monitoring(db_alert):
     registry.simulasi_sampai["cam-03"] = time.monotonic() + 30
     try:
         alert_id = await _tambah_alert(db_alert)
-        with patch("app.api.alerts.manager.broadcast", new=AsyncMock()):
-            await acknowledge_alert(alert_id, db=db_alert)
+        with patch("app.services.insiden_service.manager.broadcast", new=AsyncMock()):
+            await acknowledge_alert(alert_id, user=PERAWAT, db=db_alert)
         assert fsm.state == FallState.MONITORING
         assert fsm.fall_duration == 0.0
         assert not registry.sedang_disimulasikan("cam-03"), "simulasi harus ikut berakhir"
@@ -385,8 +424,8 @@ async def test_alert_lama_tidak_mereset_kejadian_yang_sedang_berjalan(db_alert):
     try:
         lama = await _tambah_alert(db_alert)
         await _tambah_alert(db_alert)            # insiden yang sedang berjalan
-        with patch("app.api.alerts.manager.broadcast", new=AsyncMock()):
-            await acknowledge_alert(lama, db=db_alert)
+        with patch("app.services.insiden_service.manager.broadcast", new=AsyncMock()):
+            await acknowledge_alert(lama, user=PERAWAT, db=db_alert)
         assert fsm.state == FallState.CONFIRMED_FALL
     finally:
         registry.state_machines.pop("cam-03", None)
@@ -405,8 +444,88 @@ async def test_jatuh_baru_yang_sedang_dihitung_tidak_ikut_terhapus(db_alert):
     registry.state_machines["cam-03"] = fsm
     try:
         alert_id = await _tambah_alert(db_alert)
-        with patch("app.api.alerts.manager.broadcast", new=AsyncMock()):
-            await acknowledge_alert(alert_id, db=db_alert)
+        with patch("app.services.insiden_service.manager.broadcast", new=AsyncMock()):
+            await acknowledge_alert(alert_id, user=PERAWAT, db=db_alert)
         assert fsm.state == FallState.POSSIBLE_FALL
     finally:
         registry.state_machines.pop("cam-03", None)
+
+
+# ---- Keadaan saat kejadian dan status Telegram -------------
+
+@pytest.mark.asyncio
+async def test_ambang_mode_dan_foto_ikut_tersimpan(lingkungan):
+    """Tanpa ambang dan mode saat kejadian, angka alarm palsu tidak bisa ditafsirkan."""
+    from app.db.models import AlertSnapshot
+    from app.services import inference_service
+
+    await _service().process_confirmed_fall("cam-01", 10.0)
+
+    async with lingkungan["factory"]() as s:
+        alert = (await AlertRepository(s).get_recent_alerts())[0]
+        foto = await s.get(AlertSnapshot, alert.id)
+
+    assert alert.threshold_sec == pytest.approx(mod.get_settings().FALL_DURATION_THRESHOLD)
+    assert alert.detection_mode == inference_service.mode_aktif()
+    assert foto is not None and foto.jpeg == b"\xff\xd8potret-palsu\xff\xd9"
+
+
+@pytest.mark.asyncio
+async def test_status_dan_id_pesan_telegram_dicatat(lingkungan):
+    """id pesan dipakai untuk menyunting pesan yang sama saat ada yang menekan tombol."""
+    await _service().process_confirmed_fall("cam-01", 10.0)
+
+    async with lingkungan["factory"]() as s:
+        alert = (await AlertRepository(s).get_recent_alerts())[0]
+
+    assert alert.telegram_status == "terkirim"
+    assert alert.telegram_message_id == 501
+    assert alert.telegram_foto is True
+    assert lingkungan["telegram"][0]["mode_foto"] == "buram", "foto bawaan bukan foto utuh"
+
+
+@pytest.mark.asyncio
+async def test_status_gagal_tercatat(lingkungan):
+    lingkungan["hasil_telegram"]["ok"] = False
+    await _service().process_confirmed_fall("cam-01", 10.0)
+
+    async with lingkungan["factory"]() as s:
+        alert = (await AlertRepository(s).get_recent_alerts())[0]
+    assert alert.telegram_status == "gagal"
+    assert alert.telegram_message_id is None
+
+
+@pytest.mark.asyncio
+async def test_telegram_belum_diisi_tercatat_mati(lingkungan, monkeypatch):
+    from app.services import notification_service as ns
+
+    monkeypatch.setattr(ns, "dikonfigurasi", lambda: False)
+    await _service().process_confirmed_fall("cam-01", 10.0)
+
+    async with lingkungan["factory"]() as s:
+        alert = (await AlertRepository(s).get_recent_alerts())[0]
+    assert alert.telegram_status == "mati"
+    assert lingkungan["telegram"] == []
+
+
+@pytest.mark.asyncio
+async def test_klaim_selama_pengiriman_menyunting_pesan_sesudahnya(lingkungan, monkeypatch):
+    """Perawat menekan Saya ke sana di dashboard sebelum pesan Telegram selesai terkirim."""
+    from app.db.models import AlertRecord
+    from app.services import notification_service as ns
+
+    kirim_asli = ns.kirim_alert
+
+    async def kirim_lambat(alert, foto=None, mode_foto="buram"):
+        async with lingkungan["factory"]() as s:
+            baris = await s.get(AlertRecord, alert["id"])
+            baris.claimed_by = "Siti"
+            await s.commit()
+        return await kirim_asli(alert, foto, mode_foto)
+
+    monkeypatch.setattr(ns, "kirim_alert", kirim_lambat)
+    await _service().process_confirmed_fall("cam-01", 10.0)
+
+    assert len(lingkungan["disunting"]) == 1
+    assert lingkungan["disunting"][0]["message_id"] == 501
+    assert lingkungan["disunting"][0]["alert"]["claimed_by"] == "Siti"

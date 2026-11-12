@@ -8,14 +8,14 @@ REM ============================================================
 
 REM ------------------------------------------------------------
 REM  PENTING: daftar kamera sekarang disimpan di database, dan
-REM  diatur lewat halaman "Kelola Kamera" di dashboard.
+REM  diatur lewat halaman "Daftar Kamera" di dashboard.
 REM
 REM  Dua baris di bawah HANYA dipakai saat database masih kosong,
 REM  yaitu untuk membuat kamera pertama. Setelah ada kamera yang
 REM  terdaftar, keduanya DIABAIKAN -- mengubahnya di sini tidak
 REM  akan mengganti kamera yang sedang dipakai.
 REM
-REM  Mau ganti kamera? Buka dashboard -> Kelola Kamera.
+REM  Mau ganti kamera? Buka dashboard -> Daftar Kamera.
 REM ------------------------------------------------------------
 
 REM Kamera pertama saat database masih kosong:
@@ -26,7 +26,7 @@ REM   "D:\...\fall-01-cam0.mp4"    = file video untuk uji ulang
 set "CAMERA_SOURCE=0"
 
 REM Rotasi bawaan untuk kamera pertama itu (0, 90, 180, 270 searah jarum jam).
-REM Rotasi tiap kamera bisa diubah per baris di halaman Kelola Kamera.
+REM Rotasi tiap kamera bisa diubah per baris di halaman Daftar Kamera.
 set "CAMERA_ROTATE=0"
 
 REM Model hasil training tim (EXP-006 / exp006_hybrid_adamw).
@@ -103,7 +103,7 @@ set "OPENCV_FFMPEG_CAPTURE_OPTIONS=timeout;5000000"
 if exist "%~dp0backend\fall_detection.db" (
     echo Kamera          : diambil dari database yang sudah ada.
     echo                   Untuk melihat atau menggantinya, buka dashboard
-    echo                   lalu masuk ke halaman "Kelola Kamera".
+    echo                   lalu masuk ke halaman "Daftar Kamera".
     echo.
 ) else (
     echo Database belum ada. Kamera pertama akan dibuat dari: %CAMERA_SOURCE%
@@ -112,7 +112,7 @@ if exist "%~dp0backend\fall_detection.db" (
     if errorlevel 1 (
         echo.
         echo Backend tetap dijalankan. Kamera bisa ditambahkan belakangan
-        echo lewat halaman "Kelola Kamera" di dashboard.
+        echo lewat halaman "Daftar Kamera" di dashboard.
         echo.
         pause
     )
