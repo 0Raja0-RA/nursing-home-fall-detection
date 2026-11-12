@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BellOff, CheckCircle2, FlaskConical, Footprints, TriangleAlert, Video, VolumeX, WifiOff } from 'lucide-react';
 import { api, bacaGalat, PESAN_TERPUTUS } from '../api';
 import { usePengunjung } from '../context/auth';
 import { useLive } from '../context/LiveContext';
 import { aktifkanSuara, bunyikan, useStatusSuara } from '../hooks/useAlarmSound';
+import { kabariAlarm } from '../hooks/useNotifikasi';
 import { usePengaturan } from '../hooks/usePengaturan';
 import { jamDari } from '../statusKamera';
 import { durasiTeks, msDari, useJam } from '../waktu';
@@ -120,6 +121,42 @@ export default function AlertBanner() {
         const t = setInterval(dering, ULANG_BUNYI_MS);
         return () => clearInterval(t);
     }, [alerts, adaBelum, bisu, suara, pengunjung]);
+
+    // Notifikasi sistem untuk alarm yang belum direspons selama tab ini tidak dilihat, juga
+    // bila tab ditinggalkan saat alarm masih berbunyi. Ditutup sendiri begitu ada yang menuju
+    // lokasi atau alarmnya selesai. Satu notifikasi per alarm.
+    const dikabari = useRef(new Map());     // id alert -> Notification
+    useEffect(() => {
+        if (pengunjung) return undefined;
+        const peta = dikabari.current;
+        const periksa = () => {
+            const tersembunyi = document.visibilityState === 'hidden' || !document.hasFocus();
+            alerts.forEach((x) => {
+                if (tersembunyi && !x.claimed_by && !peta.has(x.id)) {
+                    const n = kabariAlarm(x);
+                    if (n) peta.set(x.id, n);
+                }
+            });
+            peta.forEach((n, id) => {
+                const x = alerts.find((y) => y.id === id);
+                if (!x || x.claimed_by) {
+                    n.close();
+                    peta.delete(id);
+                }
+            });
+        };
+        periksa();
+        document.addEventListener('visibilitychange', periksa);
+        window.addEventListener('blur', periksa);
+        return () => {
+            document.removeEventListener('visibilitychange', periksa);
+            window.removeEventListener('blur', periksa);
+        };
+    }, [alerts, pengunjung]);
+    useEffect(() => {
+        const peta = dikabari.current;
+        return () => peta.forEach((n) => n.close());     // mis. sesudah keluar
+    }, []);
 
     // Bisu habis dengan sendirinya.
     useEffect(() => {

@@ -281,6 +281,14 @@ Banner merah muncul di semua halaman dashboard dan bunyi berulang tiap 4 detik.
 
 Memuat ulang halaman tidak menghilangkan alarm yang belum ditangani.
 
+Notifikasi browser: buka **Pengaturan → Suara dan notifikasi**, tekan **Izinkan notifikasi**,
+lalu **Tes notifikasi**. Sesudah itu, picu alarm (mis. **Mode latihan**) lalu pindah ke aplikasi
+lain: notifikasi muncul dengan nama ruang, dan hilang sendiri setelah ada yang menekan
+**Saya ke sana**. Notifikasi hanya tersedia lewat `https://` (mis. tunnel pameran) atau
+`localhost`, tidak lewat alamat IP biasa di jaringan lokal. Fitur ini untuk komputer jaga: Chrome
+Android dan Safari iOS tidak menampilkan notifikasi dari halaman web biasa, dan perawat di HP
+dikabari lewat Telegram.
+
 Untuk mengatur posisi kamera, buka **Daftar Kamera → Uji** pada kamera itu. Halaman Uji Kamera
 menampilkan semua deteksi, waktu inferensi, dan laju tangkap serta analisis. Nyalakan **Mode uji**
 selama mencoba dengan tubuh sungguhan: alarm dari kamera itu dicatat sebagai latihan selama

@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Volume2, VolumeX } from 'lucide-react';
+import { Bell, BellOff, Volume2, VolumeX } from 'lucide-react';
 import { api, bacaGalat, PESAN_TERPUTUS } from '../api';
 import { API_BASE } from '../config';
 import { msDari, tanggalJam } from '../waktu';
 import { aktifkanSuara, bunyikan, useStatusSuara } from '../hooks/useAlarmSound';
+import { kabariAlarm, mintaIzinNotifikasi, useStatusNotifikasi } from '../hooks/useNotifikasi';
 
 const KARTU = 'bg-white dark:bg-slate-900 p-4 md:p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4';
 const TOMBOL_NETRAL = 'min-h-10 px-3 rounded-lg text-sm font-semibold border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50';
@@ -30,6 +31,14 @@ function Kabar({ kabar }) {
         </div>
     );
 }
+
+const TEKS_NOTIFIKASI = {
+    granted: 'Notifikasi diizinkan di perangkat ini',
+    default: 'Notifikasi belum diizinkan',
+    denied: 'Notifikasi diblokir. Izinkan lewat pengaturan situs di browser',
+    'perlu-https': 'Notifikasi hanya bisa lewat alamat HTTPS atau localhost',
+    'tidak-didukung': 'Browser ini tidak mendukung notifikasi',
+};
 
 const masaSimpan = (hari, nol) => (hari > 0 ? `${hari} hari, lalu dihapus otomatis` : nol);
 
@@ -148,6 +157,8 @@ export default function Settings() {
     const [simpan, setSimpan] = useState(null);          // { foto, klip } dalam hari
     const [riwayat, setRiwayat] = useState(null);        // null = memuat, 'galat', atau daftar
     const suara = useStatusSuara();
+    const notifikasi = useStatusNotifikasi();
+    const [kabarNotif, setKabarNotif] = useState(null);
 
     const terapkan = (d) => {
         setThreshold(d.fall_duration_threshold);
@@ -293,6 +304,11 @@ export default function Settings() {
         if (await aktifkanSuara()) bunyikan();
     };
 
+    // Chrome Android dan Safari iOS menolak notifikasi dari halaman web biasa walau izinnya ada.
+    const tesNotifikasi = () => setKabarNotif(kabariAlarm({ id: 'uji', camera_name: 'Uji notifikasi', simulated: true })
+        ? { tipe: 'ok', teks: 'Notifikasi uji dikirim. Bila tidak muncul, periksa pengaturan notifikasi sistem operasi.' }
+        : { tipe: 'galat', teks: 'Browser ini tidak menampilkan notifikasi dari halaman web, biasanya di HP. Di HP, andalkan pesan Telegram.' });
+
     const modeTerpilih = daftarMode.find((m) => m.id === mode);
 
     return (
@@ -367,7 +383,7 @@ export default function Settings() {
                     </form>
                 </Bagian>
 
-                <Bagian id="atur-suara" judul="Suara" keterangan="Diatur per perangkat, karena browser yang memutuskan boleh tidaknya berbunyi.">
+                <Bagian id="atur-suara" judul="Suara dan notifikasi" keterangan="Diatur per perangkat, karena browser yang memutuskan boleh tidaknya berbunyi.">
                     <div className="flex flex-wrap items-center gap-3">
                         <span className="inline-flex items-center gap-2 text-sm">
                             {suara === 'aktif'
@@ -382,6 +398,26 @@ export default function Settings() {
                         Alarm berbunyi berulang sampai ada yang menekan Saya ke sana. Browser menahan suara sampai ada
                         klik pertama di halaman, jadi klik sekali setiap kali dashboard dibuka.
                     </p>
+                    <div className="flex flex-wrap items-center gap-3">
+                        <span className="inline-flex items-center gap-2 text-sm">
+                            {notifikasi === 'granted'
+                                ? <Bell className="w-4 h-4" aria-hidden="true" />
+                                : <BellOff className="w-4 h-4" aria-hidden="true" />}
+                            {TEKS_NOTIFIKASI[notifikasi]}
+                        </span>
+                        {notifikasi === 'default' && (
+                            <button type="button" onClick={mintaIzinNotifikasi} className={`${TOMBOL_NETRAL} ml-auto`}>Izinkan notifikasi</button>
+                        )}
+                        {notifikasi === 'granted' && (
+                            <button type="button" onClick={tesNotifikasi} className={`${TOMBOL_NETRAL} ml-auto`}>Tes notifikasi</button>
+                        )}
+                    </div>
+                    <p className="text-xs text-slate-500">
+                        Notifikasi muncul saat ada alarm dan tab FallDetect sedang tidak dilihat, berisi nama ruang tanpa
+                        foto. Alarm sungguhan tetap tampil sampai ada yang menuju lokasi. Untuk komputer jaga; di HP,
+                        perawat dikabari lewat Telegram.
+                    </p>
+                    <Kabar kabar={kabarNotif} />
                 </Bagian>
 
                 <Bagian id="atur-eskalasi" judul="Bila tidak ada yang merespons" keterangan="Alarm yang dibiarkan tidak boleh mati diam-diam.">

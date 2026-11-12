@@ -167,6 +167,13 @@ berasal dari riset referensi UI/UX proyek ini (audit 41 temuan, rencana Tahap 1 
 | Putusan: jatuh sungguhan, alarm palsu (alasan wajib), belum yakin | | | saat menutup, atau belakangan di Riwayat Insiden |
 | Belum dinilai | | | ditutup tanpa putusan; tetap di antrean Perlu tindakan |
 
+Bila tab FallDetect tidak sedang dilihat, alarm yang belum direspons juga muncul sebagai
+notifikasi browser (izin per perangkat di Pengaturan, hanya lewat HTTPS atau localhost), juga
+saat tab ditinggalkan ketika alarm masih berbunyi. Isinya nama ruang dan lama berbaring tanpa
+foto; notifikasi alarm sungguhan menetap sampai ada yang menuju lokasi, lalu ditutup sendiri.
+Pengunjung pameran tidak menerima notifikasi. Fitur ini untuk komputer jaga; Chrome Android dan
+Safari iOS menolak notifikasi dari halaman web biasa, jadi di HP perawat mengandalkan Telegram.
+
 Banyak alarm sekaligus tampil sebagai satu banner berisi "1 dari 3" dan daftar alarm lain,
 bukan tumpukan banner. Urutannya: alarm sungguhan yang belum direspons, lalu yang sudah ada
 yang ke sana, lalu latihan; di tiap kelompok yang terlama lebih dulu. Alarm yang baru diklaim
