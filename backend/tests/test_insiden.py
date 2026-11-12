@@ -264,6 +264,14 @@ def test_alasan_foto_tidak_ada(uji, monkeypatch):
     assert alasan(9) == "Jatuh ini dicatat manual, jadi tidak ada foto dari kamera."
 
 
+def test_pengunjung_tidak_bisa_membuka_foto_dan_klip(uji):
+    """Pengunjung melihat video sesuai privasi kamera; foto utuh dan klip hanya untuk tim."""
+    _sebagai(uji, SimpleNamespace(display_name="Pengunjung pameran", role="pengunjung"))
+    assert uji.klien.get("/api/alerts/1/snapshot").status_code == 403
+    assert uji.klien.get("/api/alerts/1/klip").status_code == 403
+    assert uji.klien.get("/api/alerts/1").status_code == 200, "detail insiden tetap terbaca"
+
+
 def test_kirim_ulang_telegram_ditolak_bila_belum_dikonfigurasi(uji, monkeypatch):
     import types
 

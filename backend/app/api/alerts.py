@@ -248,11 +248,12 @@ async def get_alert(alert_id: int, db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/{alert_id}/snapshot")
-async def get_snapshot(alert_id: int, db: AsyncSession = Depends(get_db)):
+async def get_snapshot(alert_id: int, _tim=Depends(wajib_tim), db: AsyncSession = Depends(get_db)):
     """Foto kejadian, frame yang sama dengan yang dikirim ke Telegram (tanpa diburamkan).
 
     Tidak disimpan di cache browser: foto penghuni yang tergeletak adalah data
-    kesehatan, dan hanya boleh dilihat selama sesinya masih sah.
+    kesehatan, dan hanya boleh dilihat selama sesinya masih sah. Akun tim saja:
+    pengunjung pameran melihat video sesuai privasi kameranya, bukan foto utuh.
     """
     foto = await db.get(AlertSnapshot, alert_id)
     if foto is None:
@@ -285,7 +286,7 @@ _TANPA_KLIP = {
 
 
 @router.get("/{alert_id}/klip")
-async def get_klip(alert_id: int, db: AsyncSession = Depends(get_db)):
+async def get_klip(alert_id: int, _tim=Depends(wajib_tim), db: AsyncSession = Depends(get_db)):
     """Klip sebelum dan sesudah kejadian: waktu tiap frame (detik, relatif terhadap
     alarm) dan JPEG-nya dalam base64. Tidak disimpan di cache browser, sama seperti foto."""
     alert = await _ambil_alert(alert_id, db)

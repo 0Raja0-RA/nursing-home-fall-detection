@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Mail, Lock, LogIn, ArrowLeft, AlertCircle, Eye } from 'lucide-react';
 import { api, PESAN_TERPUTUS } from '../api';
 import { useAuth } from '../context/auth';
@@ -187,7 +187,10 @@ export default function Login() {
                 )}
 
                 <p className="mt-6 text-center text-xs text-slate-500">
-                    Prototipe proyek mahasiswa, bukan alat kesehatan bersertifikat.
+                    Prototipe proyek mahasiswa, bukan alat kesehatan bersertifikat.{' '}
+                    <Link to="/#privasi" className="font-semibold underline underline-offset-2 hover:text-slate-800 dark:hover:text-slate-200">
+                        Apa yang disimpan dan siapa yang melihat
+                    </Link>
                 </p>
             </div>
         </div>
