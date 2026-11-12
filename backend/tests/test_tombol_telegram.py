@@ -165,3 +165,73 @@ def test_nama_penekan():
     assert bot.nama_penekan({"first_name": "Siti", "last_name": "Aminah"}) == "Siti Aminah (Telegram)"
     assert bot.nama_penekan({"username": "siti_a"}) == "siti_a (Telegram)"
     assert bot.nama_penekan({}) == "Seseorang (Telegram)"
+
+
+# ---- Balasan menjadi catatan -------------------------------------------------------
+
+def _balas(teks, ke=501, chat=GRUP, message_id=900, nama=("Siti", "Aminah")):
+    return {
+        "message_id": message_id,
+        "from": {"id": 9, "first_name": nama[0], "last_name": nama[1]},
+        "chat": {"id": int(chat)},
+        "text": teks,
+        "reply_to_message": {"message_id": ke},
+    }
+
+
+@pytest.fixture
+def balasan(tg, monkeypatch):
+    tg.tandai = AsyncMock()
+    tg.teks = AsyncMock(return_value=True)
+    monkeypatch.setattr(ns, "tandai_diterima", tg.tandai)
+    monkeypatch.setattr(ns, "kirim_teks", tg.teks)
+    return tg
+
+
+@pytest.mark.asyncio
+async def test_balasan_ke_pesan_alarm_menjadi_catatan(balasan):
+    await bot.tangani_balasan(_balas("  Sudah dibantu duduk, sadar  "))
+    await bot.tangani_balasan(_balas("Keluarga sudah dikabari", message_id=901, nama=("Budi", "")))
+
+    alert = await _alert(balasan)
+    assert alert.caregiver_note == ("Siti Aminah (Telegram): Sudah dibantu duduk, sadar\n"
+                                    "Budi (Telegram): Keluarga sudah dikabari")
+    assert [c.args[0] for c in balasan.tandai.call_args_list] == [900, 901], "tiap balasan ditandai 👍"
+    pesan = balasan.siar.await_args.args[0]
+    assert pesan.event == "alert_update" and pesan.data["caregiver_note"].endswith("Keluarga sudah dikabari")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("pesan", [
+    _balas("dari grup lain", chat="-100999"),
+    _balas("balasan ke pesan lain", ke=777),
+    _balas("/start"),
+    _balas("   "),
+    {"message_id": 902, "chat": {"id": int(GRUP)}, "from": {"first_name": "Siti"}, "text": "bukan balasan"},
+])
+async def test_pesan_yang_bukan_catatan_diabaikan(balasan, pesan):
+    await bot.tangani_balasan(pesan)
+    assert (await _alert(balasan)).caregiver_note is None
+    balasan.tandai.assert_not_awaited()
+    balasan.teks.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_catatan_terlalu_panjang_tidak_disimpan(balasan):
+    await bot.tangani_balasan(_balas("x" * 600))
+    assert (await _alert(balasan)).caregiver_note is None
+    assert balasan.teks.await_args.kwargs["balas_ke"] == 900, "pengirim diberi tahu lewat balasan"
+    balasan.tandai.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_penerima_meminta_pesan_dan_tombol(monkeypatch):
+    panggilan = {}
+
+    async def panggil(metode, json_=None, **_):
+        panggilan[metode] = json_
+        return True, "", {"result": []}
+
+    monkeypatch.setattr(ns, "_panggil", panggil)
+    await bot._ambil_update(None)
+    assert set(panggilan["getUpdates"]["allowed_updates"]) == {"callback_query", "message"}

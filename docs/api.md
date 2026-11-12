@@ -254,3 +254,10 @@ lokasi, tombolnya menjadi `Jatuh sungguhan`, `Alarm palsu`, dan `Belum yakin`.
 long polling `getUpdates`, karena laptop tidak punya alamat publik untuk webhook,
 dan hanya melayani tombol dari grup di `TELEGRAM_CHAT_ID`. Satu token bot hanya bisa
 dilayani satu backend; backend kedua menerima `409` dari Telegram dan menunggu.
+
+Balasan (reply) ke pesan alarm di grup ditambahkan ke `caregiver_note` sebagai satu baris
+`Nama (Telegram): isi`, lalu disiarkan sebagai `alert_update` dan ditandai reaksi 👍 (atau
+balasan teks bila grup tidak mengizinkan reaksi itu). Balasan ke pesan lain, perintah
+`/...`, dan pesan dari grup lain diabaikan. Bila catatan gabungannya melebihi 500 huruf,
+tidak ada yang disimpan dan pengirim diberi tahu lewat balasan. Bot dalam privacy mode tetap
+menerima balasan ke pesannya sendiri, jadi tidak perlu dijadikan admin grup.

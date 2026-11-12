@@ -437,3 +437,32 @@ def test_penyensor_mengenali_bentuk_token():
     assert TOKEN_PALSU not in hasil
     assert "<TOKEN>" in hasil
     assert "api.telegram.org" in hasil   # sisanya tetap berguna untuk diagnosa
+
+
+def test_pesan_selesai_mengajak_membalas_untuk_catatan():
+    selesai = ns.susun_pesan(_alert(acknowledged=True, acknowledged_by="Siti", acknowledged_at="2026-10-08T15:20:00",
+                                    verdict="jatuh"))
+    assert selesai.endswith("Balas pesan ini untuk menambah catatan.")
+    latihan = ns.susun_pesan(_alert(simulated=True, acknowledged=True, acknowledged_at="2026-10-08T15:20:00"))
+    assert "Balas pesan ini" not in latihan
+    assert "Balas pesan ini" not in ns.susun_pesan(_alert()), "petunjuk hanya sesudah ditangani"
+
+
+@pytest.mark.asyncio
+async def test_tanda_diterima_jatuh_ke_teks_bila_reaksi_ditolak(monkeypatch):
+    dipanggil, teks = [], []
+
+    async def panggil(metode, json_=None, **_):
+        dipanggil.append((metode, json_))
+        return False, "HTTP 400: REACTION_INVALID", {}
+
+    async def kirim(isi, label="pesan", balas_ke=None):
+        teks.append((isi, balas_ke))
+        return True
+
+    monkeypatch.setattr(ns, "_panggil", panggil)
+    monkeypatch.setattr(ns, "kirim_teks", kirim)
+    await ns.tandai_diterima(900)
+    assert dipanggil[0][0] == "setMessageReaction"
+    assert dipanggil[0][1]["reaction"] == [{"type": "emoji", "emoji": "👍"}]
+    assert teks == [("Catatan tersimpan di Riwayat Insiden.", 900)]

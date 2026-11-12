@@ -124,7 +124,8 @@ berasal dari riset referensi UI/UX proyek ini (audit 41 temuan, rencana Tahap 1 
    mengandalkan warna saja.
 4. **Penanganan dua langkah, terlihat semua orang.** "Saya ke sana" mencatat nama,
    menghentikan bunyi di semua dashboard, dan menyunting pesan Telegram. "Tandai
-   Ditangani" dilakukan setelah penghuni ditolong.
+   Ditangani" dilakukan setelah penghuni ditolong. Catatan bisa menyusul dari HP: membalas
+   pesan alarm di grup Telegram menambah satu baris catatan atas nama pengirimnya.
 5. **Penanganan dan putusan dipisah.** Putusan (jatuh sungguhan, alarm palsu dengan
    alasan, belum yakin) menjawab seberapa sering alarmnya salah. Alarm tanpa putusan
    tetap di antrean Perlu tindakan.

@@ -11,8 +11,12 @@ Setiap tombol menjalankan langkah yang sama dengan tombol di dashboard
 (insiden_service), jadi aturannya satu: klaim kedua oleh orang lain ditolak,
 alarm palsu wajib beralasan, dan semua dashboard ikut berubah.
 
-Hanya tombol dari grup yang ada di TELEGRAM_CHAT_ID yang dilayani. Nama penekan
-diambil dari profil Telegram-nya, dengan akhiran "(Telegram)" supaya riwayat
+Balasan (reply) ke pesan alarm di grup menjadi catatan insiden atas nama
+pengirimnya, ditandai 👍 bila tersimpan. Bot dalam privacy mode tetap menerima
+balasan ke pesannya sendiri, jadi grup tidak perlu menjadikan bot admin.
+
+Hanya tombol dan balasan dari grup yang ada di TELEGRAM_CHAT_ID yang dilayani. Nama
+pengirim diambil dari profil Telegram-nya, dengan akhiran "(Telegram)" supaya riwayat
 membedakannya dari akun dashboard.
 
 Satu token bot hanya boleh punya satu penerima. Kalau backend lain (mis. laptop
@@ -104,8 +108,31 @@ async def tangani_callback(cq: dict) -> None:
             await ns.jawab_callback(cid, str(e), peringatan=True)
 
 
+async def tangani_balasan(pesan: dict) -> None:
+    """Balasan ke pesan alarm menjadi satu baris catatan insiden: "Nama (Telegram): isi"."""
+    chat_id = str((pesan.get("chat") or {}).get("id", ""))
+    teks = (pesan.get("text") or pesan.get("caption") or "").strip()
+    induk = (pesan.get("reply_to_message") or {}).get("message_id")
+    if chat_id != str(get_settings().TELEGRAM_CHAT_ID) or not teks or induk is None or teks.startswith("/"):
+        return
+    nama = nama_penekan(pesan.get("from") or {})
+    async with get_session_factory()() as db:
+        alert = await insiden.alert_dari_pesan(db, induk)
+        if alert is None:
+            return                  # balasan ke pesan lain, mis. kabar kamera
+        try:
+            await insiden.tambah_catatan(db, alert, f"{nama}: {teks}")
+        except insiden.CatatanPenuh:
+            await ns.kirim_teks("Catatan tidak tersimpan karena terlalu panjang. Ringkas lalu kirim lagi, "
+                                "atau tulis di Riwayat Insiden.", label="catatan penuh",
+                                balas_ke=pesan.get("message_id"))
+            return
+    log.info(f"[{alert.camera_id}] catatan dari Telegram untuk alert #{alert.id} oleh {nama}")
+    await ns.tandai_diterima(pesan.get("message_id"))
+
+
 async def _ambil_update(offset: Optional[int]) -> tuple[bool, str, list]:
-    payload = {"timeout": 25, "allowed_updates": ["callback_query"]}
+    payload = {"timeout": 25, "allowed_updates": ["callback_query", "message"]}
     if offset is not None:
         payload["offset"] = offset
     ok, alasan, isi = await ns._panggil("getUpdates", json_=payload, timeout=40.0)
@@ -117,7 +144,7 @@ async def jalankan_penerima() -> None:
     if not ns.dikonfigurasi():
         log.info("Penerima tombol Telegram tidak dijalankan: Telegram belum dikonfigurasi.")
         return
-    log.info("📨 Penerima tombol Telegram berjalan")
+    log.info("📨 Penerima tombol dan balasan Telegram berjalan")
     offset: Optional[int] = None
     sudah_lapor_bentrok = False
     while True:
@@ -136,11 +163,13 @@ async def jalankan_penerima() -> None:
             sudah_lapor_bentrok = False
             for u in update:
                 offset = u["update_id"] + 1
-                if "callback_query" in u:
-                    try:
+                try:
+                    if "callback_query" in u:
                         await tangani_callback(u["callback_query"])
-                    except Exception as e:      # satu tombol rusak tidak boleh menghentikan loop
-                        log.info(f"⚠️  Gagal menangani tombol Telegram: {ns._sensor(str(e))}")
+                    elif "message" in u:
+                        await tangani_balasan(u["message"])
+                except Exception as e:      # satu pembaruan rusak tidak boleh menghentikan loop
+                    log.info(f"⚠️  Gagal menangani pembaruan Telegram: {ns._sensor(str(e))}")
         except asyncio.CancelledError:
             raise
         except Exception as e:

@@ -110,7 +110,7 @@ def _baris_status(alert: dict) -> str:
             teks += f"\nPutusan: {e(label)}" + (f", {e(alasan.lower())}" if alasan else "") + "."
         else:
             teks += "\nPutusan belum diisi. Lengkapi di Riwayat Insiden."
-        return teks
+        return teks + "\nBalas pesan ini untuk menambah catatan."
     if alert.get("claimed_by"):
         return f"🟠 <b>{e(alert['claimed_by'])}</b> menuju lokasi ({_jam(alert.get('claimed_at'))})."
     return "Belum ada yang merespons. Tekan <b>Saya ke sana</b> bila Anda menuju lokasi."
@@ -349,6 +349,17 @@ async def jawab_callback(callback_id: str, teks: str, peringatan: bool = False) 
     await _panggil("answerCallbackQuery", json_={
         "callback_query_id": callback_id, "text": teks[:200], "show_alert": peringatan,
     })
+
+
+async def tandai_diterima(message_id: int) -> None:
+    """Reaksi 👍 pada balasan yang sudah tersimpan sebagai catatan. Bila grup tidak
+    mengizinkan reaksi itu, kirim balasan teks pendek sebagai gantinya."""
+    ok, _, _ = await _panggil("setMessageReaction", json_={
+        "chat_id": get_settings().TELEGRAM_CHAT_ID, "message_id": message_id,
+        "reaction": [{"type": "emoji", "emoji": "👍"}],
+    })
+    if not ok:
+        await kirim_teks("Catatan tersimpan di Riwayat Insiden.", label="tanda catatan", balas_ke=message_id)
 
 
 async def kirim_teks(teks: str, label: str = "pesan", balas_ke: Optional[int] = None) -> bool:

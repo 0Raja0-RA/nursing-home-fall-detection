@@ -353,6 +353,9 @@ terjadi, berurutan:
 3. Menekan **Saya ke sana** di Telegram mengubah banner di dashboard menjadi amber dengan
    nama Anda berakhiran "(Telegram)", dan pesan di grup ikut disunting
 4. Riwayat Insiden menunjukkan Telegram **Terkirim**
+5. Sesudah alarm ditutup, pesan di grup diakhiri "Balas pesan ini untuk menambah catatan".
+   Balas pesan alarm itu dengan teks: balasan Anda mendapat reaksi 👍, dan laci **Detail**
+   insiden itu menampilkan catatan "Nama Anda (Telegram): isi balasan"
 
 Hanya satu backend yang bisa menerima tombol untuk satu token bot. Kalau dua laptop
 menjalankan backend dengan token yang sama, tombol dilayani salah satunya saja.

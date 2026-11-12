@@ -423,7 +423,7 @@ export default function Settings() {
                     <Kabar kabar={kabarEskalasi} />
                 </Bagian>
 
-                <Bagian id="atur-telegram" judul="Telegram" keterangan="Pesan alarm ke grup perawat, dengan tombol Saya ke sana dan Alarm palsu.">
+                <Bagian id="atur-telegram" judul="Telegram" keterangan="Pesan alarm ke grup perawat, dengan tombol Saya ke sana dan Alarm palsu. Membalas pesan alarm di grup menambah catatan insiden.">
                     <div className="flex flex-wrap items-center gap-3">
                         <span className="inline-flex items-center gap-2 text-sm">
                             <span className={`w-2 h-2 rounded-full ${telegramSiap ? 'bg-emerald-500' : 'bg-slate-400 dark:bg-slate-600'}`} aria-hidden="true" />

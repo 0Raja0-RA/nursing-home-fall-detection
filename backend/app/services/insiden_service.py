@@ -22,7 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import get_logger, utc_now_naive
 from app.db.models import AlertRecord
-from app.models.schemas import AlertResponse, FallState, Putusan, WSMessage
+from app.models.schemas import CATATAN_MAKS, AlertResponse, FallState, Putusan, WSMessage
 from app.websocket.ws_manager import manager
 
 log = get_logger("app.services.insiden_service")
@@ -90,6 +90,35 @@ async def ambil(db: AsyncSession, alert_id: int) -> AlertRecord:
     alert = await db.get(AlertRecord, alert_id)
     if alert is None:
         raise InsidenTidakAda(alert_id)
+    return alert
+
+
+class CatatanPenuh(Exception):
+    """Catatan gabungan melebihi CATATAN_MAKS huruf."""
+
+
+async def alert_dari_pesan(db: AsyncSession, message_id: int) -> Optional[AlertRecord]:
+    """Alert yang pesan alarm Telegram-nya ber-id ini. Id pesan hanya unik per grup,
+    jadi yang terbaru dipakai bila grup pernah diganti."""
+    return (await db.execute(
+        select(AlertRecord).where(AlertRecord.telegram_message_id == message_id)
+        .order_by(AlertRecord.id.desc()).limit(1)
+    )).scalar_one_or_none()
+
+
+async def tambah_catatan(db: AsyncSession, alert: AlertRecord, baris: str) -> AlertRecord:
+    """Tambahkan satu baris di bawah catatan yang sudah ada, lalu kabari dashboard.
+
+    Raises:
+        CatatanPenuh: catatan gabungannya melebihi CATATAN_MAKS; tidak ada yang disimpan.
+    """
+    gabungan = f"{alert.caregiver_note}\n{baris}" if alert.caregiver_note else baris
+    if len(gabungan) > CATATAN_MAKS:
+        raise CatatanPenuh()
+    alert.caregiver_note = gabungan
+    await db.commit()
+    await db.refresh(alert)
+    await manager.broadcast(WSMessage(event="alert_update", data=alert_ke_dict(alert)))
     return alert
 
 
