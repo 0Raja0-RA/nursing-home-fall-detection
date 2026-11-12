@@ -126,6 +126,14 @@ class Settings(BaseSettings):
     # Kamera dianggap terputus dan dikabarkan ke grup setelah selama ini tanpa gambar.
     CAMERA_OFFLINE_NOTIFY_SEC: float = 30.0
 
+    # ---- Klip kejadian --------------------------------------
+    # Beberapa detik sebelum dan sesudah alarm, disimpan sebagai bukti di Riwayat
+    # Insiden dan dihapus otomatis setelah sekian hari. 0 = tidak merekam klip, dan
+    # klip yang sudah ada ikut dihapus. Klip tidak pernah dikirim ke Telegram.
+    KLIP_MASA_SIMPAN_HARI: int = 7
+    # Folder klip. Path relatif dihitung dari folder backend.
+    KLIP_DIR: str = "klip"
+
     # ---- CORS ----------------------------------------------
     ALLOWED_ORIGINS: str = "http://localhost:5173,http://localhost:3000"
 

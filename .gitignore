@@ -61,5 +61,8 @@ Thumbs.db
 *.db
 *.sqlite3
 
+# ---- Klip kejadian (rekaman penghuni, data kesehatan) --------
+backend/klip/
+
 # ---- Jupyter Notebooks checkpoints --------------------------
 .ipynb_checkpoints/

@@ -83,6 +83,7 @@ tetap di antrean Perlu tindakan sampai dinilai.
 | GET | `/api/alerts/count` | Hitung total alert, filter `acknowledged` opsional |
 | GET | `/api/alerts/{id}` | Detail satu alert |
 | GET | `/api/alerts/{id}/snapshot` | Foto kejadian (JPEG, tanpa diburamkan, `Cache-Control: no-store`). `404` bila tidak tersimpan |
+| GET | `/api/alerts/{id}/klip` | Klip sebelum dan sesudah kejadian: `{detik_tergeletak, dihapus_pada, frame: [{t, jpeg}]}`, dengan `t` detik relatif terhadap alarm dan `jpeg` base64 (`Cache-Control: no-store`). `404` beserta sebabnya bila tidak ada; keadaannya ada di `klip_status` alert |
 | PUT | `/api/alerts/{id}/claim` | "Saya ke sana". Klaim oleh orang lain ditolak `409` beserta nama dan jamnya |
 | PUT | `/api/alerts/{id}/ack` | "Tandai Ditangani". Body opsional `{"verdict", "reason", "note"}` |
 | PUT | `/api/alerts/{id}/verdict` | Isi atau ubah putusan belakangan. `409` bila belum ditangani |
@@ -139,14 +140,17 @@ Contoh alert:
   "threshold_sec": 3.0,
   "detection_mode": "pose",
   "notified": true,
-  "telegram_status": "terkirim"
+  "telegram_status": "terkirim",
+  "klip_status": "tersimpan",
+  "klip_detik": 12.7
 }
 ```
 
 `camera_name` disalin saat kejadian (kosong pada alert lama; pakai `camera_id`).
 Nama penangan lewat Telegram berakhiran `(Telegram)`. `telegram_status`: `mengirim`,
 `terkirim`, `gagal`, `mati` (Telegram belum diatur), `dilewati` (latihan tidak dikirim),
-atau kosong pada alert lama (lihat `notified`). Waktu disimpan UTC tanpa zona.
+atau kosong pada alert lama (lihat `notified`). `klip_status`: `merekam`, `tersimpan`,
+`kosong`, `gagal`, `dihapus`, atau kosong bila tidak direkam. Waktu disimpan UTC tanpa zona.
 
 ---
 

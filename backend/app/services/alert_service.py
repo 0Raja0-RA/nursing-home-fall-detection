@@ -53,7 +53,7 @@ class AlertService:
         # alertnya dipicu, bukan belakangan -- masa simulasinya bisa saja sudah
         # lewat ketika baris ini tersimpan.
         from app.runtime.registry import registry
-        from app.services import inference_service
+        from app.services import inference_service, klip
         from app.services.notification_service import dikonfigurasi
 
         disimulasikan = registry.sedang_disimulasikan(camera_id)
@@ -79,10 +79,15 @@ class AlertService:
                 threshold_sec=fsm.fall_duration_threshold if fsm else self.settings.FALL_DURATION_THRESHOLD,
                 detection_mode=inference_service.mode_aktif(),
                 telegram_status=status_tg,
+                klip_status="merekam" if klip.aktif() else None,
             )
             # 2. Simpan ke Database, berikut frame beranotasi yang sudah ada di registry.
             db_alert = await AlertRepository(session).create_alert(alert_data, foto=foto)
             data = alert_ke_dict(db_alert)
+
+        # Klip dari sebelum orangnya tergeletak sampai beberapa detik sesudah alarm.
+        if data.get("klip_status") == "merekam":
+            klip.mulai_rekam(data["id"], camera_id, now, duration)
 
         # 3. Broadcast ke WebSocket -- SEBELUM Telegram, dan di luar sesi database.
         # Dashboard harus menyala seketika. Telegram boleh lambat atau gagal; ia

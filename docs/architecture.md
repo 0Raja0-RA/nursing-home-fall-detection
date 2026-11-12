@@ -132,8 +132,9 @@ berasal dari riset referensi UI/UX proyek ini (audit 41 temuan, rencana Tahap 1 
    massal, atau bisu tanpa jejak. Bisu hanya 5 menit dan hanya untuk alarm yang sedang
    tampil; alarm baru tetap berbunyi.
 7. **Privasi lebih dulu.** Foto di Telegram bawaannya diburamkan dan semua pesan
-   dilindungi dari penerusan. Foto lengkap hanya bisa dibuka setelah masuk. Tidak ada
-   pengenalan wajah.
+   dilindungi dari penerusan. Foto lengkap dan klip kejadian hanya bisa dibuka setelah
+   masuk, klip tidak pernah dikirim ke Telegram, dan klip dihapus otomatis setelah masa
+   simpannya (bawaan 7 hari). Tidak ada pengenalan wajah.
 8. **Latihan tidak boleh tertukar dengan kejadian nyata.** Latihan berwarna biru, bernada
    lain, tidak dinilai, tidak ikut dihitung, dan secara bawaan tidak dikirim ke Telegram.
 
@@ -157,6 +158,12 @@ berasal dari riset referensi UI/UX proyek ini (audit 41 temuan, rencana Tahap 1 
 | Ditangani | banner hilang | tidak | "Tandai Ditangani", atau tombol putusan di Telegram |
 | Putusan: jatuh sungguhan, alarm palsu (alasan wajib), belum yakin | | | saat menutup, atau belakangan di Riwayat Insiden |
 | Belum dinilai | | | ditutup tanpa putusan; tetap di antrean Perlu tindakan |
+
+Bukti di laci detail Riwayat Insiden: foto saat alarm, dan klip dari sekitar 5 detik
+sebelum orangnya terbaca berbaring sampai 5 detik sesudah alarm. Pipeline menitipkan
+4 gambar per detik (lebar 640 px) dari 30 detik terakhir di memori, dan klip dipotong
+dari situ saat alarm. Bila kamera tidak mengirim gambar, laci menulis bahwa klipnya
+tidak ada, bukan menampilkan ruang kosong.
 
 ### Aturan angka
 

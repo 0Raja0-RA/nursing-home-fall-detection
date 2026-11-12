@@ -19,6 +19,7 @@ from app.core.config import get_settings
 from app.core.logging import get_logger
 from app.db.models import CameraRecord
 from app.runtime.registry import registry
+from app.services import klip
 
 log = get_logger("app.runtime.camera_manager")
 
@@ -93,6 +94,7 @@ async def hentikan_kamera(camera_id: str) -> bool:
     registry.state_machines.pop(camera_id, None)
     registry.latest_detection.pop(camera_id, None)
     registry.latest_status.pop(camera_id, None)
+    klip.penyangga.lupakan(camera_id)
     return ada
 
 

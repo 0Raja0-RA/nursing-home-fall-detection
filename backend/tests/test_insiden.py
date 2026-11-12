@@ -322,3 +322,20 @@ def test_pengunjung_tidak_bisa_mengunduh(uji):
     r = uji.klien.get("/api/alerts/ekspor")
     assert r.status_code == 403
     assert uji.klien.get("/api/alerts/").status_code == 200, "melihat daftar tetap boleh"
+
+
+def test_klip_kejadian(uji, monkeypatch, tmp_path):
+    from app.services import klip
+
+    monkeypatch.setattr(klip, "get_settings",
+                        lambda: SimpleNamespace(KLIP_DIR=str(tmp_path), KLIP_MASA_SIMPAN_HARI=7))
+    r = uji.klien.get("/api/alerts/1/klip")
+    assert r.status_code == 404 and r.json()["detail"] == "Klip tidak tersimpan untuk kejadian ini."
+    _isi(uji, 1, klip_status="dihapus")
+    assert "masa simpan" in uji.klien.get("/api/alerts/1/klip").json()["detail"]
+
+    klip.tulis_berkas(1, [(10.0, b"\xff\xd8a"), (10.25, b"\xff\xd8b")], 10.0, 3.0)
+    r = uji.klien.get("/api/alerts/1/klip")
+    assert r.status_code == 200 and r.headers["cache-control"] == "no-store"
+    assert [f["t"] for f in r.json()["frame"]] == [0.0, 0.25]
+    assert uji.klien.get("/api/alerts/99/klip").status_code == 404

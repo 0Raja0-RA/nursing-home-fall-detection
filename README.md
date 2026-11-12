@@ -274,6 +274,7 @@ Semua endpoint wajib login, kecuali health check, `/api/auth/status`, `/api/auth
 | GET    | `/api/alerts/count`          | Hitung total alert                                  |
 | GET    | `/api/alerts/{id}`           | Detail satu alert                                   |
 | GET    | `/api/alerts/{id}/snapshot`  | Foto kejadian                                       |
+| GET    | `/api/alerts/{id}/klip`      | Klip sebelum dan sesudah kejadian                   |
 | PUT    | `/api/alerts/{id}/claim`     | "Saya ke sana"                                      |
 | PUT    | `/api/alerts/{id}/ack`       | "Tandai Ditangani", dengan putusan dan catatan      |
 | PUT    | `/api/alerts/{id}/verdict`   | Isi atau ubah putusan belakangan                    |

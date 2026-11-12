@@ -72,6 +72,11 @@ async def lingkungan(monkeypatch):
     monkeypatch.setattr(ns, "perbarui_pesan", sunting_palsu)
     # Seolah token dan chat id sudah diisi; pengirimnya tetap tiruan di atas.
     monkeypatch.setattr(ns, "dikonfigurasi", lambda: True)
+    # Perekam klip dicatat saja: yang sungguhan menunggu beberapa detik lalu menulis berkas.
+    from app.services import klip
+    klip_dimulai: list[tuple] = []
+    monkeypatch.setattr(klip, "mulai_rekam", lambda *a: klip_dimulai.append(a))
+    monkeypatch.setattr(klip, "aktif", lambda: True)
 
     from app.runtime.registry import registry
     registry.latest_jpeg["cam-01"] = b"\xff\xd8potret-palsu\xff\xd9"
@@ -79,6 +84,7 @@ async def lingkungan(monkeypatch):
     yield {
         "factory": factory, "urutan": urutan, "ws": ws_pesan,
         "telegram": tg_panggilan, "hasil_telegram": hasil_telegram, "disunting": disunting,
+        "klip": klip_dimulai,
     }
 
     registry.latest_jpeg.pop("cam-01", None)
@@ -529,3 +535,31 @@ async def test_klaim_selama_pengiriman_menyunting_pesan_sesudahnya(lingkungan, m
     assert len(lingkungan["disunting"]) == 1
     assert lingkungan["disunting"][0]["message_id"] == 501
     assert lingkungan["disunting"][0]["alert"]["claimed_by"] == "Siti"
+
+
+@pytest.mark.asyncio
+async def test_alarm_memulai_rekaman_klip(lingkungan):
+    """Klip dimulai dari alert yang sudah tersimpan, dengan waktu alarm dan lama tergeletak."""
+    sebelum = time.time()
+    await _service().process_confirmed_fall("cam-01", 12.3)
+
+    async with lingkungan["factory"]() as s:
+        alert = (await AlertRepository(s).get_recent_alerts())[0]
+    assert alert.klip_status == "merekam"
+    [(alert_id, camera_id, waktu_alarm, lama)] = lingkungan["klip"]
+    assert (alert_id, camera_id, lama) == (alert.id, "cam-01", 12.3)
+    assert sebelum <= waktu_alarm <= time.time()
+    pesan = next(m for m in lingkungan["ws"] if m.event == "alert")
+    assert pesan.data["klip_status"] == "merekam", "dashboard tahu klipnya sedang direkam"
+
+
+@pytest.mark.asyncio
+async def test_tanpa_klip_bila_perekaman_dimatikan(lingkungan, monkeypatch):
+    from app.services import klip
+    monkeypatch.setattr(klip, "aktif", lambda: False)
+    await _service().process_confirmed_fall("cam-01", 12.3)
+
+    async with lingkungan["factory"]() as s:
+        alert = (await AlertRepository(s).get_recent_alerts())[0]
+    assert alert.klip_status is None
+    assert lingkungan["klip"] == []

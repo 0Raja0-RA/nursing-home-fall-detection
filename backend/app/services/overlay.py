@@ -109,10 +109,10 @@ def gambar_deteksi(frame: np.ndarray, hasil: Optional[DetectionResult], ambang: 
     return frame
 
 
-def jadikan_jpeg(frame: np.ndarray, hasil: Optional[list[DetectionResult]], ambang: float,
-                 tampilkan_ragu: bool = True, ambang_pemicu: Optional[float] = None,
-                 kelas_pemicu: tuple = ()) -> Optional[bytes]:
-    """Gambar semua deteksi lalu kembalikan frame sebagai byte JPEG siap kirim.
+def anotasi(frame: np.ndarray, hasil: Optional[list[DetectionResult]], ambang: float,
+            tampilkan_ragu: bool = True, ambang_pemicu: Optional[float] = None,
+            kelas_pemicu: tuple = ()) -> np.ndarray:
+    """Salinan frame dengan semua deteksi tergambar.
 
     Frame disalin dulu supaya gambar yang dipakai pipeline tidak ikut tercoret.
     Deteksi berkeyakinan rendah digambar lebih dulu supaya kotak yang yakin
@@ -121,5 +121,20 @@ def jadikan_jpeg(frame: np.ndarray, hasil: Optional[list[DetectionResult]], amba
     gambar = frame.copy()
     for h in sorted(hasil or [], key=lambda d: d.confidence):
         gambar_deteksi(gambar, h, ambang, tampilkan_ragu, ambang_pemicu, kelas_pemicu)
-    ok, buffer = cv2.imencode(".jpg", gambar)
+    return gambar
+
+
+def ke_jpeg(gambar: np.ndarray, lebar_maks: Optional[int] = None, mutu: int = 95) -> Optional[bytes]:
+    """Byte JPEG, diperkecil dulu bila lebih lebar dari lebar_maks. Mutu 95 = bawaan OpenCV."""
+    if lebar_maks and gambar.shape[1] > lebar_maks:
+        tinggi = round(gambar.shape[0] * lebar_maks / gambar.shape[1])
+        gambar = cv2.resize(gambar, (lebar_maks, tinggi), interpolation=cv2.INTER_AREA)
+    ok, buffer = cv2.imencode(".jpg", gambar, [cv2.IMWRITE_JPEG_QUALITY, mutu])
     return buffer.tobytes() if ok else None
+
+
+def jadikan_jpeg(frame: np.ndarray, hasil: Optional[list[DetectionResult]], ambang: float,
+                 tampilkan_ragu: bool = True, ambang_pemicu: Optional[float] = None,
+                 kelas_pemicu: tuple = ()) -> Optional[bytes]:
+    """Gambar semua deteksi lalu kembalikan frame sebagai byte JPEG siap kirim."""
+    return ke_jpeg(anotasi(frame, hasil, ambang, tampilkan_ragu, ambang_pemicu, kelas_pemicu))

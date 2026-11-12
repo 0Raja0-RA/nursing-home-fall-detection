@@ -57,12 +57,15 @@ async def lifespan(app: FastAPI):
     # lama tetap bekerja tanpa harus mendaftar lewat dashboard dulu.
     await camera_manager.muat_dari_db()
 
-    # Dua pekerja latar: penerima tombol di pesan Telegram, dan pemantau yang
-    # mengabari grup saat kamera terputus. Keduanya diam kalau Telegram belum diisi.
+    # Pekerja latar: penerima tombol di pesan Telegram, pemantau yang mengabari grup
+    # saat kamera terputus (keduanya diam kalau Telegram belum diisi), dan pembersih
+    # klip kejadian yang melewati masa simpan.
     from app.runtime.pemantau_kamera import jalankan_pemantau
+    from app.services.klip import jalankan_pembersih
     from app.services.telegram_bot import jalankan_penerima
 
-    pekerja = [asyncio.create_task(jalankan_penerima()), asyncio.create_task(jalankan_pemantau())]
+    pekerja = [asyncio.create_task(jalankan_penerima()), asyncio.create_task(jalankan_pemantau()),
+               asyncio.create_task(jalankan_pembersih())]
 
     yield
     # --- Shutdown ---

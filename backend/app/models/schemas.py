@@ -100,6 +100,7 @@ class AlertCreate(AlertBase):
     threshold_sec: Optional[float] = Field(None, description="Ambang yang berlaku saat kejadian")
     detection_mode: Optional[str] = Field(None, description="Mode detektor saat kejadian")
     telegram_status: Optional[str] = None
+    klip_status: Optional[str] = None
 
 
 class AlertResponse(AlertBase):
@@ -131,6 +132,9 @@ class AlertResponse(AlertBase):
     detection_mode: Optional[str] = None
     # mengirim | terkirim | gagal | mati | dilewati. Kosong pada alert lama: pakai notified.
     telegram_status: Optional[str] = None
+    # merekam | tersimpan | kosong | gagal | dihapus. Kosong = tidak ada klip.
+    klip_status: Optional[str] = None
+    klip_detik: Optional[float] = None
 
     model_config = {"from_attributes": True}
 

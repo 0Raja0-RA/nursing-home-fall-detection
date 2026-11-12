@@ -49,6 +49,8 @@ erDiagram
         string telegram_status
         int telegram_message_id
         bool telegram_foto
+        string klip_status "merekam | tersimpan | kosong | gagal | dihapus"
+        float klip_detik
         datetime created_at
     }
     alert_snapshots {
@@ -109,6 +111,7 @@ Riwayat insiden. Satu baris untuk satu alarm yang dikonfirmasi state machine.
 - **Putusan:** `verdict` bernilai `jatuh`, `palsu`, atau `belum_yakin`, dan NULL berarti belum dinilai. Untuk alarm palsu, `verdict_reason` berisi kode alasannya. Putusan sengaja dipisah dari penanganan, karena alarm bisa sudah ditangani tetapi belum dinilai.
 - **Keadaan sistem saat kejadian:** `threshold_sec` dan `detection_mode`. Tanpa keduanya, angka alarm palsu tidak bisa ditafsirkan.
 - **Telegram:** `telegram_status` bernilai `mengirim`, `terkirim`, `gagal`, `mati`, atau `dilewati`. `telegram_message_id` dipakai untuk menyunting pesan yang sama, dan `telegram_foto` menandai pesan berupa foto. Pada alert lama, `telegram_status` NULL dan yang berlaku adalah `notified`.
+- **Klip:** `klip_status` bernilai `merekam` (menunggu detik-detik sesudah alarm), `tersimpan`, `kosong` (kamera tidak mengirim gambar di sekitar kejadian), `gagal`, atau `dihapus` (lewat masa simpan). NULL berarti tidak direkam: alert lama, atau perekaman dimatikan. `klip_detik` adalah panjang klipnya. Berkas klipnya sendiri tidak ada di database, tetapi di folder `KLIP_DIR` (bawaan `backend/klip/`, diabaikan git), satu ZIP berisi JPEG per alert, dan dihapus otomatis setelah `KLIP_MASA_SIMPAN_HARI` hari.
 - Nama ruang (`camera_name`) dan nama orang (`*_by`) **disalin, bukan dirujuk**. Riwayat harus tetap menyebut tempat dan orangnya walaupun kameranya dihapus atau akunnya dinonaktifkan. Pada alert lama, `camera_name` bisa NULL, dan `camera_id` dipakai sebagai cadangan.
 
 ### `alert_snapshots`

@@ -10,6 +10,7 @@ Endpoints:
     GET  /api/alerts/count           — Hitung total alert (lama, tetap dipertahankan)
     GET  /api/alerts/{id}            — Detail satu alert
     GET  /api/alerts/{id}/snapshot   — Foto kejadian (JPEG)
+    GET  /api/alerts/{id}/klip       — Klip sebelum dan sesudah kejadian (JSON, JPEG base64)
     PUT  /api/alerts/{id}/claim      — "Saya ke sana"
     PUT  /api/alerts/{id}/ack        — "Tandai Ditangani", dengan putusan dan catatan opsional
     PUT  /api/alerts/{id}/verdict    — Isi atau ubah putusan belakangan
@@ -26,6 +27,7 @@ from datetime import datetime
 from typing import Annotated, Literal, Optional
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Response, status
+from fastapi.responses import JSONResponse
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -42,6 +44,7 @@ from app.models.schemas import (
     VerdictUpdate,
 )
 from app.services import insiden_service as insiden
+from app.services import klip
 from app.services.ekspor import csv_insiden
 
 router = APIRouter()
@@ -207,6 +210,26 @@ async def get_snapshot(alert_id: int, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Foto kejadian tidak tersimpan untuk alert ini.")
     return Response(content=foto.jpeg, media_type="image/jpeg",
                     headers={"Cache-Control": "no-store"})
+
+
+_TANPA_KLIP = {
+    "merekam": "Klip masih direkam. Coba lagi beberapa detik lagi.",
+    "kosong": "Kamera tidak mengirim gambar di sekitar kejadian, jadi tidak ada klip.",
+    "gagal": "Klip gagal disimpan di server.",
+    "dihapus": "Klip sudah dihapus karena melewati masa simpan.",
+}
+
+
+@router.get("/{alert_id}/klip")
+async def get_klip(alert_id: int, db: AsyncSession = Depends(get_db)):
+    """Klip sebelum dan sesudah kejadian: waktu tiap frame (detik, relatif terhadap
+    alarm) dan JPEG-nya dalam base64. Tidak disimpan di cache browser, sama seperti foto."""
+    alert = await _ambil_alert(alert_id, db)
+    isi = await asyncio.to_thread(klip.baca_berkas, alert_id)
+    if isi is None:
+        raise HTTPException(status_code=404, detail=_TANPA_KLIP.get(
+            alert.klip_status, "Klip tidak tersimpan untuk kejadian ini."))
+    return JSONResponse(isi, headers={"Cache-Control": "no-store"})
 
 
 def _konflik(e: Exception) -> HTTPException:

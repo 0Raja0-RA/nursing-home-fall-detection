@@ -56,6 +56,7 @@ class AlertRepository:
             threshold_sec=data.threshold_sec,
             detection_mode=data.detection_mode,
             telegram_status=data.telegram_status,
+            klip_status=data.klip_status,
         )
         self.session.add(db_obj)
         if foto:

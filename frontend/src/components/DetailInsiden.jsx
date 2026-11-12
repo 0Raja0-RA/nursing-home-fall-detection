@@ -1,10 +1,10 @@
 import { useEffect, useId, useState } from 'react';
-import { CheckCircle2, Footprints, ImageOff, Pencil, RotateCw, X } from 'lucide-react';
+import { CheckCircle2, Footprints, Pencil, RotateCw, X } from 'lucide-react';
 import { api, bacaGalat, PESAN_TERPUTUS } from '../api';
-import { API_BASE } from '../config';
 import { ALASAN_PALSU, labelAlasan, labelPutusan, PUTUSAN } from '../putusan';
 import { jamDari } from '../statusKamera';
 import { durasiTeks, msDari, selisihDetik, tanggalJam } from '../waktu';
+import BuktiKejadian from './BuktiKejadian';
 import FormPenutupan, { PilihanRadio } from './FormPenutupan';
 import { StatusTelegram } from './StatusInsiden';
 import { usePengunjung } from '../context/auth';
@@ -113,27 +113,6 @@ function FormCatatan({ alert, onSelesai, onBatal }) {
     );
 }
 
-/** Foto kejadian; kejadian lama atau yang kameranya belum mengirim gambar tidak punya foto. */
-function FotoKejadian({ alert }) {
-    const [gagal, setGagal] = useState(false);
-    if (gagal) {
-        return (
-            <div className="aspect-video rounded-xl bg-slate-100 dark:bg-slate-800 flex flex-col items-center justify-center gap-2 text-sm text-slate-500">
-                <ImageOff className="w-6 h-6" aria-hidden="true" />
-                Foto tidak tersimpan untuk kejadian ini.
-            </div>
-        );
-    }
-    return (
-        <img
-            src={`${API_BASE}/api/alerts/${alert.id}/snapshot`}
-            alt={`Foto kejadian di ${alert.camera_name || alert.camera_id}`}
-            onError={() => setGagal(true)}
-            className="w-full rounded-xl bg-slate-950"
-        />
-    );
-}
-
 function BarisWaktu({ judul, waktu, dari, children }) {
     const ms = msDari(waktu);
     const jeda = dari ? selisihDetik(dari, waktu) : null;
@@ -151,7 +130,7 @@ function BarisWaktu({ judul, waktu, dari, children }) {
 }
 
 /**
- * Laci detail satu insiden: foto, linimasa penanganan, keadaan sistem saat itu,
+ * Laci detail satu insiden: foto dan klip, linimasa penanganan, keadaan sistem saat itu,
  * putusan, catatan, dan status Telegram. Alarm yang masih terbuka bisa langsung
  * ditangani dari sini, termasuk yang sudah tidak tampil sebagai banner.
  */
@@ -211,7 +190,7 @@ export default function DetailInsiden({ alert, onTutup, onBerubah }) {
                 </header>
 
                 <div className="p-4 space-y-6">
-                    <FotoKejadian alert={alert} />
+                    <BuktiKejadian alert={alert} />
 
                     {!alert.acknowledged && !pengunjung && (
                         <section className="space-y-2">

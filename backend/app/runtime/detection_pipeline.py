@@ -17,7 +17,8 @@ from app.models.schemas import DetectionResult, Observation, CameraStatus, WSMes
 from app.services.camera_service import CameraService
 from app.runtime.registry import registry
 from app.services.inference_service import run_inference
-from app.services.overlay import jadikan_jpeg
+from app.services import klip
+from app.services.overlay import anotasi, ke_jpeg
 from app.services.state_machine import FallStateMachine
 from app.websocket.ws_manager import manager
 
@@ -126,6 +127,15 @@ def pilih_observasi(
     return menang, wakil
 
 
+def _jpeg_dan_klip(frame, results, settings, untuk_klip: bool) -> tuple[Optional[bytes], Optional[bytes]]:
+    """JPEG beranotasi untuk stream, dan bila diminta versi kecilnya untuk klip.
+    Kotak deteksi digambar sekali untuk keduanya."""
+    gambar = anotasi(frame, results, settings.CONFIDENCE_THRESHOLD, settings.SHOW_UNCERTAIN_BOXES,
+                     settings.TRIGGER_MIN_CONF, tuple(settings.TRIGGER_CLASSES))
+    kecil = ke_jpeg(gambar, klip.LEBAR, klip.MUTU) if untuk_klip else None
+    return ke_jpeg(gambar), kecil
+
+
 async def camera_pipeline(camera: CameraService, fsm: FallStateMachine):
     """Detection loop untuk satu kamera."""
     settings = get_settings()
@@ -220,11 +230,13 @@ async def camera_pipeline(camera: CameraService, fsm: FallStateMachine):
         # Gambar kotak dan encode JPEG sekali di sini, bukan sekali per penonton di
         # endpoint stream. cv2.imencode itu kerja CPU yang memblokir, jadi dijalankan
         # di thread supaya event loop tetap bisa melayani REST dan WebSocket.
-        jpeg = await asyncio.to_thread(
-            jadikan_jpeg, frame, results, settings.CONFIDENCE_THRESHOLD,
-            settings.SHOW_UNCERTAIN_BOXES, settings.TRIGGER_MIN_CONF,
-            tuple(settings.TRIGGER_CLASSES)
+        # Beberapa kali per detik, versi kecilnya dititipkan ke penyangga klip.
+        untuk_klip = klip.penyangga.perlu_frame(camera.camera_id, loop_start)
+        jpeg, kecil = await asyncio.to_thread(
+            _jpeg_dan_klip, frame, results, settings, untuk_klip
         )
+        if kecil:
+            klip.penyangga.tambah(camera.camera_id, loop_start, kecil)
         registry.latest_jpeg[camera.camera_id] = jpeg
         registry.frame_seq[camera.camera_id] = registry.frame_seq.get(camera.camera_id, 0) + 1
         await manager.broadcast(WSMessage(event="status_update", data=status.model_dump()))

@@ -123,6 +123,11 @@ class AlertRecord(Base):
     telegram_message_id = Column(Integer, nullable=True)
     telegram_foto = Column(Boolean, nullable=True)     # pesan berupa foto (caption) atau teks
 
+    # ---- Klip sebelum dan sesudah kejadian (app/services/klip.py) -------
+    # merekam | tersimpan | kosong | gagal | dihapus. NULL = tidak direkam.
+    klip_status = Column(String, nullable=True)
+    klip_detik = Column(Float, nullable=True)
+
 
 class AlertSnapshot(Base):
     """Foto kejadian, satu per alert.
