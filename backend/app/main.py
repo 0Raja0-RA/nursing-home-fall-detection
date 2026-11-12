@@ -48,6 +48,9 @@ async def lifespan(app: FastAPI):
         await muat_pengaturan(session)
         # Akun demo tim dari backend/.env, disamakan setiap backend menyala.
         await auth.siapkan_akun_demo(session)
+        # Mode perawatan yang belum habis, sebelum pipeline kamera mulai berjalan.
+        from app.services.mode_perawatan import muat_dari_db as muat_jeda
+        await muat_jeda(session)
 
     # Import saat runtime untuk menghindari circular dependency
     from app.runtime import camera_manager

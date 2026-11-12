@@ -265,9 +265,10 @@ export default function Settings() {
                                 <input type="checkbox" checked={tg.camera_offline} className="mt-1 accent-slate-700"
                                     onChange={(e) => ubahTelegram({ camera_offline: e.target.checked })} />
                                 <span>
-                                    Kabari grup saat kamera terputus
+                                    Kabari grup saat kamera terputus atau dijeda
                                     <span className="block text-xs text-slate-500">
-                                        Setelah 30 detik tanpa gambar, dan sekali lagi saat kamera pulih.
+                                        Setelah 30 detik tanpa gambar dan saat kamera pulih, juga saat Mode
+                                        perawatan dimulai, diperpanjang, atau selesai.
                                     </span>
                                 </span>
                             </label>

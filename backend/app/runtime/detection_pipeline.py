@@ -17,7 +17,7 @@ from app.models.schemas import DetectionResult, Observation, CameraStatus, WSMes
 from app.services.camera_service import CameraService
 from app.runtime.registry import registry
 from app.services.inference_service import run_inference
-from app.services import klip
+from app.services import klip, mode_perawatan
 from app.services.overlay import anotasi, ke_jpeg
 from app.services.state_machine import FallStateMachine
 from app.websocket.ws_manager import manager
@@ -148,13 +148,21 @@ async def camera_pipeline(camera: CameraService, fsm: FallStateMachine):
 
     while camera.is_active:
         loop_start = time.time()
-        
+
+        # Mode perawatan yang waktunya habis: pemantauan berjalan lagi dari nol.
+        if mode_perawatan.kedaluwarsa(camera.camera_id):
+            fsm.reset()
+            jejak = None
+            mode_perawatan.kabari_habis(camera.camera_id)
+        jeda = mode_perawatan.aktif(camera.camera_id)
+        tanda_jeda = {"dijeda_sampai": jeda.sampai, "dijeda_oleh": jeda.oleh} if jeda else {}
+
         frame = camera.get_latest_frame()
         if frame is None:
             # Frame tidak tersedia atau kamera offline
             fsm.update(Observation.OFFLINE)
             jejak = None
-            
+
             # Broadcast offline status
             status = CameraStatus(
                 camera_id=camera.camera_id,
@@ -164,6 +172,7 @@ async def camera_pipeline(camera: CameraService, fsm: FallStateMachine):
                 # Jam frame terakhir yang benar-benar diterima, bukan jam sekarang,
                 # supaya dashboard bisa menulis sejak kapan kamera terputus.
                 last_frame_at=camera.waktu_frame_terakhir,
+                **tanda_jeda,
             )
             registry.latest_detection[camera.camera_id] = []
             registry.latest_status[camera.camera_id] = status
@@ -172,7 +181,26 @@ async def camera_pipeline(camera: CameraService, fsm: FallStateMachine):
 
             await asyncio.sleep(0.1)
             continue
-            
+
+        # Mode perawatan: model tidak dijalankan, video tidak ditayangkan, dan tidak ada
+        # gambar yang masuk ke penyangga klip. Kameranya tetap menyala supaya pemantauan
+        # bisa langsung berjalan lagi.
+        if jeda is not None:
+            status = CameraStatus(
+                camera_id=camera.camera_id,
+                is_active=True,
+                fall_state=fsm.state,
+                fps=camera.fps,
+                last_frame_at=camera.waktu_frame_terakhir,
+                **tanda_jeda,
+            )
+            registry.latest_detection[camera.camera_id] = []
+            registry.latest_status[camera.camera_id] = status
+            registry.latest_jpeg[camera.camera_id] = None
+            await manager.broadcast(WSMessage(event="status_update", data=status.model_dump()))
+            await asyncio.sleep(0.5)
+            continue
+
         # Inference (dieksekusi di thread pool agar tidak memblokir event loop async)
         results = await asyncio.to_thread(run_inference, frame)
         

@@ -130,7 +130,9 @@ berasal dari riset referensi UI/UX proyek ini (audit 41 temuan, rencana Tahap 1 
    tetap di antrean Perlu tindakan.
 6. **Tidak ada yang menutup alarm diam-diam.** Tidak ada penutupan otomatis, penutupan
    massal, atau bisu tanpa jejak. Bisu hanya 5 menit dan hanya untuk alarm yang sedang
-   tampil; alarm baru tetap berbunyi.
+   tampil; alarm baru tetap berbunyi. Menjeda deteksi juga tidak pernah otomatis: Mode
+   perawatan dimulai manusia per kamera, paling lama 2 jam, berhitung mundur, tercatat,
+   dan dikabarkan ke grup. Alarm yang sudah terbuka tidak ikut tertutup.
 7. **Privasi lebih dulu.** Foto di Telegram bawaannya diburamkan dan semua pesan
    dilindungi dari penerusan. Foto lengkap dan klip kejadian hanya bisa dibuka setelah
    masuk, klip tidak pernah dikirim ke Telegram, dan klip dihapus otomatis setelah masa
@@ -147,6 +149,7 @@ berasal dari riset referensi UI/UX proyek ini (audit 41 temuan, rencana Tahap 1 
 | Berbaring 00:02 dari 00:03 | belah ketupat, amber | hitungan berjalan, alarm belum berbunyi | pantau |
 | Kemungkinan jatuh | segitiga, merah | ambang terlewati, alarm berbunyi; tile naik ke depan | tangani lewat banner |
 | Latihan | labu kimia, biru | Mode latihan berjalan | ikuti alur seperti alarm sungguhan |
+| Mode perawatan 09:32 | jam, biru bergaris | deteksi dan video dijeda manual, dengan hitung mundur; jatuh di ruang ini tidak terdeteksi | lanjutkan pemantauan setelah perawatan selesai, atau biarkan habis sendiri |
 | Terputus | kamera tercoret, garis putus-putus | kamera tidak mengirim gambar; jatuh di ruang ini tidak terdeteksi | periksa daya, jaringan, dan alamat di Daftar Kamera |
 
 ### Status insiden (banner dan Riwayat Insiden)

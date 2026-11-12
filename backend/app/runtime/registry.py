@@ -45,6 +45,10 @@ class AppRegistry:
         # "transitional" dan tidak pernah memicu alarm.
         self.simulasi_sampai: Dict[str, float] = {}
 
+        # Mode perawatan yang sedang berjalan per kamera (mode_perawatan.JedaAktif).
+        # Sumber kebenarannya tabel jeda_kamera; ini salinannya untuk pipeline.
+        self.jeda: Dict[str, object] = {}
+
     def sedang_disimulasikan(self, camera_id: str) -> bool:
         """True kalau kamera ini sedang dalam masa simulasi jatuh."""
         import time

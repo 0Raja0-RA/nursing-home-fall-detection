@@ -30,11 +30,13 @@ export function jamDari(ms) {
  *   durasi: lama berbaring yang sedang dihitung, dalam detik.
  *   ambang: batas sebelum alarm, dalam detik (boleh kosong).
  *   latihan: dipicu Mode latihan, bukan kejadian sungguhan.
+ *   sisaJeda: detik tersisa Mode perawatan; 0 atau kosong bila tidak dijeda.
  *
  * Returns: { kode, label }. kode menentukan bentuk dan warna di StatusKamera.
  */
-export function bacaStatus({ aktif, state, adaOrang, durasi, ambang, latihan }) {
+export function bacaStatus({ aktif, state, adaOrang, durasi, ambang, latihan, sisaJeda }) {
     if (!aktif) return { kode: 'terputus', label: 'Terputus' };
+    if (sisaJeda > 0) return { kode: 'perawatan', label: `Mode perawatan ${mmss(sisaJeda)}` };
     const awalan = latihan ? 'Latihan · ' : '';
     if (state === 'confirmed_fall') {
         return { kode: latihan ? 'latihan' : 'jatuh', label: `${awalan}Kemungkinan jatuh · ${mmss(durasi)}` };

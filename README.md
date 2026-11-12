@@ -294,6 +294,8 @@ Semua endpoint wajib login, kecuali health check, `/api/auth/status`, `/api/auth
 | PUT    | `/api/settings/mode`         | Ganti model detektor (`bbox` / `pose`)              |
 | PUT    | `/api/settings/telegram`     | Foto Telegram, kirim latihan, kabar kamera putus    |
 | POST   | `/api/cameras/{id}/simulate-fall` | Paksa simulasi jatuh (untuk demo)              |
+| POST   | `/api/cameras/{id}/jeda`     | Mode perawatan: jeda atau perpanjang `{menit}`      |
+| DELETE | `/api/cameras/{id}/jeda`     | Hentikan Mode perawatan lebih awal                  |
 | POST   | `/api/settings/test-telegram`| Kirim notifikasi uji ke Telegram                    |
 | WS     | `/ws`                        | WebSocket live updates                              |
 

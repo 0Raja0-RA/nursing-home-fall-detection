@@ -167,7 +167,9 @@ atau kosong pada alert lama (lihat `notified`). `klip_status`: `merekam`, `tersi
 | GET | `/api/cameras/{id}/snapshot` | Satu gambar terakhir (JPEG), untuk gambar mini |
 | GET | `/api/cameras/devices` | Kamera yang terpasang di komputer ini (webcam, Iriun) |
 | POST | `/api/cameras/scan` | Pindai subnet lokal untuk mencari kamera IP |
-| POST | `/api/cameras/{id}/simulate-fall` | Mode latihan: paksa observasi pemicu beberapa detik |
+| POST | `/api/cameras/{id}/simulate-fall` | Mode latihan: paksa observasi pemicu beberapa detik. `409` selama Mode perawatan |
+| POST | `/api/cameras/{id}/jeda` | Mode perawatan. Body `{"menit": 1-120}`: mulai jeda, atau perpanjang jeda yang berjalan (sisa paling lama 120 menit). `409` bila kamera mati |
+| DELETE | `/api/cameras/{id}/jeda` | Hentikan Mode perawatan lebih awal. Aman dipanggil bila tidak sedang dijeda |
 
 Kata sandi di `source` disamarkan dalam jawaban (`rtsp://admin:***@10.0.0.5/s`).
 Mengirim balik alamat tersamar itu lewat PATCH dianggap "tidak diubah".
@@ -202,7 +204,7 @@ koneksi ditolak sebelum diterima.
 
 | Event | Isi `data` | Kapan |
 |---|---|---|
-| `status_update` | status satu kamera (`camera_id`, `is_active`, `current_posture`, `fall_state`, `fall_duration`, `confidence`, `fps`, `last_frame_at`, `simulated`) | setiap frame diproses |
+| `status_update` | status satu kamera (`camera_id`, `is_active`, `current_posture`, `fall_state`, `fall_duration`, `confidence`, `fps`, `last_frame_at`, `simulated`, `dijeda_sampai`, `dijeda_oleh`) | setiap frame diproses; selama Mode perawatan tiap setengah detik |
 | `alert` | alert baru, bentuk sama dengan `GET /api/alerts/{id}` | jatuh terkonfirmasi atau latihan |
 | `alert_update` | alert lengkap | ada yang menekan "Saya ke sana" atau mengubah putusan, dari dashboard atau Telegram |
 | `alert_ack` | alert lengkap | alert ditandai ditangani; banner hilang di semua dashboard |

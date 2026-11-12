@@ -172,3 +172,23 @@ class SessionRecord(Base):
     user_id = Column(Integer, nullable=False, index=True)
     created_at = Column(DateTime, default=utc_now_naive)
     expires_at = Column(DateTime, nullable=False)
+
+
+class JedaKamera(Base):
+    """Riwayat Mode perawatan: jeda deteksi jatuh di satu kamera.
+
+    Menjeda deteksi berarti jatuh di ruang itu tidak terdeteksi, jadi setiap jeda
+    harus meninggalkan jejak: siapa, kapan, dan sampai kapan. Jeda yang berjalan
+    sampai habis membiarkan `selesai` kosong; akhirnya adalah `sampai`.
+    """
+
+    __tablename__ = "jeda_kamera"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    camera_id = Column(String, nullable=False, index=True)
+    camera_name = Column(String, nullable=True)        # disalin, seperti di alerts
+    mulai = Column(DateTime, nullable=False, default=utc_now_naive)
+    sampai = Column(DateTime, nullable=False)          # bergeser bila diperpanjang
+    oleh = Column(String, nullable=True)
+    selesai = Column(DateTime, nullable=True)          # diisi bila dihentikan lebih awal
+    diakhiri_oleh = Column(String, nullable=True)

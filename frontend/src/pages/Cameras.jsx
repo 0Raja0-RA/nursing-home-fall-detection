@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Info, Loader2, Plus, Power, Radar, Settings2, Trash2, Usb, VideoOff, X } from 'lucide-react';
+import { Clock, Info, Loader2, Plus, Power, Radar, Settings2, Trash2, Usb, VideoOff, X } from 'lucide-react';
 import { api, bacaGalat, PESAN_TERPUTUS } from '../api';
 import { API_BASE } from '../config';
 import { jamDari } from '../statusKamera';
@@ -30,6 +30,18 @@ function StatusKameraDaftar({ cam }) {
         return (
             <p className="text-xs text-slate-500">
                 <span className="font-semibold text-slate-700 dark:text-slate-300">Dimatikan.</span> Ruang ini tidak dipantau.
+            </p>
+        );
+    }
+    // Backend hanya mengisi dijeda_sampai selama Mode perawatan masih berjalan.
+    const jeda = msDari(cam.dijeda_sampai);
+    if (cam.is_active && Number.isFinite(jeda)) {
+        return (
+            <p className="text-xs text-slate-700 dark:text-slate-300 tabular-nums">
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 mr-1.5 rounded border border-blue-500 text-blue-800 dark:text-blue-200 font-semibold">
+                    <Clock className="w-3 h-3" aria-hidden="true" /> Mode perawatan
+                </span>
+                sampai {jamDari(jeda)}{cam.dijeda_oleh ? `, oleh ${cam.dijeda_oleh}` : ''}. Deteksi dan video dijeda.
             </p>
         );
     }

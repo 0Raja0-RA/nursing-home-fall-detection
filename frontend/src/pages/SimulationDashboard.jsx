@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { FlaskConical, Send, Video, VideoOff, Volume2, VolumeX, X } from 'lucide-react';
+import { Clock, FlaskConical, Send, Video, VideoOff, Volume2, VolumeX, X } from 'lucide-react';
 import { api, bacaGalat, PESAN_TERPUTUS } from '../api';
 import { API_BASE } from '../config';
 import { usePengunjung } from '../context/auth';
@@ -8,7 +8,8 @@ import { useLive } from '../context/LiveContext';
 import { aktifkanSuara, bunyikan, useStatusSuara } from '../hooks/useAlarmSound';
 import { usePengaturan } from '../hooks/usePengaturan';
 import StatusKamera from '../components/StatusKamera';
-import { bacaStatus, jamDari } from '../statusKamera';
+import { bacaStatus, jamDari, mmss } from '../statusKamera';
+import { msDari, useJam } from '../waktu';
 
 /**
  * Gambar MJPEG dari backend, yang melepas koneksinya saat dilepas dari DOM.
@@ -51,6 +52,7 @@ function StreamImg({ src, alt, kunci, onUkuran }) {
 
 const CHIP = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs whitespace-nowrap';
 const CHIP_TENANG = `${CHIP} bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300`;
+const PILIHAN_JEDA = [15, 30, 60];
 
 // Rasio video tiap kamera, disimpan di luar komponen supaya kartu langsung berukuran
 // benar saat halaman ini dibuka lagi. Tanpa itu kartu melompat begitu video termuat,
@@ -76,6 +78,9 @@ export default function SimulationDashboard() {
     // Pilihan "kirim latihan ke Telegram" yang baru diubah di halaman ini; selama
     // belum diubah, nilai dari pengaturan backend yang dipakai.
     const [kirimLatihan, setKirimLatihan] = useState(null);
+    // Kamera yang pilihan Mode perawatannya sedang terbuka, dan yang permintaannya sedang dikirim.
+    const [menuJeda, setMenuJeda] = useState('');
+    const [mengubahJeda, setMengubahJeda] = useState('');
 
     const { cameraData, alerts } = useLive();
     // Pengunjung pameran hanya menonton: tanpa Mode latihan dan tanpa kontrol suara.
@@ -195,10 +200,48 @@ export default function SimulationDashboard() {
         }
     };
 
+    /**
+     * Mode perawatan: mulai (atau perpanjang) dengan menit, hentikan dengan menit null.
+     * Jawabannya langsung dipakai, supaya kartu berubah tanpa menunggu polling.
+     */
+    const ubahJeda = async (cam, menit) => {
+        setMengubahJeda(cam.camera_id);
+        setGalat('');
+        try {
+            const r = await api(`/api/cameras/${cam.camera_id}/jeda`,
+                menit ? { method: 'POST', json: { menit } } : { method: 'DELETE' });
+            if (!r.ok) {
+                setGalat(await bacaGalat(r));
+                return;
+            }
+            const data = await r.json();
+            setCameras((prev) => prev.map((c) => (c.camera_id === data.camera_id ? { ...c, ...data } : c)));
+            setMenuJeda('');
+        } catch {
+            setGalat(PESAN_TERPUTUS);
+        } finally {
+            setMengubahJeda('');
+        }
+    };
+
+    // Status WebSocket lebih baru daripada polling, termasuk saat jeda baru saja habis.
+    const jedaSampai = (cam) => {
+        const live = cameraData?.[cam.camera_id];
+        return msDari(live ? live.dijeda_sampai : cam.dijeda_sampai);
+    };
+    const jedaOleh = (cam) => cameraData?.[cam.camera_id]?.dijeda_oleh || cam.dijeda_oleh;
+    // Hitung mundur per detik hanya selama ada kamera yang dijeda.
+    const sekarang = useJam(cameras.some((c) => Number.isFinite(jedaSampai(c))) ? 1000 : 30000);
+    const sisaJeda = (cam) => {
+        const ms = jedaSampai(cam);
+        return Number.isFinite(ms) ? Math.max(0, (ms - sekarang) / 1000) : 0;
+    };
+
     const kameraLatihan = cameras.find((c) => c.camera_id === kameraLatihanId) || cameras[0];
     const jumlahAktif = cameras.filter((c) => c.is_active).length;
     const jumlahTerputus = cameras.length - jumlahAktif;
     const sedangLatihan = cameras.filter((c) => cameraData?.[c.camera_id]?.simulated);
+    const jumlahJeda = cameras.filter((c) => c.is_active && sisaJeda(c) > 0).length;
 
     return (
         <div className="p-4 md:p-8 w-full max-w-full min-w-0 overflow-x-hidden">
@@ -227,6 +270,12 @@ export default function SimulationDashboard() {
                     <span className={`${CHIP} border border-dashed border-slate-400 dark:border-slate-500 text-slate-700 dark:text-slate-200`}>
                         <VideoOff className="w-3.5 h-3.5" aria-hidden="true" />
                         <b className="font-semibold tabular-nums">{jumlahTerputus}</b> terputus
+                    </span>
+                )}
+                {jumlahJeda > 0 && (
+                    <span className={`${CHIP} border border-blue-500 bg-blue-50 text-blue-800 dark:bg-blue-950 dark:text-blue-200`}>
+                        <Clock className="w-3.5 h-3.5" aria-hidden="true" />
+                        <b className="font-semibold tabular-nums">{jumlahJeda}</b> dalam Mode perawatan
                     </span>
                 )}
                 <span className={alerts.length ? `${CHIP} bg-red-600 text-white font-semibold` : CHIP_TENANG}>
@@ -356,9 +405,11 @@ export default function SimulationDashboard() {
                     const durasi = live?.fall_duration ?? cam.fall_duration ?? 0;
                     const latihan = Boolean(live?.simulated)
                         || alerts.some((a) => a.camera_id === cam.camera_id && a.simulated);
+                    const sisa = sisaJeda(cam);
+                    const dijeda = aktif && sisa > 0;
                     const status = bacaStatus({
                         aktif, state, adaOrang: Boolean(posture), durasi,
-                        ambang: pengaturan?.fall_duration_threshold, latihan,
+                        ambang: pengaturan?.fall_duration_threshold, latihan, sisaJeda: sisa,
                     });
 
                     const jatuh = state === 'confirmed_fall';
@@ -367,6 +418,7 @@ export default function SimulationDashboard() {
                     if (!aktif) bingkai = 'border-dashed border-slate-400 dark:border-slate-600';
                     else if (jatuh) bingkai = latihan ? 'border-2 border-blue-600' : 'border-2 border-red-600';
                     else if (berbaring) bingkai = latihan ? 'border-blue-500' : 'border-amber-400';
+                    else if (dijeda) bingkai = 'border-blue-300 dark:border-blue-800';
 
                     return (
                         <section
@@ -387,14 +439,90 @@ export default function SimulationDashboard() {
                                     <Video className="w-4 h-4 shrink-0 text-slate-400" aria-hidden="true" />
                                     <span className="truncate">{cam.name}</span>
                                 </span>
-                                <StatusKamera status={status} />
+                                <span className="flex items-center gap-2 shrink-0">
+                                    <StatusKamera status={status} />
+                                    {!pengunjung && aktif && !dijeda && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setMenuJeda((m) => (m === cam.camera_id ? '' : cam.camera_id))}
+                                            aria-expanded={menuJeda === cam.camera_id}
+                                            aria-label={`Mode perawatan untuk ${cam.name}`}
+                                            title="Mode perawatan"
+                                            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-200/70 dark:hover:bg-slate-800"
+                                        >
+                                            <Clock className="w-4 h-4" aria-hidden="true" />
+                                            <span className="hidden sm:inline">Jeda</span>
+                                        </button>
+                                    )}
+                                </span>
                             </header>
+
+                            {menuJeda === cam.camera_id && !dijeda && (
+                                <div className="p-3 border-b border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/40 space-y-2">
+                                    <p className="text-sm font-semibold">Mode perawatan untuk {cam.name}</p>
+                                    <p className="text-xs text-slate-600 dark:text-slate-400">
+                                        Deteksi jatuh dan video dijeda, misalnya saat penghuni dimandikan. Selama jeda,
+                                        jatuh di ruang ini tidak terdeteksi. Alarm yang sudah muncul tetap harus ditangani.
+                                    </p>
+                                    <div className="flex flex-wrap gap-2">
+                                        {PILIHAN_JEDA.map((menit) => (
+                                            <button
+                                                key={menit}
+                                                type="button"
+                                                disabled={mengubahJeda === cam.camera_id}
+                                                onClick={() => ubahJeda(cam, menit)}
+                                                className="min-h-10 px-3 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white text-sm font-semibold"
+                                            >
+                                                {menit} menit
+                                            </button>
+                                        ))}
+                                        <button
+                                            type="button"
+                                            onClick={() => setMenuJeda('')}
+                                            className="min-h-10 px-3 rounded-lg border border-slate-300 dark:border-slate-700 text-sm font-semibold hover:bg-white dark:hover:bg-slate-800"
+                                        >
+                                            Batal
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
 
                             <div
                                 className="bg-slate-950 relative flex items-center justify-center text-slate-300 max-h-[75vh] mx-auto"
                                 style={{ aspectRatio: (aktif && rasio[cam.camera_id]) || 16 / 9 }}
                             >
-                                {aktif ? (
+                                {dijeda ? (
+                                    <div className="px-6 text-center flex flex-col items-center gap-2">
+                                        <Clock className="w-8 h-8 text-blue-300" aria-hidden="true" />
+                                        <p className="text-sm font-semibold text-slate-100 tabular-nums">
+                                            Mode perawatan · {mmss(sisa)} lagi
+                                        </p>
+                                        <p className="text-xs text-slate-400 max-w-sm">
+                                            Deteksi jatuh dan video dijeda sampai {jamDari(jedaSampai(cam))}
+                                            {jedaOleh(cam) ? `, dimulai ${jedaOleh(cam)}` : ''}. Jatuh di ruang ini tidak terdeteksi.
+                                        </p>
+                                        {!pengunjung && (
+                                            <div className="mt-1 flex flex-wrap justify-center gap-2">
+                                                <button
+                                                    type="button"
+                                                    disabled={mengubahJeda === cam.camera_id}
+                                                    onClick={() => ubahJeda(cam, null)}
+                                                    className="min-h-10 px-3 rounded-lg bg-white text-slate-900 hover:bg-slate-200 disabled:opacity-60 text-sm font-semibold"
+                                                >
+                                                    Lanjutkan pemantauan
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    disabled={mengubahJeda === cam.camera_id}
+                                                    onClick={() => ubahJeda(cam, 15)}
+                                                    className="min-h-10 px-3 rounded-lg border border-slate-500 text-slate-100 hover:bg-slate-800 disabled:opacity-60 text-sm font-semibold"
+                                                >
+                                                    +15 mnt
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                ) : aktif ? (
                                     <StreamImg
                                         src={`${API_BASE}${cam.stream_url}`}
                                         alt={`Video ${cam.name}`}
@@ -414,7 +542,7 @@ export default function SimulationDashboard() {
                                     </div>
                                 )}
 
-                                {aktif && (status.kode === 'kosong' || detailAI) && (
+                                {aktif && !dijeda && (status.kode === 'kosong' || detailAI) && (
                                     <div className="absolute left-3 bottom-3 flex flex-col items-start gap-1">
                                         {status.kode === 'kosong' && live?.terakhir_terlihat && (
                                             <span className="text-xs text-white bg-black/60 px-2 py-1 rounded">

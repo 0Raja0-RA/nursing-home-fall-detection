@@ -73,9 +73,20 @@ erDiagram
         datetime created_at
         datetime expires_at
     }
+    jeda_kamera {
+        int id PK
+        string camera_id "rujukan longgar, bukan FK"
+        string camera_name "disalin saat jeda"
+        datetime mulai
+        datetime sampai "bergeser bila diperpanjang"
+        string oleh
+        datetime selesai "diisi bila dihentikan lebih awal"
+        string diakhiri_oleh
+    }
     cameras ||..o{ alerts : "camera_id (tanpa FK)"
     alerts ||..o| alert_snapshots : "satu foto per alert"
     users ||..o{ sessions : "user_id"
+    cameras ||..o{ jeda_kamera : "camera_id (tanpa FK)"
 ```
 
 Semua garisnya putus-putus, karena database ini tidak memasang foreign key sama sekali (`models.py` tidak memakai `ForeignKey`). Hubungan antartabel dijaga oleh kode.
@@ -130,6 +141,10 @@ Akun per orang, karena tombol "Saya ke sana" harus menyebut siapa yang menuju lo
 ### `sessions`
 
 Sesi masuk. Yang disimpan hanya hash token, sedangkan tokennya sendiri ada di cookie HttpOnly. Sesi berlaku 30 hari (`UMUR_SESI` di `api/auth.py`), dan sesi kedaluwarsa dibersihkan saat ada yang masuk.
+
+### `jeda_kamera`
+
+Riwayat Mode perawatan: jeda deteksi jatuh dan video di satu kamera, misalnya saat penghuni dimandikan. Jatuh di ruang itu tidak terdeteksi selama jeda, jadi setiap jeda dicatat: siapa (`oleh`), mulai kapan, dan sampai kapan. Memperpanjang jeda menggeser `sampai` di baris yang sama. Bila dihentikan lebih awal, `selesai` dan `diakhiri_oleh` diisi; jeda yang berjalan sampai habis membiarkan `selesai` kosong. Jeda yang belum habis dimuat lagi saat backend menyala (`services/mode_perawatan.py`).
 
 ## Batasan dan akses
 

@@ -1,4 +1,4 @@
-import { Circle, Diamond, EyeOff, FlaskConical, TriangleAlert, VideoOff } from 'lucide-react';
+import { Circle, Clock, Diamond, EyeOff, FlaskConical, TriangleAlert, VideoOff } from 'lucide-react';
 
 // Tiap status punya bentuk, warna, dan kata, supaya tidak hanya mengandalkan warna.
 // Merah untuk alarm, amber untuk hitungan, biru untuk latihan, abu-abu untuk yang tenang
@@ -9,6 +9,9 @@ const GAYA = {
     berbaring: { ikon: Diamond, kelas: 'font-semibold bg-amber-400 text-slate-950' },
     jatuh: { ikon: TriangleAlert, kelas: 'font-semibold bg-red-600 text-white' },
     latihan: { ikon: FlaskConical, kelas: 'font-semibold bg-blue-600 text-white' },
+    // Biru seperti latihan (keadaan buatan manusia, bukan kejadian), tetapi bergaris,
+    // supaya jeda yang tenang tidak tertukar dengan latihan yang sedang berjalan.
+    perawatan: { ikon: Clock, kelas: 'font-semibold border border-blue-500 bg-blue-50 text-blue-800 dark:bg-blue-950 dark:text-blue-200' },
     terputus: { ikon: VideoOff, kelas: 'font-medium border border-dashed border-slate-400 text-slate-600 dark:border-slate-500 dark:text-slate-300' },
 };
 

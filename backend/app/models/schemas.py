@@ -216,6 +216,9 @@ class CameraStatus(BaseModel):
     last_frame_at: Optional[datetime] = None
     # Sedang dilatih lewat Mode latihan (tombol simulasi), bukan kejadian sungguhan.
     simulated: bool = False
+    # Mode perawatan: deteksi dan video dijeda sampai waktu ini (UTC). Kosong = tidak dijeda.
+    dijeda_sampai: Optional[datetime] = None
+    dijeda_oleh: Optional[str] = None
 
 
 # ---- Camera Registry ---------------------------------------
@@ -288,6 +291,11 @@ class CameraInfo(CameraStatus):
     rotate: int = 0
     enabled: bool = True
     stream_url: str = Field(..., description="Path endpoint MJPEG untuk kamera ini")
+
+
+class JedaRequest(BaseModel):
+    """Body POST /api/cameras/{id}/jeda: mulai Mode perawatan, atau perpanjang yang berjalan."""
+    menit: int = Field(..., ge=1, le=120, description="Lama jeda, atau tambahan bila sedang dijeda")
 
 
 class SimulationResponse(BaseModel):

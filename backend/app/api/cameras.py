@@ -11,6 +11,8 @@ Endpoints:
     PATCH  /api/cameras/{id}          — Ubah nama/sumber/rotasi/enabled
     DELETE /api/cameras/{id}          — Hapus kamera
     POST   /api/cameras/{id}/simulate-fall — Paksa simulasi jatuh (untuk demo)
+    POST   /api/cameras/{id}/jeda     — Mulai atau perpanjang Mode perawatan
+    DELETE /api/cameras/{id}/jeda     — Hentikan Mode perawatan lebih awal
     GET    /api/cameras/{id}/snapshot — Satu gambar terakhir (JPEG), untuk gambar mini
     GET    /api/cameras/{id}/stream   — Video MJPEG dengan bounding box tergambar
 
@@ -25,6 +27,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.auth import wajib_login
 from app.core.config import get_settings
 from app.core.logging import get_logger
 from app.db.database import get_db
@@ -35,12 +38,14 @@ from app.models.schemas import (
     CameraInfo,
     CameraStatus,
     CameraUpdate,
+    JedaRequest,
     LocalDevice,
     ScanResponse,
     SimulationResponse,
 )
 from app.runtime import camera_manager
 from app.runtime.registry import registry
+from app.services import mode_perawatan
 from app.services.camera_service import samarkan_sumber, validasi_sumber
 
 log = get_logger("app.api.cameras")
@@ -62,6 +67,10 @@ def _gabung(record: CameraRecord) -> CameraInfo:
     # baru dinyalakan sempat terlihat OFFLINE padahal sudah mengalir.
     camera = registry.cameras.get(record.id)
     dasar["is_active"] = bool(camera and camera.sedang_mengalir)
+    # Jeda dibaca langsung juga, supaya jawaban POST /jeda sudah memuatnya.
+    jeda = mode_perawatan.aktif(record.id)
+    dasar["dijeda_sampai"] = jeda.sampai if jeda else None
+    dasar["dijeda_oleh"] = jeda.oleh if jeda else None
 
     return CameraInfo(
         **dasar,
@@ -208,8 +217,10 @@ async def ubah_kamera(camera_id: str, payload: CameraUpdate, db: AsyncSession = 
 async def hapus_kamera(camera_id: str, db: AsyncSession = Depends(get_db)):
     """Matikan dan hapus kamera dari daftar."""
     repo = CameraRepository(db)
-    if await repo.get_camera(camera_id) is None:
+    record = await repo.get_camera(camera_id)
+    if record is None:
         raise HTTPException(status_code=404, detail="Camera not found")
+    await mode_perawatan.akhiri(db, camera_id, record.name, "kamera dihapus", kabari=False)
     await camera_manager.hentikan_kamera(camera_id)
     await repo.delete_camera(camera_id)
     return None
@@ -257,6 +268,9 @@ async def simulasi_jatuh(camera_id: str):
 
     if camera_id not in registry.cameras:
         raise HTTPException(status_code=404, detail="Camera not found")
+    if mode_perawatan.aktif(camera_id):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                            detail="Kamera ini sedang dalam Mode perawatan. Lanjutkan pemantauan dulu.")
 
     settings = get_settings()
     # Cukup lama untuk melewati ambang, plus margin supaya tidak terpotong oleh
@@ -272,6 +286,31 @@ async def simulasi_jatuh(camera_id: str):
         pesan=f"Simulasi berjalan {durasi:.0f} detik. Alert muncul setelah "
               f"{settings.FALL_DURATION_THRESHOLD:.0f} detik.",
     )
+
+
+@router.post("/{camera_id}/jeda", response_model=CameraInfo)
+async def mulai_jeda(camera_id: str, payload: JedaRequest,
+                     user=Depends(wajib_login), db: AsyncSession = Depends(get_db)):
+    """Mode perawatan: jeda deteksi dan video kamera ini selama `menit`, atau perpanjang
+    jeda yang sedang berjalan. Alarm yang sudah terbuka tidak ikut tertutup."""
+    record = await CameraRepository(db).get_camera(camera_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Camera not found")
+    if camera_id not in registry.cameras:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                            detail="Kamera ini sedang mati, jadi tidak ada yang perlu dijeda.")
+    await mode_perawatan.mulai(db, camera_id, record.name, payload.menit, user.display_name)
+    return _gabung(record)
+
+
+@router.delete("/{camera_id}/jeda", response_model=CameraInfo)
+async def akhiri_jeda(camera_id: str, user=Depends(wajib_login), db: AsyncSession = Depends(get_db)):
+    """Hentikan Mode perawatan lebih awal. Aman dipanggil bila kamera tidak sedang dijeda."""
+    record = await CameraRepository(db).get_camera(camera_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Camera not found")
+    await mode_perawatan.akhiri(db, camera_id, record.name, user.display_name)
+    return _gabung(record)
 
 
 @router.get("/{camera_id}/snapshot")
