@@ -56,7 +56,9 @@ class AlertService:
         from app.services import inference_service, klip
         from app.services.notification_service import dikonfigurasi
 
-        disimulasikan = registry.sedang_disimulasikan(camera_id)
+        # Mode uji di halaman Uji Kamera: deteksi sungguhan, dicatat sebagai latihan,
+        # supaya uji posisi kamera tidak membunyikan alarm sungguhan dan tidak ikut dihitung.
+        disimulasikan = registry.sedang_disimulasikan(camera_id) or registry.sedang_diuji(camera_id)
         awalan = "[SIMULASI] " if disimulasikan else ""
         fsm = registry.state_machines.get(camera_id)
         foto = registry.latest_jpeg.get(camera_id)

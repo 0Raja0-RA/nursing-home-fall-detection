@@ -292,6 +292,8 @@ Semua endpoint wajib login, kecuali health check, `/api/auth/status`, `/api/auth
 | GET    | `/api/cameras/{id}/stream`   | Video MJPEG dengan bounding box tergambar           |
 | POST   | `/api/cameras/{id}/buka-asli` | Video asli 15 detik saat alarm (kamera berprivasi) |
 | POST   | `/api/cameras/tes`           | Tes alamat kamera dengan pratinjau sebelum disimpan |
+| GET    | `/api/cameras/{id}/diagnostik` | Deteksi mentah, waktu inferensi, laju (Uji Kamera) |
+| POST   | `/api/cameras/{id}/uji`      | Mode uji: alarm kamera ini dicatat sebagai latihan  |
 | GET    | `/api/cameras/{id}/snapshot` | Satu gambar terakhir, untuk gambar mini             |
 | GET    | `/api/cameras/devices`       | Kamera lokal (webcam, Iriun) beserta namanya        |
 | POST   | `/api/cameras/scan`          | Pindai subnet lokal untuk mencari kamera IP         |

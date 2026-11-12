@@ -281,6 +281,11 @@ Banner merah muncul di semua halaman dashboard dan bunyi berulang tiap 4 detik.
 
 Memuat ulang halaman tidak menghilangkan alarm yang belum ditangani.
 
+Untuk mengatur posisi kamera, buka **Daftar Kamera → Uji** pada kamera itu. Halaman Uji Kamera
+menampilkan semua deteksi, waktu inferensi, dan laju tangkap serta analisis. Nyalakan **Mode uji**
+selama mencoba dengan tubuh sungguhan: alarm dari kamera itu dicatat sebagai latihan selama
+10 menit, lalu ikuti skrip uji di bawahnya.
+
 Tombol **Unduh CSV** di Riwayat Insiden mengunduh semua insiden sesuai tab dan filter,
 lengkap dengan waktu respons dalam detik. Untuk menguji alur alarm dengan perawat atau
 mahasiswa keperawatan, ikuti [docs/uji-mini.md](docs/uji-mini.md).
@@ -400,8 +405,7 @@ ruangan lain. Yang bisa dicoba:
 
 ### `Gagal membuka kamera`
 
-- **Webcam laptop:** tutup aplikasi lain yang memakainya, termasuk tab browser yang membuka
-  halaman "Testing Kamera HP" (halaman itu memakai kamera browser).
+- **Webcam laptop:** tutup aplikasi lain yang memakainya, misalnya browser, Zoom, atau aplikasi Kamera.
 - **Kamera HP:** periksa IP-nya. Alamat HP bisa berubah setelah tersambung ulang ke WiFi.
 
 ### Kamera HP tidak terjangkau padahal IP sudah benar (WiFi kampus)

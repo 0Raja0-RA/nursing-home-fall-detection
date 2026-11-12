@@ -563,3 +563,16 @@ async def test_tanpa_klip_bila_perekaman_dimatikan(lingkungan, monkeypatch):
         alert = (await AlertRepository(s).get_recent_alerts())[0]
     assert alert.klip_status is None
     assert lingkungan["klip"] == []
+
+
+@pytest.mark.asyncio
+async def test_mode_uji_mencatat_sebagai_latihan(lingkungan, monkeypatch):
+    """Uji posisi kamera dengan tubuh sungguhan tidak boleh membunyikan alarm sungguhan."""
+    from app.runtime.registry import registry
+    monkeypatch.setitem(registry.uji_sampai, "cam-01", time.monotonic() + 60)
+    await _service().process_confirmed_fall("cam-01", 10.0)
+
+    async with lingkungan["factory"]() as s:
+        alert = (await AlertRepository(s).get_recent_alerts())[0]
+    assert alert.simulated is True and alert.message.startswith("[SIMULASI]")
+    assert lingkungan["telegram"] == [], "latihan tidak dikirim ke Telegram secara bawaan"

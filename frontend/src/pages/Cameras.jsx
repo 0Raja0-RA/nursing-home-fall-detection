@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { CheckCircle2, Clock, Info, Loader2, Plug, Plus, Power, Radar, Settings2, Trash2, Usb, VideoOff, X } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { CheckCircle2, Clock, Info, Loader2, Plug, Plus, Power, Radar, ScanEye, Settings2, Trash2, Usb, VideoOff, X } from 'lucide-react';
 import { api, bacaGalat, PESAN_TERPUTUS } from '../api';
 import { API_BASE } from '../config';
 import { jamDari } from '../statusKamera';
@@ -611,6 +612,9 @@ export default function Cameras() {
                                 />
                             ) : (
                                 <div className="mt-3 flex gap-2">
+                                    <Link to={`/dashboard/camera-test?kamera=${cam.camera_id}`} className={TOMBOL_NETRAL}>
+                                        <ScanEye className="w-4 h-4" aria-hidden="true" /> Uji
+                                    </Link>
                                     <button type="button" onClick={() => setAtur(cam.camera_id)} className={TOMBOL_NETRAL}>
                                         <Settings2 className="w-4 h-4" aria-hidden="true" /> Atur
                                     </button>

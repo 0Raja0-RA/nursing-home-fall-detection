@@ -321,6 +321,25 @@ class TesKoneksiResponse(BaseModel):
     gambar: Optional[str] = Field(None, description="Pratinjau JPEG base64, lebar paling besar 480 px")
 
 
+class DeteksiDiagnostik(BaseModel):
+    postur: str
+    keyakinan: float
+    kotak: list[float] = Field(default_factory=list, description="x1, y1, x2, y2 dalam piksel")
+
+
+class Diagnostik(BaseModel):
+    """Angka mentah untuk halaman Uji Kamera, bukan untuk perawat."""
+    deteksi: list[DeteksiDiagnostik] = Field(default_factory=list)
+    inferensi_ms: Optional[float] = None
+    fps_tangkap: Optional[float] = None
+    fps_analisis: Optional[float] = None
+    uji_sampai: Optional[datetime] = Field(None, description="Mode uji berjalan sampai (UTC)")
+
+
+class UjiRequest(BaseModel):
+    menit: int = Field(10, ge=1, le=30)
+
+
 class JedaRequest(BaseModel):
     """Body POST /api/cameras/{id}/jeda: mulai Mode perawatan, atau perpanjang yang berjalan."""
     menit: int = Field(..., ge=1, le=120, description="Lama jeda, atau tambahan bila sedang dijeda")

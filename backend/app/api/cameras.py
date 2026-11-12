@@ -14,6 +14,9 @@ Endpoints:
     POST   /api/cameras/{id}/simulate-fall — Paksa simulasi jatuh (untuk demo)
     POST   /api/cameras/{id}/buka-asli — Video asli 15 detik saat alarm (kamera berprivasi)
     POST   /api/cameras/{id}/jeda     — Mulai atau perpanjang Mode perawatan
+    GET    /api/cameras/{id}/diagnostik — Deteksi mentah, waktu inferensi, laju (Uji Kamera)
+    POST   /api/cameras/{id}/uji      — Mode uji: kejadian dicatat sebagai latihan
+    DELETE /api/cameras/{id}/uji      — Akhiri Mode uji
     DELETE /api/cameras/{id}/jeda     — Hentikan Mode perawatan lebih awal
     GET    /api/cameras/{id}/snapshot — Satu gambar terakhir (JPEG), untuk gambar mini
     GET    /api/cameras/{id}/stream   — Video MJPEG dengan bounding box tergambar
@@ -42,7 +45,9 @@ from app.models.schemas import (
     CameraInfo,
     CameraStatus,
     CameraUpdate,
+    Diagnostik,
     JedaRequest,
+    UjiRequest,
     TesKoneksiRequest,
     TesKoneksiResponse,
     LocalDevice,
@@ -318,6 +323,47 @@ async def simulasi_jatuh(camera_id: str):
         pesan=f"Simulasi berjalan {durasi:.0f} detik. Alert muncul setelah "
               f"{settings.FALL_DURATION_THRESHOLD:.0f} detik.",
     )
+
+
+def _diagnostik(camera_id: str) -> Diagnostik:
+    d = registry.diagnostik.get(camera_id, {})
+    camera = registry.cameras.get(camera_id)
+    sisa = registry.uji_sampai.get(camera_id, 0.0) - time.monotonic()
+    return Diagnostik(
+        deteksi=[{"postur": r.posture.value, "keyakinan": round(r.confidence, 3), "kotak": [round(v) for v in (r.bbox or [])]}
+                 for r in registry.latest_detection.get(camera_id, [])],
+        inferensi_ms=d.get("inferensi_ms"),
+        fps_tangkap=round(camera.fps, 1) if camera is not None and camera.fps else None,
+        fps_analisis=d.get("fps_analisis"),
+        uji_sampai=utc_now_naive() + timedelta(seconds=sisa) if sisa > 0 else None,
+    )
+
+
+@router.get("/{camera_id}/diagnostik", response_model=Diagnostik)
+async def diagnostik(camera_id: str, _tim=Depends(wajib_tim)):
+    """Semua deteksi frame terakhir, waktu inferensi, laju tangkap dan analisis, dan Mode uji."""
+    if camera_id not in registry.cameras:
+        raise HTTPException(status_code=404, detail="Camera not found")
+    return _diagnostik(camera_id)
+
+
+@router.post("/{camera_id}/uji", response_model=Diagnostik)
+async def mulai_uji(camera_id: str, payload: UjiRequest, _tim=Depends(wajib_tim)):
+    """Mode uji: deteksi tetap sungguhan, tetapi alarm dari kamera ini dicatat sebagai latihan
+    (biru, tidak dihitung, tidak dikirim ke Telegram kecuali latihan dinyalakan) sampai habis."""
+    if camera_id not in registry.cameras:
+        raise HTTPException(status_code=404, detail="Camera not found")
+    registry.uji_sampai[camera_id] = time.monotonic() + payload.menit * 60
+    log.info(f"[{camera_id}] 🧪 Mode uji {payload.menit} menit")
+    return _diagnostik(camera_id)
+
+
+@router.delete("/{camera_id}/uji", response_model=Diagnostik)
+async def akhiri_uji(camera_id: str, _tim=Depends(wajib_tim)):
+    registry.uji_sampai.pop(camera_id, None)
+    if camera_id not in registry.cameras:
+        raise HTTPException(status_code=404, detail="Camera not found")
+    return _diagnostik(camera_id)
 
 
 DETIK_ASLI = 15

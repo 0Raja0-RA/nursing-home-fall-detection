@@ -52,7 +52,18 @@ class AppRegistry:
         # Video asli kamera berprivasi yang sedang dibuka sementara saat alarm:
         # batas waktunya (time.monotonic) dan JPEG beranotasi dari gambar asli.
         self.asli_sampai: Dict[str, float] = {}
+
+        # Mode uji per kamera (batas time.monotonic), dan angka diagnostik terakhir:
+        # waktu inferensi dan kecepatan analisis, untuk halaman Uji Kamera.
+        self.uji_sampai: Dict[str, float] = {}
+        self.diagnostik: Dict[str, dict] = {}
         self.latest_jpeg_asli: Dict[str, Optional[bytes]] = {}
+
+    def sedang_diuji(self, camera_id: str) -> bool:
+        """True selama Mode uji kamera ini berjalan: deteksi sungguhan, tetapi kejadiannya
+        dicatat sebagai latihan."""
+        import time
+        return self.uji_sampai.get(camera_id, 0.0) > time.monotonic()
 
     def sedang_disimulasikan(self, camera_id: str) -> bool:
         """True kalau kamera ini sedang dalam masa simulasi jatuh."""

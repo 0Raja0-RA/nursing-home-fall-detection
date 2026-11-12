@@ -1,7 +1,7 @@
 /**
  * statusKamera.js
  * ===============
- * Kosakata status kamera, dipakai di Pemantauan dan Testing Kamera HP.
+ * Kosakata status kamera, dipakai di Pemantauan dan Uji Kamera.
  *
  * "AI tidak menemukan orang" sengaja dibedakan dari "Terpantau". Model bisa gagal
  * membaca orang yang tergeletak, dan layar tidak boleh menutupi kegagalan itu

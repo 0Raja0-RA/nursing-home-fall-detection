@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, NavLink, Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, History, Settings as SettingsIcon, Video, Sun, Moon, LogOut, Camera, Menu, X, Loader2, ServerOff } from 'lucide-react';
+import { LayoutDashboard, History, Settings as SettingsIcon, Video, Sun, Moon, LogOut, Menu, X, Loader2, ServerOff } from 'lucide-react';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { LiveProvider, useLive } from './context/LiveContext';
 import { AuthProvider } from './context/AuthContext';
@@ -42,10 +42,9 @@ function TataLetakDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false); // State untuk buka/tutup sidebar
 
   // Menu bertanda `tim` tidak ditampilkan untuk pengunjung pameran: isinya alat kerja
-  // tim (alamat kamera, pengaturan, uji kamera), bukan tontonan.
+  // tim (alamat kamera, pengaturan), bukan tontonan. Uji Kamera dibuka dari Daftar Kamera.
   const navItems = [
     { to: '/dashboard', icon: LayoutDashboard, label: 'Pemantauan' },
-    { to: '/dashboard/camera-test', icon: Camera, label: 'Testing Kamera HP', tim: true },
     { to: '/dashboard/cameras', icon: Video, label: 'Daftar Kamera', tim: true },
     { to: '/dashboard/history', icon: History, label: 'Riwayat Insiden', lencana: true },
     { to: '/dashboard/settings', icon: SettingsIcon, label: 'Pengaturan', tim: true },

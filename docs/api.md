@@ -174,6 +174,8 @@ pengingat terakhir di `eskalasi_terakhir`. Waktu disimpan UTC tanpa zona.
 | GET | `/api/cameras/devices` | Kamera yang terpasang di komputer ini (webcam, Iriun) |
 | POST | `/api/cameras/scan` | Pindai subnet lokal untuk mencari kamera IP |
 | POST | `/api/cameras/tes` | Tes alamat sebelum disimpan. Body `{"source", "rotate"}`. Selalu `200`: `{ok, pesan, lebar, tinggi, fps, detik_gambar_pertama, gambar}` dengan `gambar` pratinjau JPEG base64 (lebar paling besar 480 px). Alamat yang sudah dipakai kamera lain tidak dibuka |
+| GET | `/api/cameras/{id}/diagnostik` | Untuk halaman Uji Kamera, akun tim saja: `deteksi` (postur, keyakinan, kotak), `inferensi_ms`, `fps_tangkap`, `fps_analisis`, `uji_sampai` |
+| POST | `/api/cameras/{id}/uji` | Mode uji `{"menit": 1-30}` (bawaan 10): deteksi tetap sungguhan, tetapi alarm dari kamera ini dicatat sebagai latihan sampai habis. `DELETE` mengakhirinya |
 | POST | `/api/cameras/{id}/simulate-fall` | Mode latihan: paksa observasi pemicu beberapa detik. `409` selama Mode perawatan |
 | POST | `/api/cameras/{id}/jeda` | Mode perawatan. Body `{"menit": 1-120}`: mulai jeda, atau perpanjang jeda yang berjalan (sisa paling lama 120 menit). `409` bila kamera mati |
 | DELETE | `/api/cameras/{id}/jeda` | Hentikan Mode perawatan lebih awal. Aman dipanggil bila tidak sedang dijeda |

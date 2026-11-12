@@ -128,6 +128,17 @@ def pilih_observasi(
     return menang, wakil
 
 
+def _catat_diagnostik(camera_id: str, detik_inferensi: float, waktu: float) -> None:
+    """Rata-rata bergerak waktu inferensi dan laju analisis, untuk panel diagnostik."""
+    d = registry.diagnostik.setdefault(camera_id, {"inferensi_ms": 0.0, "fps_analisis": 0.0, "terakhir": 0.0})
+    d["inferensi_ms"] = round(0.8 * d["inferensi_ms"] + 0.2 * detik_inferensi * 1000, 1) if d["inferensi_ms"] \
+        else round(detik_inferensi * 1000, 1)
+    if d["terakhir"]:
+        laju = 1.0 / max(1e-3, waktu - d["terakhir"])
+        d["fps_analisis"] = round(0.8 * d["fps_analisis"] + 0.2 * laju, 1) if d["fps_analisis"] else round(laju, 1)
+    d["terakhir"] = waktu
+
+
 def _jpeg_dan_klip(frame, results, settings, untuk_klip: bool, privasi: str = "utuh",
                    minta_asli: bool = False) -> tuple[Optional[bytes], Optional[bytes], Optional[bytes]]:
     """JPEG beranotasi untuk stream, versi kecilnya untuk klip bila diminta, dan versi dari
@@ -212,7 +223,9 @@ async def camera_pipeline(camera: CameraService, fsm: FallStateMachine):
             continue
 
         # Inference (dieksekusi di thread pool agar tidak memblokir event loop async)
+        awal_inferensi = time.perf_counter()
         results = await asyncio.to_thread(run_inference, frame)
+        _catat_diagnostik(camera.camera_id, time.perf_counter() - awal_inferensi, loop_start)
         
         # Terjemahkan semua deteksi ke satu Observation untuk FSM
         sekarang = time.monotonic()
@@ -262,7 +275,7 @@ async def camera_pipeline(camera: CameraService, fsm: FallStateMachine):
             confidence=result.confidence if result else 0.0,
             fps=camera.fps,
             last_frame_at=camera.waktu_frame_terakhir,
-            simulated=registry.sedang_disimulasikan(camera.camera_id),
+            simulated=registry.sedang_disimulasikan(camera.camera_id) or registry.sedang_diuji(camera.camera_id),
         )
         # Simpan untuk dipakai endpoint stream (menggambar kotak) dan GET /api/cameras/.
         registry.latest_detection[camera.camera_id] = results
