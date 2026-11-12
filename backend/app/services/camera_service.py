@@ -189,6 +189,58 @@ def validasi_sumber(source: str, batas: float = 3.0) -> tuple[bool, str]:
     return False, f"File video tidak ditemukan: {source}"
 
 
+def tes_koneksi(source: str, rotate: int = 0, batas: float = 4.0) -> dict:
+    """Buka sumber, ambil gambar beberapa detik, dan laporkan apa yang terlihat.
+
+    Untuk tombol "Tes koneksi" sebelum kamera disimpan: perawat atau tim melihat
+    gambarnya lebih dulu, termasuk apakah perlu diputar, bukan baru tahu sesudah
+    kamera muncul sebagai Terputus. Memblokir, jadi panggil lewat asyncio.to_thread.
+
+    Returns: {ok, pesan, lebar, tinggi, fps, detik_gambar_pertama, jpeg (bytes)}.
+    """
+    import time as _time
+
+    ok, alasan = validasi_sumber(source)
+    if not ok:
+        return {"ok": False, "pesan": alasan}
+    sumber = int(source) if source.strip().isdigit() else source.strip()
+    mulai = _time.monotonic()
+    cap = cv2.VideoCapture(sumber)
+    try:
+        if not cap.isOpened():
+            return {"ok": False, "pesan": "Sumber bisa dihubungi, tetapi tidak mengirim video yang bisa dibaca."}
+        pertama, frame, jumlah = None, None, 0
+        while _time.monotonic() - mulai < batas:
+            ada, gambar = cap.read()
+            if not ada:
+                if pertama is None:
+                    continue
+                break
+            frame = gambar
+            jumlah += 1
+            if pertama is None:
+                pertama = _time.monotonic()
+            elif _time.monotonic() - pertama >= 1.0:
+                break
+        if frame is None:
+            return {"ok": False, "pesan": f"Tidak ada gambar yang masuk dalam {batas:.0f} detik."}
+        if rotate in _ROTATE_CODES:
+            frame = cv2.rotate(frame, _ROTATE_CODES[rotate])
+        tinggi, lebar = frame.shape[:2]
+        durasi = _time.monotonic() - pertama
+        fps = round((jumlah - 1) / durasi, 1) if jumlah > 1 and durasi > 0 else None
+        if isinstance(sumber, str) and "://" not in sumber:
+            # Berkas video dibaca secepat mungkin; yang bermakna adalah fps bawaan berkasnya.
+            fps = round(cap.get(cv2.CAP_PROP_FPS), 1) or None
+        skala = min(1.0, 480 / lebar)
+        kecil = cv2.resize(frame, (int(lebar * skala), int(tinggi * skala))) if skala < 1 else frame
+        _, jpeg = cv2.imencode(".jpg", kecil, [cv2.IMWRITE_JPEG_QUALITY, 80])
+        return {"ok": True, "pesan": "", "lebar": lebar, "tinggi": tinggi, "fps": fps,
+                "detik_gambar_pertama": round(pertama - mulai, 1), "jpeg": jpeg.tobytes()}
+    finally:
+        cap.release()
+
+
 class CameraService:
     """Manage video capture dari satu sumber kamera.
 

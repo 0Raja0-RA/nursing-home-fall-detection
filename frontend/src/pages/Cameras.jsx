@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Clock, Info, Loader2, Plus, Power, Radar, Settings2, Trash2, Usb, VideoOff, X } from 'lucide-react';
+import { CheckCircle2, Clock, Info, Loader2, Plug, Plus, Power, Radar, Settings2, Trash2, Usb, VideoOff, X } from 'lucide-react';
 import { api, bacaGalat, PESAN_TERPUTUS } from '../api';
 import { API_BASE } from '../config';
 import { jamDari } from '../statusKamera';
@@ -21,6 +21,33 @@ function gabungSandi(alamat, pengguna, sandi) {
 }
 
 const pakaiJaringan = (alamat) => /^(rtsp|https?):\/\//i.test(alamat.trim());
+
+/** Langkah periksa sesuai jenis alamat, dari yang paling sering terjadi. */
+function daftarPeriksa(alamat) {
+    const a = alamat.trim();
+    if (/^https?:\/\//i.test(a)) {
+        return [
+            'Aplikasi kamera di HP (mis. IP Webcam) sudah menyala dan server-nya sudah dimulai.',
+            'HP dan laptop ada di jaringan yang sama. WiFi kampus atau publik sering memblokir koneksi antarperangkat; pakai hotspot.',
+            'Alamatnya sama persis dengan yang tampil di layar HP, termasuk port dan /video.',
+            'Coba buka alamat itu di browser laptop. Bila tidak tampil di browser, FallDetect juga tidak bisa membukanya.',
+        ];
+    }
+    if (/^rtsp:\/\//i.test(a)) {
+        return [
+            'Nama pengguna dan sandi kamera benar.',
+            'Port RTSP (biasanya 554) dan jalur stream sesuai manual kamera, mis. /stream1.',
+            'Kamera dan laptop ada di jaringan yang sama.',
+        ];
+    }
+    if (/^\d+$/.test(a)) {
+        return [
+            'Tutup aplikasi lain yang memakai kamera: browser, Zoom, atau aplikasi Kamera.',
+            'Kamera kedua atau Iriun biasanya berindeks 1 atau 2.',
+        ];
+    }
+    return ['Periksa jalur berkas video. Jalur dibaca di laptop yang menjalankan backend.'];
+}
 
 /** Status kamera beserta alasannya, bukan sekadar Terhubung atau Terputus. */
 function StatusKameraDaftar({ cam }) {
@@ -218,6 +245,7 @@ export default function Cameras() {
     const [menambah, setMenambah] = useState(false);
     const [memindai, setMemindai] = useState(false);
     const [kandidat, setKandidat] = useState(null);     // hasil pemindaian jaringan
+    const [tes, setTes] = useState(null);               // { memuat } atau { hasil, alamat }
     const [atur, setAtur] = useState(null);             // id kamera yang panelnya terbuka
     const t = useJam(5000);
 
@@ -326,16 +354,37 @@ export default function Cameras() {
                 setPesan({
                     tipe: 'info',
                     teks: `Tidak ada kamera ditemukan di ${jaringan.subnets.join(', ') || 'jaringan ini'}, `
-                        + 'dan tidak ada kamera yang terpasang di komputer ini. '
-                        + 'Pastikan aplikasi kamera di HP sedang menyala dan berada di jaringan yang sama. '
-                        + 'WiFi kampus biasanya memblokir koneksi antar-perangkat, jadi nyalakan hotspot '
-                        + 'di laptop lalu sambungkan HP ke hotspot itu.',
+                        + 'dan tidak ada kamera yang terpasang di komputer ini.',
+                    langkah: [
+                        'Aplikasi kamera di HP sudah menyala dan server-nya sudah dimulai.',
+                        'HP dan laptop ada di jaringan yang sama. WiFi kampus biasanya memblokir koneksi antarperangkat; nyalakan hotspot di laptop lalu sambungkan HP ke sana.',
+                        'Tekan Cari kamera lagi setelah keduanya siap, atau ketik alamat dari layar HP lalu tekan Tes koneksi.',
+                    ],
                 });
             }
         } catch {
             setPesan({ tipe: 'error', teks: PESAN_TERPUTUS });
         } finally {
             setMemindai(false);
+        }
+    };
+
+    /** Buka alamat dan tampilkan gambarnya sebelum kamera disimpan. */
+    const tesKoneksi = async () => {
+        const sumber = gabungSandi(alamat.trim(), pengguna.trim(), sandi);
+        if (!alamat.trim()) {
+            setPesan({ tipe: 'error', teks: 'Isi alamat kamera dulu, lalu tekan Tes koneksi.' });
+            return;
+        }
+        setPesan(null);
+        setTes({ memuat: true });
+        try {
+            const r = await api('/api/cameras/tes', { method: 'POST', json: { source: sumber } });
+            if (!r.ok) throw new Error(await bacaGalat(r));
+            setTes({ hasil: await r.json(), alamat: alamat.trim() });
+        } catch (err) {
+            setTes(null);
+            setPesan({ tipe: 'error', teks: err instanceof TypeError ? PESAN_TERPUTUS : err.message });
         }
     };
 
@@ -399,6 +448,10 @@ export default function Cameras() {
                             ? <><Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> Memeriksa alamat…</>
                             : <><Plus className="w-4 h-4" aria-hidden="true" /> Tambah kamera</>}
                     </button>
+                    <button type="button" onClick={tesKoneksi} disabled={tes?.memuat} className={TOMBOL_NETRAL}>
+                        {tes?.memuat ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : <Plug className="w-4 h-4" aria-hidden="true" />}
+                        Tes koneksi
+                    </button>
                     <button type="button" onClick={pindaiJaringan} disabled={memindai} className={TOMBOL_NETRAL}>
                         {memindai ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : <Radar className="w-4 h-4" aria-hidden="true" />}
                         Cari kamera
@@ -406,13 +459,57 @@ export default function Cameras() {
                 </div>
             </form>
 
+            {/* Hasil Tes koneksi: gambar pratinjau, atau sebab dan daftar periksa. */}
+            {tes?.hasil && (
+                <div role="status" className="mb-6 p-4 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm flex flex-col sm:flex-row gap-4">
+                    {tes.hasil.ok ? (
+                        <>
+                            <img src={`data:image/jpeg;base64,${tes.hasil.gambar}`} alt="Pratinjau kamera"
+                                className="w-full sm:w-64 rounded-lg bg-slate-950 self-start" />
+                            <div className="space-y-1">
+                                <p className="font-semibold inline-flex items-center gap-2">
+                                    <CheckCircle2 className="w-4 h-4 text-emerald-600" aria-hidden="true" /> Terhubung
+                                </p>
+                                <p className="text-slate-600 dark:text-slate-400 tabular-nums">
+                                    {tes.hasil.lebar} × {tes.hasil.tinggi} piksel
+                                    {tes.hasil.fps ? `, sekitar ${String(tes.hasil.fps).replace('.', ',')} gambar per detik` : ''}.
+                                    Gambar pertama {String(tes.hasil.detik_gambar_pertama).replace('.', ',')} detik.
+                                </p>
+                                <p className="text-xs text-slate-500">
+                                    Gambar miring atau terbalik? Tambahkan dulu, lalu atur rotasinya di Atur.
+                                    {tes.hasil.tinggi > tes.hasil.lebar ? ' Gambar tegak cocok untuk kamera HP yang dipasang berdiri.' : ''}
+                                </p>
+                            </div>
+                        </>
+                    ) : (
+                        <div className="space-y-2">
+                            <p className="font-semibold text-red-700 dark:text-red-400">Belum terhubung: {tes.hasil.pesan}</p>
+                            <p className="text-xs font-semibold text-slate-600 dark:text-slate-400">Periksa:</p>
+                            <ol className="list-decimal pl-5 space-y-1 text-slate-700 dark:text-slate-300">
+                                {daftarPeriksa(tes.alamat).map((l) => <li key={l}>{l}</li>)}
+                            </ol>
+                        </div>
+                    )}
+                    <button type="button" onClick={() => setTes(null)} aria-label="Tutup hasil tes" className="self-start sm:ml-auto p-0.5 rounded hover:bg-black/5">
+                        <X className="w-4 h-4" />
+                    </button>
+                </div>
+            )}
+
             {/* Pesan kesalahan / info dari backend */}
             {pesan && (
                 <div role={pesan.tipe === 'info' ? 'status' : 'alert'} className={`mb-6 p-4 rounded-xl border text-sm flex items-start gap-2 ${pesan.tipe === 'info'
                     ? 'bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300'
                     : 'bg-red-500/10 border-red-500/30 text-red-700 dark:text-red-400'}`}>
                     <Info className="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
-                    <span className="flex-1">{pesan.teks}</span>
+                    <span className="flex-1">
+                        {pesan.teks}
+                        {pesan.langkah && (
+                            <ol className="list-decimal pl-5 mt-2 space-y-1">
+                                {pesan.langkah.map((l) => <li key={l}>{l}</li>)}
+                            </ol>
+                        )}
+                    </span>
                     {pesan.tipe !== 'koneksi' && (
                         <button type="button" onClick={() => setPesan(null)} aria-label="Tutup pesan" className="p-0.5 rounded hover:bg-black/5">
                             <X className="w-4 h-4" />

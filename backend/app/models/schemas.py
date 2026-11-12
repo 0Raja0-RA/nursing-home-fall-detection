@@ -305,6 +305,22 @@ class CameraInfo(CameraStatus):
     asli_sampai: Optional[datetime] = None
 
 
+class TesKoneksiRequest(BaseModel):
+    """Body POST /api/cameras/tes."""
+    source: str = Field(..., min_length=1)
+    rotate: int = 0
+
+
+class TesKoneksiResponse(BaseModel):
+    ok: bool
+    pesan: str = ""
+    lebar: Optional[int] = None
+    tinggi: Optional[int] = None
+    fps: Optional[float] = None
+    detik_gambar_pertama: Optional[float] = None
+    gambar: Optional[str] = Field(None, description="Pratinjau JPEG base64, lebar paling besar 480 px")
+
+
 class JedaRequest(BaseModel):
     """Body POST /api/cameras/{id}/jeda: mulai Mode perawatan, atau perpanjang yang berjalan."""
     menit: int = Field(..., ge=1, le=120, description="Lama jeda, atau tambahan bila sedang dijeda")

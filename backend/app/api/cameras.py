@@ -7,6 +7,7 @@ Endpoints:
     GET    /api/cameras/              — Daftar kamera terdaftar + status terakhirnya
     POST   /api/cameras/              — Daftarkan kamera baru (sumber divalidasi dulu)
     POST   /api/cameras/scan          — Pindai jaringan lokal untuk mencari kamera
+    POST   /api/cameras/tes           — Tes alamat dengan pratinjau sebelum disimpan
     GET    /api/cameras/{id}          — Satu kamera
     PATCH  /api/cameras/{id}          — Ubah nama/sumber/rotasi/enabled
     DELETE /api/cameras/{id}          — Hapus kamera
@@ -42,6 +43,8 @@ from app.models.schemas import (
     CameraStatus,
     CameraUpdate,
     JedaRequest,
+    TesKoneksiRequest,
+    TesKoneksiResponse,
     LocalDevice,
     ScanResponse,
     SimulationResponse,
@@ -112,6 +115,21 @@ async def scan_jaringan():
 
     subnets, kandidat, durasi = await asyncio.to_thread(network_scan.pindai)
     return ScanResponse(subnets=subnets, duration_sec=round(durasi, 2), candidates=kandidat)
+
+
+@router.post("/tes", response_model=TesKoneksiResponse)
+async def tes_koneksi_kamera(payload: TesKoneksiRequest, db: AsyncSession = Depends(get_db)):
+    """Tes alamat kamera sebelum disimpan: gambar pratinjau, resolusi, fps, dan berapa lama
+    sampai gambar pertama. Gagal tetap dijawab 200 dengan `ok: false` dan alasannya."""
+    import base64
+
+    from app.services.camera_service import tes_koneksi
+
+    if await CameraRepository(db).source_dipakai(payload.source.strip()):
+        return TesKoneksiResponse(ok=False, pesan="Alamat ini sudah dipakai kamera lain di Daftar Kamera.")
+    hasil = await asyncio.to_thread(tes_koneksi, payload.source.strip(), payload.rotate)
+    jpeg = hasil.pop("jpeg", None)
+    return TesKoneksiResponse(**hasil, gambar=base64.b64encode(jpeg).decode("ascii") if jpeg else None)
 
 
 @router.get("/devices", response_model=list[LocalDevice])

@@ -291,6 +291,7 @@ Semua endpoint wajib login, kecuali health check, `/api/auth/status`, `/api/auth
 | DELETE | `/api/cameras/{id}`          | Matikan dan hapus kamera                            |
 | GET    | `/api/cameras/{id}/stream`   | Video MJPEG dengan bounding box tergambar           |
 | POST   | `/api/cameras/{id}/buka-asli` | Video asli 15 detik saat alarm (kamera berprivasi) |
+| POST   | `/api/cameras/tes`           | Tes alamat kamera dengan pratinjau sebelum disimpan |
 | GET    | `/api/cameras/{id}/snapshot` | Satu gambar terakhir, untuk gambar mini             |
 | GET    | `/api/cameras/devices`       | Kamera lokal (webcam, Iriun) beserta namanya        |
 | POST   | `/api/cameras/scan`          | Pindai subnet lokal untuk mencari kamera IP         |
