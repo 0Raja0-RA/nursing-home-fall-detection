@@ -23,4 +23,5 @@ export const ALASAN_PALSU = [
 ];
 
 export const labelPutusan = (id) => PUTUSAN.find((p) => p.id === id)?.label || 'Belum dinilai';
-export const labelAlasan = (id) => ALASAN_PALSU.find((a) => a.id === id)?.label || id;
+// Selalu teks: alarm palsu tanpa alasan (data lama atau disunting manual) tidak boleh membuat halaman crash.
+export const labelAlasan = (id) => ALASAN_PALSU.find((a) => a.id === id)?.label || id || 'Alasan tidak tercatat';
