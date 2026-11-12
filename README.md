@@ -198,8 +198,11 @@ Saat ada alarm, grup menerima satu pesan per insiden: nama ruang, lama terbaca
 berbaring, jam, dan foto kejadian yang **diburamkan** (bisa diganti di **Pengaturan →
 Privasi**). Pesannya membawa tombol **Saya ke sana** dan **Alarm palsu**; begitu ada yang
 menekan, di Telegram atau di dashboard, pesan yang sama disunting supaya seluruh grup
-melihat siapa yang menuju lokasi. Latihan tidak dikirim ke grup kecuali dinyalakan di
-Pengaturan, dan grup juga dikabari bila kamera terputus lebih dari 30 detik.
+melihat siapa yang menuju lokasi. Bila belum ada yang menekan **Saya ke sana** setelah
+beberapa menit (bawaan 2, diatur di **Pengaturan**), grup menerima pengingat sebagai
+balasan ke pesan alarm, paling banyak tiga kali. Latihan tidak dikirim ke grup kecuali
+dinyalakan di Pengaturan, dan grup juga dikabari bila kamera terputus lebih dari 30 detik
+atau dijeda lewat Mode perawatan.
 
 Kegagalan kirim tidak membatalkan alert: statusnya tercatat (`telegram_status: gagal`)
 dan bisa dikirim ulang dari detail insiden di Riwayat Insiden.
@@ -293,6 +296,7 @@ Semua endpoint wajib login, kecuali health check, `/api/auth/status`, `/api/auth
 | PUT    | `/api/settings/threshold`    | Update threshold durasi (disimpan, diteruskan ke kamera) |
 | PUT    | `/api/settings/mode`         | Ganti model detektor (`bbox` / `pose`)              |
 | PUT    | `/api/settings/telegram`     | Foto Telegram, kirim latihan, kabar kamera putus    |
+| PUT    | `/api/settings/eskalasi`     | Menit tanpa respons sebelum alarm dieskalasi        |
 | POST   | `/api/cameras/{id}/simulate-fall` | Paksa simulasi jatuh (untuk demo)              |
 | POST   | `/api/cameras/{id}/jeda`     | Mode perawatan: jeda atau perpanjang `{menit}`      |
 | DELETE | `/api/cameras/{id}/jeda`     | Hentikan Mode perawatan lebih awal                  |

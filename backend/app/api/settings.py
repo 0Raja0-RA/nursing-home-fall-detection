@@ -8,6 +8,7 @@ Endpoints:
     PUT  /api/settings/threshold   — Update threshold durasi falling
     PUT  /api/settings/mode        — Ganti model detektor (bbox / pose)
     PUT  /api/settings/telegram    — Foto Telegram, kirim latihan, kabar kamera putus
+    PUT  /api/settings/eskalasi    — Menit tanpa respons sebelum alarm dieskalasi
     POST /api/settings/test-telegram — Kirim notifikasi uji ke Telegram
 
 Semua endpoint wajib login. Perubahan dari ketiga PUT di atas disimpan ke tabel app_settings, bukan hanya ke
@@ -22,6 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import get_settings
 from app.db.database import get_db
 from app.db.repository import (
+    KUNCI_ESKALASI,
     KUNCI_TG_FOTO,
     KUNCI_TG_KAMERA,
     KUNCI_TG_LATIHAN,
@@ -31,6 +33,7 @@ from app.models.schemas import (
     ALASAN_PALSU,
     LABEL_PUTUSAN,
     MODE_FOTO_TELEGRAM,
+    EskalasiUpdate,
     ModeUpdate,
     Pilihan,
     SettingsResponse,
@@ -65,6 +68,7 @@ async def _jawaban(db: AsyncSession) -> SettingsResponse:
         photo_modes=[Pilihan(id=k, label=v) for k, v in MODE_FOTO_TELEGRAM.items()],
         verdicts=[Pilihan(id=k, label=v) for k, v in LABEL_PUTUSAN.items()],
         false_alarm_reasons=[Pilihan(id=k, label=v) for k, v in ALASAN_PALSU.items()],
+        eskalasi_menit=await SettingRepository(db).eskalasi_menit(),
     )
 
 
@@ -163,6 +167,19 @@ async def update_telegram(payload: TelegramSettingsUpdate, db: AsyncSession = De
     if payload.camera_offline is not None:
         await repo.simpan(KUNCI_TG_KAMERA, "1" if payload.camera_offline else "0")
     log.info(f"⚙️  Pengaturan Telegram diubah: {payload.model_dump(exclude_none=True)}")
+    return await _jawaban(db)
+
+
+@router.put("/eskalasi", response_model=SettingsResponse)
+async def update_eskalasi(payload: EskalasiUpdate, db: AsyncSession = Depends(get_db)):
+    """Ubah berapa menit alarm boleh tanpa respons sebelum dieskalasi.
+
+    Angkanya berbeda antarproduk (Ascom memakai 30 detik, 60 detik, dan 5 menit), dan
+    belum ada yang teruji untuk panti, jadi nilainya diatur dari dashboard dan diuji
+    lewat uji mini.
+    """
+    await SettingRepository(db).simpan(KUNCI_ESKALASI, str(payload.eskalasi_menit))
+    log.info(f"⚙️  Eskalasi alarm jadi {payload.eskalasi_menit} menit tanpa respons")
     return await _jawaban(db)
 
 

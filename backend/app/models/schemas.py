@@ -135,6 +135,9 @@ class AlertResponse(AlertBase):
     # merekam | tersimpan | kosong | gagal | dihapus. Kosong = tidak ada klip.
     klip_status: Optional[str] = None
     klip_detik: Optional[float] = None
+    # Pengingat Telegram yang sudah terkirim karena belum ada yang merespons.
+    eskalasi_ke: Optional[int] = None
+    eskalasi_terakhir: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
 
@@ -333,6 +336,11 @@ class ScanResponse(BaseModel):
 
 # ---- Settings ----------------------------------------------
 
+class EskalasiUpdate(BaseModel):
+    """Body PUT /api/settings/eskalasi."""
+    eskalasi_menit: int = Field(..., ge=1, le=30, description="Menit tanpa respons sebelum eskalasi")
+
+
 class ThresholdUpdate(BaseModel):
     """Schema untuk update threshold durasi falling."""
     fall_duration_threshold: float = Field(
@@ -407,6 +415,9 @@ class SettingsResponse(BaseModel):
     # Pilihan putusan dan alasan alarm palsu, supaya dashboard tidak menyalin daftarnya.
     verdicts: list[Pilihan] = Field(default_factory=list)
     false_alarm_reasons: list[Pilihan] = Field(default_factory=list)
+    # Menit tanpa "Saya ke sana" sebelum banner menulis "Belum ada yang merespons" dengan
+    # lamanya dan grup Telegram menerima pengingat.
+    eskalasi_menit: int = 2
 
 
 # ---- Akun ----------------------------------------------------

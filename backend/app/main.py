@@ -64,11 +64,12 @@ async def lifespan(app: FastAPI):
     # saat kamera terputus (keduanya diam kalau Telegram belum diisi), dan pembersih
     # klip kejadian yang melewati masa simpan.
     from app.runtime.pemantau_kamera import jalankan_pemantau
+    from app.services.eskalasi import jalankan_eskalasi
     from app.services.klip import jalankan_pembersih
     from app.services.telegram_bot import jalankan_penerima
 
     pekerja = [asyncio.create_task(jalankan_penerima()), asyncio.create_task(jalankan_pemantau()),
-               asyncio.create_task(jalankan_pembersih())]
+               asyncio.create_task(jalankan_pembersih()), asyncio.create_task(jalankan_eskalasi())]
 
     yield
     # --- Shutdown ---

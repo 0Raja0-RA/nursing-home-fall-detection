@@ -157,10 +157,16 @@ berasal dari riset referensi UI/UX proyek ini (audit 41 temuan, rencana Tahap 1 
 | Status | Warna banner | Bunyi | Siapa yang mengubah |
 |---|---|---|---|
 | Belum direspons | merah | berulang tiap 4 detik | muncul saat ambang terlewati |
+| Belum ada yang merespons · 2 mnt | merah, lama ditulis tebal | berulang | tidak ada klaim setelah N menit (Pengaturan, bawaan 2); grup Telegram menerima pengingat sebagai balasan ke pesan alarm, tiap N menit, paling banyak 3 kali |
 | Menuju lokasi | amber, dengan nama penangan | berhenti di semua dashboard | "Saya ke sana" di dashboard atau Telegram |
 | Ditangani | banner hilang | tidak | "Tandai Ditangani", atau tombol putusan di Telegram |
 | Putusan: jatuh sungguhan, alarm palsu (alasan wajib), belum yakin | | | saat menutup, atau belakangan di Riwayat Insiden |
 | Belum dinilai | | | ditutup tanpa putusan; tetap di antrean Perlu tindakan |
+
+Banyak alarm sekaligus tampil sebagai satu banner berisi "1 dari 3" dan daftar alarm lain,
+bukan tumpukan banner. Urutannya: alarm sungguhan yang belum direspons, lalu yang sudah ada
+yang ke sana, lalu latihan; di tiap kelompok yang terlama lebih dulu. Alarm yang baru diklaim
+tetap tampil di layar penekannya, supaya Tandai Ditangani ada di tempat yang sama.
 
 Bukti di laci detail Riwayat Insiden: foto saat alarm, dan klip dari sekitar 5 detik
 sebelum orangnya terbaca berbaring sampai 5 detik sesudah alarm. Pipeline menitipkan

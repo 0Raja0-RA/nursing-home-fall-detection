@@ -51,6 +51,8 @@ erDiagram
         bool telegram_foto
         string klip_status "merekam | tersimpan | kosong | gagal | dihapus"
         float klip_detik
+        int eskalasi_ke "pengingat Telegram yang terkirim"
+        datetime eskalasi_terakhir
         datetime created_at
     }
     alert_snapshots {
@@ -109,7 +111,8 @@ Pengaturan dari dashboard yang harus bertahan setelah restart. Bentuknya pasanga
 | `camera_last_number` | Nomor kamera tertinggi yang pernah dipakai | `db/repository.py` |
 | `telegram_photo_mode` | Cara foto dikirim ke Telegram (`buram` bawaan, `utuh`, ...) | `db/repository.py` |
 | `telegram_send_drills` | `1` bila latihan ikut dikirim ke Telegram | `db/repository.py` |
-| `telegram_camera_offline` | `1` bila kamera terputus dikabarkan ke Telegram (bawaan `1`) | `db/repository.py` |
+| `telegram_camera_offline` | `1` bila kamera terputus atau dijeda dikabarkan ke Telegram (bawaan `1`) | `db/repository.py` |
+| `eskalasi_menit` | Menit tanpa "Saya ke sana" sebelum alarm dieskalasi (bawaan `2`) | `api/settings.py` |
 
 Rahasia seperti token bot dan ID chat Telegram tidak disimpan di sini. Keduanya tetap di `backend/.env`.
 
@@ -122,6 +125,7 @@ Riwayat insiden. Satu baris untuk satu alarm yang dikonfirmasi state machine.
 - **Putusan:** `verdict` bernilai `jatuh`, `palsu`, atau `belum_yakin`, dan NULL berarti belum dinilai. Untuk alarm palsu, `verdict_reason` berisi kode alasannya. Putusan sengaja dipisah dari penanganan, karena alarm bisa sudah ditangani tetapi belum dinilai.
 - **Keadaan sistem saat kejadian:** `threshold_sec` dan `detection_mode`. Tanpa keduanya, angka alarm palsu tidak bisa ditafsirkan.
 - **Telegram:** `telegram_status` bernilai `mengirim`, `terkirim`, `gagal`, `mati`, atau `dilewati`. `telegram_message_id` dipakai untuk menyunting pesan yang sama, dan `telegram_foto` menandai pesan berupa foto. Pada alert lama, `telegram_status` NULL dan yang berlaku adalah `notified`.
+- **Eskalasi:** `eskalasi_ke` menghitung pengingat Telegram yang sudah terkirim karena alarm belum direspons, dan `eskalasi_terakhir` jam pengingat terakhir. Pengingat dikirim setiap `eskalasi_menit` menit, paling banyak tiga kali, hanya untuk alarm yang pesan Telegram-nya terkirim (`services/eskalasi.py`).
 - **Klip:** `klip_status` bernilai `merekam` (menunggu detik-detik sesudah alarm), `tersimpan`, `kosong` (kamera tidak mengirim gambar di sekitar kejadian), `gagal`, atau `dihapus` (lewat masa simpan). NULL berarti tidak direkam: alert lama, atau perekaman dimatikan. `klip_detik` adalah panjang klipnya. Berkas klipnya sendiri tidak ada di database, tetapi di folder `KLIP_DIR` (bawaan `backend/klip/`, diabaikan git), satu ZIP berisi JPEG per alert, dan dihapus otomatis setelah `KLIP_MASA_SIMPAN_HARI` hari.
 - Nama ruang (`camera_name`) dan nama orang (`*_by`) **disalin, bukan dirujuk**. Riwayat harus tetap menyebut tempat dan orangnya walaupun kameranya dihapus atau akunnya dinonaktifkan. Pada alert lama, `camera_name` bisa NULL, dan `camera_id` dipakai sebagai cadangan.
 

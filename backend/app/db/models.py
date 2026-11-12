@@ -128,6 +128,11 @@ class AlertRecord(Base):
     klip_status = Column(String, nullable=True)
     klip_detik = Column(Float, nullable=True)
 
+    # ---- Eskalasi (app/services/eskalasi.py) ------------------------------
+    # Berapa pengingat Telegram yang sudah terkirim karena belum ada yang merespons.
+    eskalasi_ke = Column(Integer, nullable=True)
+    eskalasi_terakhir = Column(DateTime, nullable=True)
+
 
 class AlertSnapshot(Base):
     """Foto kejadian, satu per alert.

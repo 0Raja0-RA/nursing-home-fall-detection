@@ -30,6 +30,9 @@ KUNCI_NOMOR_KAMERA = "camera_last_number"
 KUNCI_TG_FOTO = "telegram_photo_mode"
 KUNCI_TG_LATIHAN = "telegram_send_drills"
 KUNCI_TG_KAMERA = "telegram_camera_offline"
+# Menit tanpa "Saya ke sana" sebelum alarm dieskalasi (banner dan pengingat Telegram).
+KUNCI_ESKALASI = "eskalasi_menit"
+ESKALASI_BAWAAN = 2
 
 
 def _nomor_kamera(camera_id: str) -> int:
@@ -217,6 +220,13 @@ class SettingRepository:
         else:
             baris.value = value
         await self.session.commit()
+
+    async def eskalasi_menit(self) -> int:
+        nilai = await self.ambil(KUNCI_ESKALASI)
+        try:
+            return max(1, int(nilai)) if nilai else ESKALASI_BAWAAN
+        except ValueError:
+            return ESKALASI_BAWAAN
 
     async def telegram(self) -> TelegramSettings:
         """Pengaturan Telegram tersimpan, dengan bawaan yang aman bila belum pernah diubah."""

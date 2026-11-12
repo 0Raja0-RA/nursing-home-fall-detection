@@ -80,6 +80,8 @@ _KOLOM_SUSULAN: dict[str, list[tuple[str, str]]] = {
         ("telegram_foto", "BOOLEAN"),
         ("klip_status", "VARCHAR"),
         ("klip_detik", "FLOAT"),
+        ("eskalasi_ke", "INTEGER"),
+        ("eskalasi_terakhir", "DATETIME"),
     ],
 }
 

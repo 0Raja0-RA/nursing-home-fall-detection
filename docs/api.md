@@ -142,7 +142,9 @@ Contoh alert:
   "notified": true,
   "telegram_status": "terkirim",
   "klip_status": "tersimpan",
-  "klip_detik": 12.7
+  "klip_detik": 12.7,
+  "eskalasi_ke": null,
+  "eskalasi_terakhir": null
 }
 ```
 
@@ -150,7 +152,9 @@ Contoh alert:
 Nama penangan lewat Telegram berakhiran `(Telegram)`. `telegram_status`: `mengirim`,
 `terkirim`, `gagal`, `mati` (Telegram belum diatur), `dilewati` (latihan tidak dikirim),
 atau kosong pada alert lama (lihat `notified`). `klip_status`: `merekam`, `tersimpan`,
-`kosong`, `gagal`, `dihapus`, atau kosong bila tidak direkam. Waktu disimpan UTC tanpa zona.
+`kosong`, `gagal`, `dihapus`, atau kosong bila tidak direkam. `eskalasi_ke`: berapa pengingat
+Telegram yang sudah terkirim karena belum ada yang merespons (paling banyak 3), dengan jam
+pengingat terakhir di `eskalasi_terakhir`. Waktu disimpan UTC tanpa zona.
 
 ---
 
@@ -186,6 +190,7 @@ terputus menunjukkan sejak kapan ia buta.
 | PUT | `/api/settings/threshold` | `{"fall_duration_threshold": 3}` (lebih dari 0, paling besar 60) |
 | PUT | `/api/settings/mode` | `{"detection_mode": "pose"}` atau `bbox`; mereset hitungan semua kamera |
 | PUT | `/api/settings/telegram` | `{"photo_mode", "send_drills", "camera_offline"}`, semuanya opsional |
+| PUT | `/api/settings/eskalasi` | `{"eskalasi_menit": 1-30}`: menit tanpa "Saya ke sana" sebelum banner menulis lamanya dan grup Telegram menerima pengingat. Bawaan 2; ikut dikembalikan `GET /api/settings/` |
 | POST | `/api/settings/test-telegram` | Kirim pesan uji ke grup |
 
 `photo_mode`: `buram` (bawaan), `utuh` (tertutup sampai diketuk), atau `tanpa`.

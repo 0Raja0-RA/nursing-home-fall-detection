@@ -225,7 +225,7 @@ async def _panggil(metode: str, *, json_: Optional[dict] = None, data: Optional[
 
 
 async def _kirim_sekali(teks: str, foto: Optional[bytes], tombol: Optional[dict],
-                        spoiler: bool = False) -> tuple[bool, str, Optional[int]]:
+                        spoiler: bool = False, balas_ke: Optional[int] = None) -> tuple[bool, str, Optional[int]]:
     """Satu kali percobaan kirim. Pakai sendPhoto kalau ada gambarnya."""
     chat_id = get_settings().TELEGRAM_CHAT_ID
     if foto:
@@ -240,13 +240,17 @@ async def _kirim_sekali(teks: str, foto: Optional[bytes], tombol: Optional[dict]
         payload = {"chat_id": chat_id, "text": teks, "parse_mode": "HTML", "protect_content": True}
         if tombol:
             payload["reply_markup"] = tombol
+        if balas_ke:
+            # Tetap terkirim walau pesan asalnya sudah dihapus dari grup.
+            payload["reply_parameters"] = {"message_id": balas_ke, "allow_sending_without_reply": True}
         ok, alasan, isi = await _panggil("sendMessage", json_=payload)
     message_id = (isi.get("result") or {}).get("message_id") if ok else None
     return ok, alasan, message_id
 
 
 async def _kirim_dengan_ulang(teks: str, foto: Optional[bytes] = None, tombol: Optional[dict] = None,
-                              spoiler: bool = False, label: str = "pesan") -> HasilKirim:
+                              spoiler: bool = False, label: str = "pesan",
+                              balas_ke: Optional[int] = None) -> HasilKirim:
     """Kirim dengan percobaan ulang bila gagal.
 
     Gangguan jaringan sesaat itu lumrah, apalagi kalau laptop sedang berbagi
@@ -263,7 +267,7 @@ async def _kirim_dengan_ulang(teks: str, foto: Optional[bytes] = None, tombol: O
         percobaan += 1
         if jeda:
             await asyncio.sleep(jeda)
-        ok, alasan, message_id = await _kirim_sekali(teks, foto, tombol, spoiler)
+        ok, alasan, message_id = await _kirim_sekali(teks, foto, tombol, spoiler, balas_ke)
         if ok:
             log.info(f"✅ Telegram terkirim ({'foto' if foto else 'teks'}) untuk {label}"
                      + (f" pada percobaan ke-{percobaan}" if percobaan > 1 else ""))
@@ -347,9 +351,10 @@ async def jawab_callback(callback_id: str, teks: str, peringatan: bool = False) 
     })
 
 
-async def kirim_teks(teks: str, label: str = "pesan") -> bool:
-    """Pesan teks biasa ke grup, dengan percobaan ulang. Dipakai untuk kabar kamera."""
-    return (await _kirim_dengan_ulang(teks, label=label)).berhasil
+async def kirim_teks(teks: str, label: str = "pesan", balas_ke: Optional[int] = None) -> bool:
+    """Pesan teks biasa ke grup, dengan percobaan ulang. Dipakai untuk kabar kamera dan
+    pengingat eskalasi (`balas_ke`: id pesan alarm yang dibalas)."""
+    return (await _kirim_dengan_ulang(teks, label=label, balas_ke=balas_ke)).berhasil
 
 
 async def send_test_notification() -> bool:

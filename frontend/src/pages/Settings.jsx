@@ -47,6 +47,8 @@ export default function Settings() {
     const [sibuk, setSibuk] = useState(false);
     const [kabar, setKabar] = useState(null);           // deteksi: { tipe: 'ok' | 'galat', teks }
     const [kabarTg, setKabarTg] = useState(null);       // { tipe, teks, bagian: 'telegram' | 'privasi' }
+    const [eskalasi, setEskalasi] = useState(2);
+    const [kabarEskalasi, setKabarEskalasi] = useState(null);
     const suara = useStatusSuara();
 
     const terapkan = (d) => {
@@ -56,6 +58,7 @@ export default function Settings() {
         setTelegramSiap(d.telegram_configured);
         setTg(d.telegram);
         setOpsiFoto(d.photo_modes || []);
+        setEskalasi(d.eskalasi_menit ?? 2);
         setTersimpan({ threshold: d.fall_duration_threshold, mode: d.detection_mode });
     };
 
@@ -139,6 +142,21 @@ export default function Settings() {
             setKabarTg({ tipe: 'galat', teks: PESAN_TERPUTUS, bagian: 'telegram' });
         } finally {
             setSibuk(false);
+        }
+    };
+
+    /** Tersimpan seketika setiap diubah, seperti pengaturan Telegram. */
+    const ubahEskalasi = async (menit) => {
+        setKabarEskalasi(null);
+        setEskalasi(menit);
+        try {
+            const r = await api('/api/settings/eskalasi', { method: 'PUT', json: { eskalasi_menit: menit } });
+            if (!r.ok) throw new Error(await bacaGalat(r));
+            terapkan(await r.json());
+            setKabarEskalasi({ tipe: 'ok', teks: 'Tersimpan.' });
+        } catch (err) {
+            setKabarEskalasi({ tipe: 'galat', teks: `Gagal menyimpan: ${err.message}` });
+            ambil();
         }
     };
 
@@ -234,6 +252,30 @@ export default function Settings() {
                         Alarm berbunyi berulang sampai ada yang menekan Saya ke sana. Browser menahan suara sampai ada
                         klik pertama di halaman, jadi klik sekali setiap kali dashboard dibuka.
                     </p>
+                </Bagian>
+
+                <Bagian id="atur-eskalasi" judul="Bila tidak ada yang merespons" keterangan="Alarm yang dibiarkan tidak boleh mati diam-diam.">
+                    <div className="flex flex-wrap items-center gap-3">
+                        <label htmlFor="eskalasi" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                            Ingatkan setelah
+                        </label>
+                        <select
+                            id="eskalasi"
+                            value={eskalasi}
+                            onChange={(e) => ubahEskalasi(Number(e.target.value))}
+                            disabled={memuat}
+                            className="bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                        >
+                            {[1, 2, 3, 5, 10].map((m) => <option key={m} value={m}>{m} menit</option>)}
+                        </select>
+                        <span className="text-sm text-slate-600 dark:text-slate-400">tanpa Saya ke sana</span>
+                    </div>
+                    <p className="text-xs text-slate-500">
+                        Setelah {eskalasi} menit, banner menulis Belum ada yang merespons beserta lamanya, dan grup Telegram
+                        menerima pengingat sebagai balasan ke pesan alarm, setiap {eskalasi} menit, paling banyak 3 kali.
+                        Belum ada angka yang teruji untuk panti, jadi sesuaikan dengan hasil uji mini.
+                    </p>
+                    <Kabar kabar={kabarEskalasi} />
                 </Bagian>
 
                 <Bagian id="atur-telegram" judul="Telegram" keterangan="Pesan alarm ke grup perawat, dengan tombol Saya ke sana dan Alarm palsu.">
