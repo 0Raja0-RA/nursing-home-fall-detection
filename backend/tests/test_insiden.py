@@ -9,7 +9,7 @@ masuk diganti dengan pengganti yang bisa ditukar di tengah uji, supaya dua
 perawat bisa diperankan bergantian.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
@@ -70,7 +70,7 @@ def uji():
             patch("app.services.insiden_service.manager.broadcast", new=AsyncMock()) as siar, \
             patch("app.services.notification_service.perbarui_pesan", new=AsyncMock()) as sunting:
         c.portal.call(siapkan)
-        yield SimpleNamespace(klien=c, masuk=masuk, siar=siar, sunting=sunting)
+        yield SimpleNamespace(klien=c, masuk=masuk, siar=siar, sunting=sunting, factory=factory)
 
 
 def _sebagai(uji, akun):
@@ -247,3 +247,78 @@ def test_kirim_ulang_telegram_ditolak_bila_belum_dikonfigurasi(uji, monkeypatch)
     monkeypatch.setattr(config, "get_settings", lambda: types.SimpleNamespace(
         TELEGRAM_BOT_TOKEN="", TELEGRAM_CHAT_ID=""))
     assert uji.klien.post("/api/alerts/3/telegram").status_code == 409
+
+
+# ---- Ekspor CSV untuk uji mini -------------------------------
+
+def _isi(uji, alert_id, **kolom):
+    """Tulis kolom langsung ke database, supaya selisih waktunya pasti."""
+    async def ubah():
+        async with uji.factory() as s:
+            a = await s.get(AlertRecord, alert_id)
+            for nama, nilai in kolom.items():
+                setattr(a, nama, nilai)
+            await s.commit()
+    uji.klien.portal.call(ubah)
+
+
+def _baris_csv(r):
+    import csv
+    import io
+
+    assert r.content.startswith(b"\xef\xbb\xbf"), "BOM supaya Excel membaca UTF-8"
+    return list(csv.DictReader(io.StringIO(r.content.decode("utf-8-sig"))))
+
+
+def test_ekspor_csv_menghitung_waktu_respons(uji):
+    awal = datetime(2026, 11, 12, 7, 0, 0)
+    _isi(uji, 1, claimed_by="Siti", claimed_at=awal + timedelta(seconds=40),
+         acknowledged=True, acknowledged_by="Siti", acknowledged_at=awal + timedelta(seconds=100),
+         verdict="palsu", verdict_reason="berbaring_sengaja", verdict_by="Siti",
+         verdict_at=awal + timedelta(seconds=100), threshold_sec=3.0, detection_mode="pose",
+         caregiver_note="Pasien tidur, posisi miring")
+    # Ditutup tanpa klaim: respons pertamanya adalah penutupan itu sendiri.
+    _isi(uji, 3, acknowledged=True, acknowledged_by="Budi",
+         acknowledged_at=datetime(2026, 11, 11, 7, 2, 30))
+
+    r = uji.klien.get("/api/alerts/ekspor")
+    assert r.status_code == 200
+    assert r.headers["content-type"].startswith("text/csv")
+    assert r.headers["cache-control"] == "no-store"
+    assert r.headers["content-disposition"].startswith('attachment; filename="insiden-falldetect-')
+
+    baris = _baris_csv(r)
+    assert [b["id"] for b in baris] == ["3", "2", "1"], "urut dari yang terlama"
+    pertama = baris[2]
+    assert pertama["waktu_alarm"] == awal.replace(tzinfo=timezone.utc).astimezone().strftime("%Y-%m-%d %H:%M:%S")
+    assert pertama["ruang"] == "Kamar 101" and pertama["latihan"] == "tidak"
+    assert (pertama["detik_sampai_respons"], pertama["detik_sampai_ditangani"]) == ("40", "100")
+    assert (pertama["putusan"], pertama["alasan_palsu"]) == ("Alarm palsu", "Berbaring sengaja")
+    assert (pertama["ambang_detik"], pertama["lama_tergeletak_detik"], pertama["mode_deteksi"]) == ("3", "5", "pose")
+    assert pertama["telegram"] == "terkirim" and pertama["catatan"] == "Pasien tidur, posisi miring"
+    assert (baris[0]["detik_sampai_respons"], baris[0]["detik_sampai_ditangani"]) == ("150", "150")
+    assert baris[0]["telegram"] == "gagal" and baris[1]["latihan"] == "ya"
+    assert baris[1]["detik_sampai_respons"] == "", "belum direspons, sel dibiarkan kosong"
+
+
+def test_ekspor_csv_memakai_filter_daftar(uji):
+    baris = _baris_csv(uji.klien.get("/api/alerts/ekspor", params={"simulated": "false"}))
+    assert [b["id"] for b in baris] == ["3", "1"]
+    baris = _baris_csv(uji.klien.get("/api/alerts/ekspor", params={"camera_id": "cam-02"}))
+    assert [b["id"] for b in baris] == ["2"]
+
+
+def test_ekspor_csv_menjinakkan_rumus(uji):
+    """Nama Telegram ditulis orang luar; jangan sampai menjadi rumus di spreadsheet."""
+    _isi(uji, 1, claimed_by='=HYPERLINK("http://contoh.invalid","klik") (Telegram)',
+         caregiver_note="-2+3")
+    pertama = _baris_csv(uji.klien.get("/api/alerts/ekspor"))[2]
+    assert pertama["diklaim_oleh"].startswith("'=HYPERLINK")
+    assert pertama["catatan"] == "'-2+3"
+
+
+def test_pengunjung_tidak_bisa_mengunduh(uji):
+    _sebagai(uji, SimpleNamespace(id=0, display_name="Pengunjung", role="pengunjung", active=True))
+    r = uji.klien.get("/api/alerts/ekspor")
+    assert r.status_code == 403
+    assert uji.klien.get("/api/alerts/").status_code == 200, "melihat daftar tetap boleh"

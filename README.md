@@ -270,6 +270,7 @@ Semua endpoint wajib login, kecuali health check, `/api/auth/status`, `/api/auth
 | PATCH  | `/api/users/{id}`            | Ubah, nonaktifkan, atau atur ulang sandi (pengelola) |
 | GET    | `/api/alerts/`               | Daftar alert, dengan filter antrean                 |
 | GET    | `/api/alerts/ringkasan`      | Jumlah per kelompok untuk tab dan lencana           |
+| GET    | `/api/alerts/ekspor`         | Unduh CSV insiden sesuai filter (akun tim)          |
 | GET    | `/api/alerts/count`          | Hitung total alert                                  |
 | GET    | `/api/alerts/{id}`           | Detail satu alert                                   |
 | GET    | `/api/alerts/{id}/snapshot`  | Foto kejadian                                       |

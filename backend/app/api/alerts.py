@@ -5,6 +5,7 @@ REST endpoints untuk insiden (alert jatuh) dan penanganannya. Semua wajib login.
 
 Endpoints:
     GET  /api/alerts/                — Daftar alert, dengan filter antrean
+    GET  /api/alerts/ekspor          — Unduh CSV dengan filter yang sama (tim saja)
     GET  /api/alerts/ringkasan       — Jumlah per kelompok, untuk tab dan lencana
     GET  /api/alerts/count           — Hitung total alert (lama, tetap dipertahankan)
     GET  /api/alerts/{id}            — Detail satu alert
@@ -28,7 +29,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query, Response, st
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.auth import wajib_login
+from app.api.auth import wajib_login, wajib_tim
 from app.core.logging import get_logger
 from app.db.database import get_db
 from app.db.models import AlertRecord, AlertSnapshot, UserRecord
@@ -41,6 +42,7 @@ from app.models.schemas import (
     VerdictUpdate,
 )
 from app.services import insiden_service as insiden
+from app.services.ekspor import csv_insiden
 
 router = APIRouter()
 
@@ -92,8 +94,16 @@ async def get_alerts(
     db: AsyncSession = Depends(get_db),
 ):
     """Ambil daftar alert terbaru lebih dulu, dengan filter untuk antrean Riwayat Insiden."""
-    query = select(AlertRecord).order_by(AlertRecord.created_at.desc(), AlertRecord.id.desc())
+    query = _saring(
+        select(AlertRecord).order_by(AlertRecord.created_at.desc(), AlertRecord.id.desc()),
+        acknowledged, status_, camera_id, verdict, simulated, sejak, sampai,
+    )
+    result = await db.execute(query.offset(skip).limit(limit))
+    return result.scalars().all()
 
+
+def _saring(query, acknowledged, status_, camera_id, verdict, simulated, sejak, sampai):
+    """Filter yang sama untuk daftar dan ekspor CSV."""
     if acknowledged is not None:
         query = query.where(AlertRecord.acknowledged == acknowledged)
     if status_ == "terbuka":
@@ -114,9 +124,34 @@ async def get_alerts(
         query = query.where(AlertRecord.created_at >= sejak.replace(tzinfo=None))
     if sampai:
         query = query.where(AlertRecord.created_at <= sampai.replace(tzinfo=None))
+    return query
 
-    result = await db.execute(query.offset(skip).limit(limit))
-    return result.scalars().all()
+
+@router.get("/ekspor")
+async def ekspor_csv(
+    status_: Optional[Status] = Query(None, alias="status"),
+    camera_id: Optional[str] = Query(None),
+    verdict: Optional[FilterPutusan] = Query(None),
+    simulated: Optional[bool] = Query(None),
+    sejak: Optional[datetime] = Query(None, description="Batas bawah created_at (UTC)"),
+    sampai: Optional[datetime] = Query(None, description="Batas atas created_at (UTC)"),
+    _tim=Depends(wajib_tim),
+    db: AsyncSession = Depends(get_db),
+):
+    """Semua alert yang cocok dengan filter, sebagai CSV, urut dari yang terlama.
+
+    Untuk uji mini dan laporan: waktu respons sudah dihitung dalam detik. Pengunjung
+    tidak boleh mengunduh, walau boleh melihat daftarnya.
+    """
+    query = _saring(
+        select(AlertRecord).order_by(AlertRecord.created_at.asc(), AlertRecord.id.asc()),
+        None, status_, camera_id, verdict, simulated, sejak, sampai,
+    )
+    alerts = (await db.execute(query)).scalars().all()
+    nama = f"insiden-falldetect-{datetime.now():%Y%m%d-%H%M}.csv"
+    return Response(content=csv_insiden(alerts), media_type="text/csv; charset=utf-8",
+                    headers={"Content-Disposition": f'attachment; filename="{nama}"',
+                             "Cache-Control": "no-store"})
 
 
 @router.get("/ringkasan", response_model=AlertSummary)

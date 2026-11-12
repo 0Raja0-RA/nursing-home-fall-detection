@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ChevronRight, FlaskConical, Inbox, Loader2 } from 'lucide-react';
-import { api, PESAN_TERPUTUS } from '../api';
+import { ChevronRight, Download, FlaskConical, Inbox, Loader2 } from 'lucide-react';
+import { api, bacaGalat, PESAN_TERPUTUS } from '../api';
+import { usePengunjung } from '../context/auth';
 import { useLive } from '../context/LiveContext';
 import DetailInsiden from '../components/DetailInsiden';
 import { StatusPenanganan, StatusPutusan, StatusTelegram } from '../components/StatusInsiden';
@@ -16,12 +17,16 @@ const RENTANG = [
 const PER_HALAMAN = 50;
 const SELECT = 'bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500';
 
-function Waktu({ iso, sekarang }) {
+// `bertumpuk`: tanggal di baris kedua, supaya kolom Waktu di tabel tidak memakan
+// lebar yang dibutuhkan kolom Penanganan di layar 1024 px.
+function Waktu({ iso, sekarang, bertumpuk = false }) {
     const ms = msDari(iso);
     return (
         <time dateTime={iso} className="text-sm tabular-nums whitespace-nowrap">
             <span className="font-medium">{waktuRelatif(ms, sekarang)}</span>
-            <span className="text-slate-500"> · {tanggalJam(ms)}</span>
+            {bertumpuk
+                ? <span className="block text-xs text-slate-500">{tanggalJam(ms)}</span>
+                : <span className="text-slate-500"> · {tanggalJam(ms)}</span>}
         </time>
     );
 }
@@ -63,8 +68,13 @@ export default function AlertHistory() {
     // tab Perlu tindakan, tetapi lacinya tidak boleh ikut tertutup tiba-tiba.
     const [detail, setDetail] = useState(null);
 
-    const ambil = useCallback(async () => {
-        const q = new URLSearchParams({ limit: String(batas + 1) });
+    const pengunjung = usePengunjung();
+    const [mengunduh, setMengunduh] = useState(false);
+    const [galatUnduh, setGalatUnduh] = useState('');
+
+    // Filter yang sama dipakai daftar dan ekspor CSV.
+    const saringan = useCallback(() => {
+        const q = new URLSearchParams();
         if (kameraId) q.set('camera_id', kameraId);
         if (tab === 'perlu_tindakan') {
             q.set('status', 'perlu_tindakan');
@@ -73,6 +83,12 @@ export default function AlertHistory() {
             if (!latihan) q.set('simulated', 'false');
             if (rentang !== 'semua') q.set('sejak', new Date(Date.now() - Number(rentang) * 86400e3).toISOString());
         }
+        return q;
+    }, [tab, kameraId, putusan, rentang, latihan]);
+
+    const ambil = useCallback(async () => {
+        const q = saringan();
+        q.set('limit', String(batas + 1));
         try {
             const r = await api(`/api/alerts/?${q}`);
             if (!r.ok) throw new Error(String(r.status));
@@ -85,7 +101,34 @@ export default function AlertHistory() {
         } finally {
             setMemuat(false);
         }
-    }, [tab, kameraId, putusan, rentang, latihan, batas]);
+    }, [saringan, batas]);
+
+    // Semua baris yang cocok dengan filter, bukan hanya yang sedang tampil.
+    const unduh = async () => {
+        setMengunduh(true);
+        setGalatUnduh('');
+        try {
+            const r = await api(`/api/alerts/ekspor?${saringan()}`);
+            if (!r.ok) {
+                setGalatUnduh(await bacaGalat(r));
+                return;
+            }
+            const url = URL.createObjectURL(await r.blob());
+            const d = new Date();
+            const dua = (n) => String(n).padStart(2, '0');
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `insiden-falldetect-${d.getFullYear()}${dua(d.getMonth() + 1)}${dua(d.getDate())}-${dua(d.getHours())}${dua(d.getMinutes())}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+        } catch {
+            setGalatUnduh(PESAN_TERPUTUS);
+        } finally {
+            setMengunduh(false);
+        }
+    };
 
     // Segarkan berkala, dan seketika setiap ada alarm baru atau alarm ditutup.
     useEffect(() => {
@@ -124,21 +167,39 @@ export default function AlertHistory() {
     };
 
     const detailSegar = detail ? (daftar.find((a) => a.id === detail.id) || detail) : null;
-    const tabKelas = (aktif) => `min-h-10 px-4 rounded-lg text-sm font-semibold inline-flex items-center gap-2 ${aktif
+    const tabKelas = (aktif) => `min-h-10 px-4 rounded-lg text-sm font-semibold inline-flex items-center gap-2 whitespace-nowrap ${aktif
         ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900'
         : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`;
 
     return (
         <div className="p-4 md:p-8 w-full max-w-full min-w-0">
-            <div className="mb-5">
-                <h1 className="text-xl md:text-2xl font-bold">Riwayat Insiden</h1>
-                <p className="text-xs md:text-sm text-slate-500">
-                    Setiap alarm, siapa yang menangani, dan apakah benar jatuh.
-                </p>
+            <div className="mb-5 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                <div>
+                    <h1 className="text-xl md:text-2xl font-bold">Riwayat Insiden</h1>
+                    <p className="text-xs md:text-sm text-slate-500">
+                        Setiap alarm, siapa yang menangani, dan apakah benar jatuh.
+                    </p>
+                </div>
+                {!pengunjung && (
+                    <button type="button" onClick={unduh} disabled={mengunduh}
+                        title="Semua insiden sesuai tab dan filter di bawah, untuk uji mini atau laporan"
+                        className="self-start shrink-0 min-h-10 px-3 rounded-lg border border-slate-300 dark:border-slate-700 text-sm font-semibold inline-flex items-center gap-2 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-60">
+                        {mengunduh
+                            ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+                            : <Download className="w-4 h-4" aria-hidden="true" />}
+                        Unduh CSV
+                    </button>
+                )}
             </div>
 
+            {galatUnduh && (
+                <p role="alert" className="mb-4 text-sm text-red-700 dark:text-red-400">
+                    CSV gagal diunduh: {galatUnduh}
+                </p>
+            )}
+
             <div className="flex flex-col lg:flex-row lg:items-center gap-3 mb-4">
-                <div role="tablist" aria-label="Kelompok insiden" className="inline-flex self-start rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-1 gap-1">
+                <div role="tablist" aria-label="Kelompok insiden" className="inline-flex self-start shrink-0 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-1 gap-1">
                     <button type="button" role="tab" aria-selected={tab === 'perlu_tindakan'}
                         onClick={() => { setTab('perlu_tindakan'); setBatas(PER_HALAMAN); }}
                         className={tabKelas(tab === 'perlu_tindakan')}>
@@ -226,7 +287,7 @@ export default function AlertHistory() {
                             <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
                                 {daftar.map((a) => (
                                     <tr key={a.id} onClick={() => setDetail(a)} className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors align-top">
-                                        <td className="p-3"><Waktu iso={a.created_at} sekarang={sekarang} /></td>
+                                        <td className="p-3"><Waktu iso={a.created_at} sekarang={sekarang} bertumpuk /></td>
                                         <td className="p-3 text-sm"><Ruang alert={a} /></td>
                                         <td className="p-3"><StatusPenanganan alert={a} /></td>
                                         <td className="p-3"><StatusPutusan alert={a} /></td>

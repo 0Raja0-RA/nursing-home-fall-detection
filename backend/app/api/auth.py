@@ -242,6 +242,13 @@ async def tolak_perubahan_pengunjung(request: Request, user=Depends(wajib_login)
     return user
 
 
+async def wajib_tim(user=Depends(wajib_login)):
+    """Dependency: akun tim saja. Pengunjung tidak boleh, mis. mengunduh data insiden."""
+    if user.role == "pengunjung":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Pengunjung hanya bisa melihat.")
+    return user
+
+
 async def wajib_pengelola(user=Depends(wajib_login)):
     """Dependency: hanya pengelola."""
     if user.role != "pengelola":

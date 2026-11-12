@@ -281,6 +281,10 @@ Banner merah muncul di semua halaman dashboard dan bunyi berulang tiap 4 detik.
 
 Memuat ulang halaman tidak menghilangkan alarm yang belum ditangani.
 
+Tombol **Unduh CSV** di Riwayat Insiden mengunduh semua insiden sesuai tab dan filter,
+lengkap dengan waktu respons dalam detik. Untuk menguji alur alarm dengan perawat atau
+mahasiswa keperawatan, ikuti [docs/uji-mini.md](docs/uji-mini.md).
+
 ---
 
 ## 5. Notifikasi Telegram

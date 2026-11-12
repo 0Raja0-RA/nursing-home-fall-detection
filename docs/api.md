@@ -79,6 +79,7 @@ tetap di antrean Perlu tindakan sampai dinilai.
 |---|---|---|
 | GET | `/api/alerts/` | Daftar alert, terbaru dulu. Filter di bawah |
 | GET | `/api/alerts/ringkasan` | Jumlah per kelompok, untuk tab dan lencana menu |
+| GET | `/api/alerts/ekspor` | Unduh CSV, filter sama dengan daftar tanpa `skip`/`limit`, urut dari yang terlama. Akun tim saja, pengunjung `403`. Kolomnya di bawah |
 | GET | `/api/alerts/count` | Hitung total alert, filter `acknowledged` opsional |
 | GET | `/api/alerts/{id}` | Detail satu alert |
 | GET | `/api/alerts/{id}/snapshot` | Foto kejadian (JPEG, tanpa diburamkan, `Cache-Control: no-store`). `404` bila tidak tersimpan |
@@ -98,6 +99,15 @@ Filter `GET /api/alerts/`:
 | `simulated` | `true` hanya latihan, `false` tanpa latihan |
 | `sejak`, `sampai` | waktu ISO; tanpa zona dibaca UTC |
 | `skip`, `limit` | pagination, `limit` 1 sampai 200 |
+
+CSV `GET /api/alerts/ekspor` berawalan BOM UTF-8 supaya terbaca Excel. Waktu ditulis dalam
+zona waktu komputer backend. `detik_sampai_respons` dihitung sampai klaim, atau sampai
+penutupan bila tidak ada yang mengklaim. Sel yang diawali `=`, `+`, `-`, atau `@` diberi
+tanda kutip tunggal supaya tidak dijalankan sebagai rumus. Kolom: `id`, `waktu_alarm`,
+`ruang`, `kamera_id`, `latihan`, `mode_deteksi`, `ambang_detik`, `lama_tergeletak_detik`,
+`diklaim_oleh`, `waktu_klaim`, `ditangani_oleh`, `waktu_ditangani`, `detik_sampai_respons`,
+`detik_sampai_ditangani`, `putusan`, `alasan_palsu`, `dinilai_oleh`, `waktu_dinilai`,
+`telegram`, `catatan`. Dipakai untuk [uji mini](uji-mini.md).
 | `acknowledged` | `true` / `false` (lama, tetap didukung) |
 
 Putusan (`verdict`): `jatuh`, `palsu`, `belum_yakin`, atau `null` (belum dinilai).
