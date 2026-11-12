@@ -125,6 +125,8 @@ class CameraStatus(BaseModel):
     confidence: float = 0.0
     fps: float = 0.0
     last_frame_at: Optional[datetime] = None
+    # Sedang dilatih lewat Mode latihan (tombol simulasi), bukan kejadian sungguhan.
+    simulated: bool = False
 
 
 # ---- Camera Registry ---------------------------------------

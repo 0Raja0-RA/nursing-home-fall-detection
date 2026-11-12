@@ -162,6 +162,9 @@ Saat pertama dijalankan, satu kamera dibuat otomatis dari `CAMERA_SOURCE` di
 `run-backend.bat` (bawaannya `0`, webcam laptop). Selanjutnya kamera diatur dari
 dashboard — lihat [Mengelola Kamera](#mengelola-kamera).
 
+Akun demo untuk halaman Login tertulis di `frontend/src/pages/Login.jsx`. Login ini baru
+pemeriksaan di browser, belum melindungi dashboard maupun API.
+
 ### 5. (Opsional) Notifikasi Telegram
 
 Tanpa langkah ini sistem tetap berjalan penuh; hanya notifikasi ke HP yang tidak dikirim.

@@ -1,15 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AlertTriangle, Video } from 'lucide-react';
+import { Link, useLocation } from 'react-router-dom';
+import { FlaskConical, Send, Video, VideoOff, Volume2, VolumeX, X } from 'lucide-react';
 import { API_BASE } from '../config';
 import { useLive } from '../context/LiveContext';
-
-// Label dan warna pil status, mengikuti state machine di backend.
-const STATUS = {
-    monitoring: { label: 'Normal', kelas: 'bg-emerald-500/10 text-emerald-500' },
-    possible_fall: { label: 'Waspada', kelas: 'bg-amber-500/10 text-amber-500 animate-pulse' },
-    confirmed_fall: { label: 'JATUH TERDETEKSI', kelas: 'bg-red-500/10 text-red-500 animate-pulse' },
-    unknown: { label: 'Terputus', kelas: 'bg-slate-500/10 text-slate-400' },
-};
+import { aktifkanSuara, bunyikan, useStatusSuara } from '../hooks/useAlarmSound';
+import { usePengaturan } from '../hooks/usePengaturan';
+import StatusKamera from '../components/StatusKamera';
+import { bacaStatus, jamDari } from '../statusKamera';
 
 /**
  * Gambar MJPEG dari backend, yang melepas koneksinya saat dilepas dari DOM.
@@ -36,15 +33,28 @@ function StreamImg({ src, alt }) {
     return <img ref={ref} alt={alt} className="absolute inset-0 w-full h-full object-contain" />;
 }
 
+const CHIP = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs whitespace-nowrap';
+const CHIP_TENANG = `${CHIP} bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300`;
+
+function bacaDetailAI() {
+    try { return localStorage.getItem('detailAI') === '1'; } catch { return false; }
+}
+
 export default function SimulationDashboard() {
     const [cameras, setCameras] = useState([]);
-    const [kameraSimulasiId, setKameraSimulasiId] = useState('');
-    const [memulaiSimulasi, setMemulaiSimulasi] = useState(false);
+    const [panelLatihan, setPanelLatihan] = useState(false);
+    const [kameraLatihanId, setKameraLatihanId] = useState('');
+    const [memulai, setMemulai] = useState(false);
     const [galat, setGalat] = useState('');
+    // Nama kelas dan keyakinan model berguna untuk tim, bukan untuk perawat,
+    // jadi disembunyikan kecuali dinyalakan.
+    const [detailAI, setDetailAI] = useState(bacaDetailAI);
 
-    // Alarm jatuh ditampilkan oleh AlertBanner global; halaman ini hanya butuh
-    // status per kamera.
-    const { cameraData } = useLive();
+    const { cameraData, alerts } = useLive();
+    const suara = useStatusSuara();
+    const pengaturan = usePengaturan();
+    const lokasi = useLocation();
+    const fokusSelesai = useRef(null);
 
     // Daftar kamera diambil dari backend, jadi kamera yang didaftarkan di halaman
     // "Kelola Kamera" langsung muncul di sini tanpa menyunting kode.
@@ -64,14 +74,34 @@ export default function SimulationDashboard() {
         return () => clearInterval(t);
     }, [ambilDaftar]);
 
-    // Pilihan awal: kamera pertama yang benar-benar mengalir.
+    // Pilihan awal Mode latihan: kamera pertama yang benar-benar mengalir.
     useEffect(() => {
-        if (!kameraSimulasiId && cameras.length) {
+        if (!kameraLatihanId && cameras.length) {
             // Menyelaraskan pilihan dengan daftar yang baru tiba dari backend.
             // eslint-disable-next-line react-hooks/set-state-in-effect
-            setKameraSimulasiId((cameras.find((c) => c.is_active) || cameras[0]).camera_id);
+            setKameraLatihanId((cameras.find((c) => c.is_active) || cameras[0]).camera_id);
         }
-    }, [cameras, kameraSimulasiId]);
+    }, [cameras, kameraLatihanId]);
+
+    // "Lihat kamera" di banner membawa id kamera. Gulir ke kartunya begitu daftar kamera ada.
+    useEffect(() => {
+        const id = lokasi.state?.fokus;
+        if (!id || fokusSelesai.current === lokasi.key || !cameras.length) return;
+        const el = document.getElementById(`kamera-${id}`);
+        if (!el) return;
+        fokusSelesai.current = lokasi.key;
+        const halus = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        el.scrollIntoView({ behavior: halus ? 'smooth' : 'auto', block: 'start' });
+    }, [lokasi.key, lokasi.state, cameras.length]);
+
+    const ubahDetailAI = (nyala) => {
+        setDetailAI(nyala);
+        try { localStorage.setItem('detailAI', nyala ? '1' : '0'); } catch { /* tanpa penyimpanan */ }
+    };
+
+    const tesSuara = async () => {
+        if (await aktifkanSuara()) bunyikan();
+    };
 
     /**
      * Minta backend menganggap satu kamera melaporkan postur pemicu.
@@ -79,69 +109,159 @@ export default function SimulationDashboard() {
      * Yang disimulasikan hanya keluaran detektor. State machine tetap menghitung
      * durasinya sendiri, debounce tetap berlaku, cooldown tetap dihormati, dan
      * alertnya melewati jalur yang sama dengan deteksi sungguhan -- termasuk foto
-     * frame kamera saat itu juga. Hitungan mundur di kartu pun jadi angka asli
-     * dari state machine, bukan tiruan di browser.
+     * frame kamera saat itu juga dan penanda SIMULASI di riwayat dan Telegram.
      */
-    const triggerFallSimulation = async () => {
-        if (!kameraSimulasiId || memulaiSimulasi) return;
-        setMemulaiSimulasi(true);
+    const mulaiLatihan = async () => {
+        if (!kameraLatihanId || memulai) return;
+        setMemulai(true);
         setGalat('');
         try {
             const r = await fetch(
-                `${API_BASE}/api/cameras/${kameraSimulasiId}/simulate-fall`,
+                `${API_BASE}/api/cameras/${kameraLatihanId}/simulate-fall`,
                 { method: 'POST' },
             );
-            if (!r.ok) {
+            if (r.ok) {
+                setPanelLatihan(false);
+            } else {
                 const b = await r.json().catch(() => ({}));
                 setGalat(typeof b.detail === 'string' ? b.detail : `Backend menjawab ${r.status}`);
             }
         } catch {
             setGalat(`Tidak bisa menghubungi backend di ${API_BASE}.`);
         } finally {
-            setMemulaiSimulasi(false);
+            setMemulai(false);
         }
     };
 
-    const kameraSimulasi = cameras.find((c) => c.camera_id === kameraSimulasiId) || cameras[0];
+    const kameraLatihan = cameras.find((c) => c.camera_id === kameraLatihanId) || cameras[0];
+    const jumlahAktif = cameras.filter((c) => c.is_active).length;
+    const jumlahTerputus = cameras.length - jumlahAktif;
+    const sedangLatihan = cameras.filter((c) => cameraData?.[c.camera_id]?.simulated);
 
     return (
         <div className="p-4 md:p-8 w-full max-w-full min-w-0 overflow-x-hidden">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
                 <div>
-                    <h1 className="text-xl md:text-2xl font-bold">Simulasi Live Monitoring CCTV</h1>
-                    <p className="text-xs md:text-sm text-slate-500">Uji coba deteksi model YOLO11</p>
+                    <h1 className="text-xl md:text-2xl font-bold">Pemantauan Kamera</h1>
+                    <p className="text-xs md:text-sm text-slate-500">Status setiap kamera, diperbarui langsung.</p>
                 </div>
-                <div className="flex items-center gap-3">
-                    <select
-                        value={kameraSimulasiId}
-                        onChange={(e) => setKameraSimulasiId(e.target.value)}
-                        title="Kamera yang akan disimulasikan"
-                        className="bg-slate-200 dark:bg-slate-800 px-3 py-2 rounded-xl text-xs md:text-sm font-medium focus:outline-none"
-                    >
-                        {cameras.length === 0 && <option value="">Belum ada kamera</option>}
-                        {cameras.map((c) => (
-                            <option key={c.camera_id} value={c.camera_id}>
-                                {c.name}{c.is_active ? '' : ' (terputus)'}
-                            </option>
-                        ))}
-                    </select>
-                    <button
-                        onClick={triggerFallSimulation}
-                        disabled={memulaiSimulasi || !kameraSimulasi?.is_active}
-                        className="bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white px-4 py-2 rounded-xl font-medium text-xs md:text-sm transition-colors flex items-center gap-2 shadow-md"
-                    >
-                        <AlertTriangle className="w-4 h-4" /> Trigger Simulasi Orang Jatuh
-                    </button>
-                </div>
+                <button
+                    type="button"
+                    onClick={() => setPanelLatihan((b) => !b)}
+                    aria-expanded={panelLatihan}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition-colors"
+                >
+                    <FlaskConical className="w-4 h-4" aria-hidden="true" /> Mode latihan
+                </button>
             </div>
 
+            {/* Ringkasan: perawat tahu keadaan semua kamera tanpa memindai tiap kartu. */}
+            <div className="flex flex-wrap items-center gap-2 mb-6" aria-label="Ringkasan sistem">
+                <span className={CHIP_TENANG}>
+                    <Video className="w-3.5 h-3.5" aria-hidden="true" />
+                    <b className="font-semibold tabular-nums text-slate-800 dark:text-slate-100">{jumlahAktif}/{cameras.length}</b> kamera aktif
+                </span>
+                {jumlahTerputus > 0 && (
+                    <span className={`${CHIP} border border-dashed border-slate-400 dark:border-slate-500 text-slate-700 dark:text-slate-200`}>
+                        <VideoOff className="w-3.5 h-3.5" aria-hidden="true" />
+                        <b className="font-semibold tabular-nums">{jumlahTerputus}</b> terputus
+                    </span>
+                )}
+                <span className={alerts.length ? `${CHIP} bg-red-600 text-white font-semibold` : CHIP_TENANG}>
+                    <b className="font-semibold tabular-nums">{alerts.length}</b> alarm
+                </span>
+                <span className={CHIP_TENANG}>
+                    {suara === 'aktif'
+                        ? <><Volume2 className="w-3.5 h-3.5" aria-hidden="true" /> Suara aktif</>
+                        : <><VolumeX className="w-3.5 h-3.5" aria-hidden="true" /> Suara belum aktif</>}
+                    <button
+                        type="button"
+                        onClick={tesSuara}
+                        className="ml-1 font-semibold text-slate-800 dark:text-slate-100 underline underline-offset-2"
+                    >
+                        Tes suara
+                    </button>
+                </span>
+                {pengaturan && (
+                    <span className={CHIP_TENANG}>
+                        <Send className="w-3.5 h-3.5" aria-hidden="true" />
+                        {pengaturan.telegram_configured ? 'Telegram aktif' : 'Telegram belum dikonfigurasi'}
+                    </span>
+                )}
+                <label className={`${CHIP_TENANG} cursor-pointer md:ml-auto`}>
+                    <input
+                        type="checkbox"
+                        checked={detailAI}
+                        onChange={(e) => ubahDetailAI(e.target.checked)}
+                        className="accent-slate-600"
+                    />
+                    Tampilkan detail AI
+                </label>
+            </div>
+
+            {sedangLatihan.length > 0 && (
+                <div role="status" className="mb-6 px-4 py-2.5 rounded-xl bg-blue-600 text-white text-sm flex items-center gap-2">
+                    <FlaskConical className="w-4 h-4 shrink-0" aria-hidden="true" />
+                    Latihan berjalan di {sedangLatihan.map((c) => c.name).join(', ')}. Bukan kejadian sungguhan.
+                </div>
+            )}
+
+            {panelLatihan && (
+                <div className="mb-6 rounded-2xl border border-blue-500/30 bg-blue-50 dark:bg-blue-950/40 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                        <div>
+                            <h2 className="font-semibold text-sm">Mode latihan</h2>
+                            <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 max-w-2xl">
+                                Latihan menjalankan alur alarm sungguhan di satu kamera: hitungan, banner,
+                                riwayat, dan pesan Telegram. Semuanya bertanda SIMULASI, jadi tidak tertukar
+                                dengan kejadian nyata.
+                            </p>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => setPanelLatihan(false)}
+                            aria-label="Tutup Mode latihan"
+                            className="p-1.5 rounded-lg text-slate-500 hover:bg-blue-100 dark:hover:bg-blue-900/40"
+                        >
+                            <X className="w-4 h-4" />
+                        </button>
+                    </div>
+                    <div className="mt-3 flex flex-col sm:flex-row sm:items-end gap-3">
+                        <label className="text-xs font-medium flex flex-col gap-1">
+                            Kamera untuk latihan
+                            <select
+                                value={kameraLatihanId}
+                                onChange={(e) => setKameraLatihanId(e.target.value)}
+                                className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 px-3 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            >
+                                {cameras.length === 0 && <option value="">Belum ada kamera</option>}
+                                {cameras.map((c) => (
+                                    <option key={c.camera_id} value={c.camera_id}>
+                                        {c.name}{c.is_active ? '' : ' (terputus)'}
+                                    </option>
+                                ))}
+                            </select>
+                        </label>
+                        <button
+                            type="button"
+                            onClick={mulaiLatihan}
+                            disabled={memulai || !kameraLatihan?.is_active}
+                            className="min-h-11 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-4 rounded-xl text-sm font-medium"
+                        >
+                            {memulai ? 'Memulai…' : 'Mulai latihan'}
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {galat && (
-                <div className="mb-6 p-4 rounded-xl border border-red-500/30 bg-red-500/10 text-red-500 text-sm">
+                <div className="mb-6 p-4 rounded-xl border border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400 text-sm">
                     {galat}
                 </div>
             )}
 
-            {/* Grid CCTV — satu kartu per kamera yang terdaftar di halaman Kelola Kamera */}
+            {/* Grid kamera. Kamera yang alarm naik ke depan lewat CSS order, bukan
+                menyusun ulang DOM, supaya aliran MJPEG-nya tidak terputus. */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full">
                 {cameras.length === 0 && (
                     <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-10 text-center text-sm text-slate-500 shadow-sm">
@@ -153,62 +273,79 @@ export default function SimulationDashboard() {
                 {cameras.map((cam) => {
                     // Status langsung dari WebSocket kalau ada, kalau tidak dari hasil polling.
                     const live = cameraData?.[cam.camera_id];
-                    const state = !cam.is_active ? 'unknown' : (live?.fall_state || cam.fall_state || 'monitoring');
-                    const info = STATUS[state] || STATUS.monitoring;
-                    const posture = live?.current_posture ?? cam.current_posture;
+                    const aktif = cam.is_active && (live?.is_active ?? true);
+                    const state = !aktif ? 'unknown' : (live?.fall_state || cam.fall_state || 'monitoring');
+                    const posture = live ? live.current_posture : cam.current_posture;
                     const conf = live?.confidence ?? cam.confidence ?? 0;
-
-                    // Overlay simulasi hanya menempel di kamera pertama, seperti sebelumnya.
                     const durasi = live?.fall_duration ?? cam.fall_duration ?? 0;
-                    const menghitung = state === 'possible_fall' || state === 'confirmed_fall';
-                    const bahaya = menghitung;
+                    const latihan = Boolean(live?.simulated)
+                        || alerts.some((a) => a.camera_id === cam.camera_id && a.simulated);
+                    const status = bacaStatus({
+                        aktif, state, adaOrang: Boolean(posture), durasi,
+                        ambang: pengaturan?.fall_duration_threshold, latihan,
+                    });
+
+                    const jatuh = state === 'confirmed_fall';
+                    const berbaring = state === 'possible_fall';
+                    let bingkai = 'border-slate-200 dark:border-slate-800';
+                    if (!aktif) bingkai = 'border-dashed border-slate-400 dark:border-slate-600';
+                    else if (jatuh) bingkai = latihan ? 'border-2 border-blue-600' : 'border-2 border-red-600';
+                    else if (berbaring) bingkai = latihan ? 'border-blue-500' : 'border-amber-400';
 
                     return (
-                        <div
+                        <section
                             key={cam.camera_id}
-                            className={`bg-white dark:bg-slate-900 rounded-2xl border overflow-hidden shadow-sm transition-all ${
-                                bahaya ? 'border-red-500 ring-2 ring-red-500/20' : 'border-slate-200 dark:border-slate-800'
-                            }`}
+                            id={`kamera-${cam.camera_id}`}
+                            aria-label={`${cam.name}: ${status.label}`}
+                            style={{ order: jatuh ? -2 : berbaring ? -1 : 0 }}
+                            className={`relative scroll-mt-24 bg-white dark:bg-slate-900 rounded-2xl border overflow-hidden shadow-sm ${jatuh ? 'lg:col-span-2' : ''} ${bingkai}`}
                         >
-                            <div className="p-3 bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
-                                <span className="font-semibold text-sm flex items-center gap-2">
-                                    <Video className={`w-4 h-4 ${cam.is_active ? 'text-emerald-500' : 'text-slate-500'}`} />
-                                    {cam.name}
-                                </span>
-                                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${info.kelas}`}>
-                                    {menghitung ? `${info.label} (${durasi.toFixed(1)}s)` : info.label}
-                                </span>
-                            </div>
+                            {/* Hanya tepinya yang berdenyut, tidak lebih cepat dari sekali per detik,
+                                dan diam bila pengguna meminta gerak dikurangi. */}
+                            {jatuh && !latihan && (
+                                <span aria-hidden="true" className="pointer-events-none absolute inset-0 z-10 rounded-2xl ring-4 ring-red-500/50 motion-safe:animate-pulse" />
+                            )}
 
-                            <div className="aspect-video bg-slate-950 relative flex items-center justify-center text-slate-400">
-                                {cam.is_active ? (
-                                    <StreamImg src={`${API_BASE}${cam.stream_url}`} alt={`Stream ${cam.name}`} />
+                            <header className="p-3 bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center gap-3">
+                                <span className="font-semibold text-sm flex items-center gap-2 min-w-0">
+                                    <Video className="w-4 h-4 shrink-0 text-slate-400" aria-hidden="true" />
+                                    <span className="truncate">{cam.name}</span>
+                                </span>
+                                <StatusKamera status={status} />
+                            </header>
+
+                            <div className="aspect-video bg-slate-950 relative flex items-center justify-center text-slate-300">
+                                {aktif ? (
+                                    <StreamImg src={`${API_BASE}${cam.stream_url}`} alt={`Video ${cam.name}`} />
                                 ) : (
-                                    <p className="text-sm px-4 text-center">
-                                        Kamera terputus — periksa alamatnya di halaman Kelola Kamera.
-                                    </p>
-                                )}
-
-                                {menghitung && (
-                                    <div className="absolute inset-0 bg-red-950/40 flex flex-col items-center justify-center">
-                                        <div className="border-2 border-red-500 bg-red-500/20 p-6 rounded-xl text-center animate-pulse">
-                                            <p className="text-red-400 font-bold text-lg">⚠️ STATE: {state.toUpperCase()}</p>
-                                            <p className="text-white text-2xl font-mono mt-1">Timer Alarm: {durasi.toFixed(1)} Detik</p>
-                                        </div>
+                                    <div className="px-6 text-center flex flex-col items-center gap-2">
+                                        <p className="text-sm font-semibold text-slate-100">{cam.name} tidak terpantau</p>
+                                        <p className="text-xs text-slate-400">Kamera tidak mengirim gambar. Periksa daya dan jaringannya.</p>
+                                        <Link
+                                            to="/dashboard/cameras"
+                                            className="mt-1 text-xs font-medium px-3 py-1.5 rounded-lg border border-slate-600 text-slate-200 hover:bg-slate-800"
+                                        >
+                                            Buka Kelola Kamera
+                                        </Link>
                                     </div>
                                 )}
 
-                                {cam.is_active && (
-                                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-4">
-                                        <span className="text-xs text-white font-mono bg-black/40 px-2 py-1 rounded">
-                                            {posture
-                                                ? `YOLO: ${posture} ${(conf * 100).toFixed(0)}%`
-                                                : 'YOLO: tidak ada deteksi'}
-                                        </span>
+                                {aktif && (status.kode === 'kosong' || detailAI) && (
+                                    <div className="absolute left-3 bottom-3 flex flex-col items-start gap-1">
+                                        {status.kode === 'kosong' && live?.terakhir_terlihat && (
+                                            <span className="text-xs text-white bg-black/60 px-2 py-1 rounded">
+                                                Orang terakhir terlihat {jamDari(live.terakhir_terlihat)}
+                                            </span>
+                                        )}
+                                        {detailAI && (
+                                            <span className="text-xs text-white font-mono bg-black/60 px-2 py-1 rounded">
+                                                {posture ? `${posture} · ${(conf * 100).toFixed(0)}%` : 'tidak ada deteksi'}
+                                            </span>
+                                        )}
                                     </div>
                                 )}
                             </div>
-                        </div>
+                        </section>
                     );
                 })}
             </div>

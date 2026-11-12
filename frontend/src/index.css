@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+/* Tailwind v4 mengikuti tema sistem operasi untuk dark:. Baris ini membuatnya mengikuti
+   kelas .dark yang dipasang ThemeContext, sehingga tombol tema benar-benar berfungsi. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* Menambahkan efek custom untuk animasi */
 @theme {
   --animate-pulse-fast: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;

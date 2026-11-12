@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, History, Settings as SettingsIcon, Video, ShieldCheck, Sun, Moon, LogOut, Camera, Menu, X } from 'lucide-react';
+import { LayoutDashboard, History, Settings as SettingsIcon, Video, Sun, Moon, LogOut, Camera, Menu, X } from 'lucide-react';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { LiveProvider } from './context/LiveContext';
 import AlertBanner from './components/AlertBanner';
@@ -20,7 +20,7 @@ function DashboardLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false); // State untuk buka/tutup sidebar
 
   const navItems = [
-    { to: '/dashboard', icon: LayoutDashboard, label: 'Simulasi Live' },
+    { to: '/dashboard', icon: LayoutDashboard, label: 'Pemantauan' },
     { to: '/dashboard/camera-test', icon: Camera, label: 'Testing Kamera HP' },
     { to: '/dashboard/cameras', icon: Video, label: 'Kelola Kamera' },
     { to: '/dashboard/history', icon: History, label: 'Riwayat Insiden' },
@@ -95,7 +95,8 @@ function DashboardLayout() {
           <button
             onClick={() => setDarkMode(!darkMode)}
             className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:opacity-80 transition-opacity"
-            title="Ubah Tema"
+            title="Ubah tema"
+            aria-label="Ubah tema"
           >
             {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
           </button>

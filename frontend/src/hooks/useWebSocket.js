@@ -28,7 +28,17 @@ export function useWebSocket(url) {
                 const { event: jenis, data } = pesan;
 
                 if (jenis === 'status_update') {
-                    setCameraData((prev) => ({ ...prev, [data.camera_id]: data }));
+                    setCameraData((prev) => ({
+                        ...prev,
+                        [data.camera_id]: {
+                            ...data,
+                            // Kapan model terakhir melihat orang di kamera ini, untuk
+                            // keterangan saat AI tidak menemukan siapa pun.
+                            terakhir_terlihat: data.current_posture
+                                ? Date.now()
+                                : prev[data.camera_id]?.terakhir_terlihat,
+                        },
+                    }));
                 } else if (jenis === 'alert') {
                     // Tanpa duplikat: alert yang sama tidak boleh muncul dua kali.
                     setAlerts((prev) => (prev.some((a) => a.id === data.id) ? prev : [...prev, data]));

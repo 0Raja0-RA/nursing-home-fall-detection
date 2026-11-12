@@ -208,7 +208,8 @@ async def camera_pipeline(camera: CameraService, fsm: FallStateMachine):
             fall_duration=fsm.fall_duration,
             confidence=result.confidence if result else 0.0,
             fps=camera.fps,
-            last_frame_at=utc_now_naive()
+            last_frame_at=utc_now_naive(),
+            simulated=registry.sedang_disimulasikan(camera.camera_id),
         )
         # Simpan untuk dipakai endpoint stream (menggambar kotak) dan GET /api/cameras/.
         registry.latest_detection[camera.camera_id] = results

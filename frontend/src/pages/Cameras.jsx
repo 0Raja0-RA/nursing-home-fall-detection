@@ -70,7 +70,12 @@ export default function Cameras() {
         }
     };
 
-    const handleDelete = async (id) => {
+    const handleDelete = async (id, nama) => {
+        // Satu klik tidak boleh langsung menghentikan pemantauan sebuah ruangan.
+        const setuju = window.confirm(
+            `Hapus ${nama}? Kamera berhenti memantau dan dihapus dari daftar. Riwayat insidennya tetap tersimpan.`,
+        );
+        if (!setuju) return;
         setPesan(null);
         try {
             const r = await fetch(`${API_BASE}/api/cameras/${id}`, { method: 'DELETE' });
@@ -300,8 +305,13 @@ export default function Cameras() {
                                         <AlertCircle className="w-3.5 h-3.5" /> Terputus
                                     </span>
                                 )}
-                                <button onClick={() => handleDelete(cam.camera_id)} className="text-slate-400 hover:text-red-500 transition-colors p-2">
-                                    <Trash2 className="w-4 h-4" />
+                                <button
+                                    onClick={() => handleDelete(cam.camera_id, cam.name)}
+                                    aria-label={`Hapus ${cam.name}`}
+                                    title={`Hapus ${cam.name}`}
+                                    className="text-slate-400 hover:text-red-500 transition-colors p-2"
+                                >
+                                    <Trash2 className="w-4 h-4" aria-hidden="true" />
                                 </button>
                             </div>
                         </div>

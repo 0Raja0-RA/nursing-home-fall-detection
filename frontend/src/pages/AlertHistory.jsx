@@ -64,20 +64,20 @@ export default function AlertHistory() {
     };
 
     return (
-        <div className="min-h-screen bg-slate-950 p-6 text-slate-300">
-            <h1 className="text-2xl font-bold text-slate-100 mb-6">Riwayat Insiden</h1>
+        <div className="p-4 md:p-8 w-full max-w-full min-w-0">
+            <h1 className="text-xl md:text-2xl font-bold mb-6">Riwayat Insiden</h1>
 
             {galat && (
-                <div className="mb-6 p-4 rounded-xl border border-red-500/30 bg-red-500/10 text-red-400 text-sm">
+                <div className="mb-6 p-4 rounded-xl border border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-400 text-sm">
                     {galat}
                 </div>
             )}
 
-            <div className="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
                 <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse">
                         <thead>
-                            <tr className="bg-slate-950 border-b border-slate-800 text-slate-400 text-sm uppercase tracking-wider">
+                            <tr className="bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 text-sm uppercase tracking-wider">
                                 <th className="p-4 font-medium">Waktu Kejadian</th>
                                 <th className="p-4 font-medium">Lokasi Kamera</th>
                                 <th className="p-4 font-medium">Status Validasi</th>
@@ -85,7 +85,7 @@ export default function AlertHistory() {
                                 <th className="p-4 font-medium">Catatan Caregiver</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-800/50">
+                        <tbody className="divide-y divide-slate-200 dark:divide-slate-800/50">
                             {history.length === 0 && !galat && (
                                 <tr>
                                     <td colSpan={5} className="p-8 text-center text-sm text-slate-500">
@@ -94,7 +94,7 @@ export default function AlertHistory() {
                                 </tr>
                             )}
                             {history.map((item) => (
-                                <tr key={item.id} className="hover:bg-slate-800/50 transition-colors">
+                                <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                                     <td className="p-4">
                                         <div className="flex items-center gap-2">
                                             <Clock className="w-4 h-4 text-slate-500" />
@@ -108,7 +108,7 @@ export default function AlertHistory() {
                                             {item.simulated && (
                                                 <span
                                                     title="Dipicu tombol simulasi, bukan deteksi sungguhan"
-                                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20"
                                                 >
                                                     <FlaskConical className="w-3 h-3" /> Simulasi
                                                 </span>
@@ -117,13 +117,13 @@ export default function AlertHistory() {
                                     </td>
                                     <td className="p-4">
                                         {item.acknowledged ? (
-                                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
                                                 <CheckCircle2 className="w-3.5 h-3.5" /> Sudah Ditangani
                                             </span>
                                         ) : (
                                             <button
                                                 onClick={() => tandaiDitangani(item.id)}
-                                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors"
+                                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-red-500/10 text-red-700 dark:text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors"
                                             >
                                                 <AlertTriangle className="w-3.5 h-3.5" /> Tandai Ditangani
                                             </button>
@@ -133,7 +133,7 @@ export default function AlertHistory() {
                                         {item.notified ? (
                                             <span
                                                 title="Notifikasi Telegram terkirim"
-                                                className="inline-flex items-center gap-1.5 text-xs text-emerald-400"
+                                                className="inline-flex items-center gap-1.5 text-xs text-emerald-700 dark:text-emerald-400"
                                             >
                                                 <Send className="w-3.5 h-3.5" /> Terkirim
                                             </span>
@@ -163,7 +163,7 @@ export default function AlertHistory() {
                                                         if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); simpanCatatan(); }
                                                     }}
                                                     placeholder="Tindakan yang diambil..."
-                                                    className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-slate-200 text-sm focus:outline-none focus:border-blue-500 resize-y"
+                                                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg p-2 text-slate-800 dark:text-slate-200 text-sm focus:outline-none focus:border-blue-500 resize-y"
                                                 />
                                                 <div className="flex gap-2">
                                                     <button type="submit" disabled={menyimpan}
@@ -171,19 +171,19 @@ export default function AlertHistory() {
                                                         {menyimpan ? 'Menyimpan…' : 'Simpan'}
                                                     </button>
                                                     <button type="button" onClick={() => setSunting(null)}
-                                                        className="px-3 py-1 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-300">
+                                                        className="px-3 py-1 rounded-lg text-xs font-medium bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300">
                                                         Batal
                                                     </button>
                                                 </div>
                                             </form>
                                         ) : item.caregiver_note ? (
                                             <div className="flex items-start gap-2 group">
-                                                <p className="text-slate-200 whitespace-pre-wrap break-words">{item.caregiver_note}</p>
+                                                <p className="text-slate-800 dark:text-slate-200 whitespace-pre-wrap break-words">{item.caregiver_note}</p>
                                                 <button
                                                     onClick={() => setSunting({ id: item.id, teks: item.caregiver_note })}
                                                     title="Ubah catatan"
                                                     aria-label="Ubah catatan"
-                                                    className="shrink-0 p-1 rounded text-slate-500 hover:text-slate-200 hover:bg-slate-800"
+                                                    className="shrink-0 p-1 rounded text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
                                                 >
                                                     <Pencil className="w-3.5 h-3.5" />
                                                 </button>
@@ -191,7 +191,7 @@ export default function AlertHistory() {
                                         ) : (
                                             <button
                                                 onClick={() => setSunting({ id: item.id, teks: '' })}
-                                                className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-300"
+                                                className="inline-flex items-center gap-1 text-xs font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
                                             >
                                                 <Plus className="w-3.5 h-3.5" /> Tambah catatan
                                             </button>

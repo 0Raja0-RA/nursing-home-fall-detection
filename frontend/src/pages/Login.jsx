@@ -24,7 +24,7 @@ export default function Login() {
                 navigate('/dashboard');
             } else {
                 setIsLoading(false);
-                setErrorMsg('Email atau password salah! Gunakan: caregiver@panti.com | 123');
+                setErrorMsg('Email atau password salah.');
             }
         }, 800);
     };
@@ -51,13 +51,6 @@ export default function Login() {
                     </p>
                 </div>
 
-                {/* Informasi Akun Simulasi */}
-                <div className="mb-6 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-600 dark:text-emerald-400">
-                    <p className="font-semibold mb-1">💡 Info Akun Simulasi:</p>
-                    <p>Email: <span className="font-mono font-bold">caregiver@panti.com</span></p>
-                    <p>Password: <span className="font-mono font-bold">123</span></p>
-                </div>
-
                 {errorMsg && (
                     <div className="mb-6 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-xs text-red-600 dark:text-red-400 flex items-center gap-2">
                         <AlertCircle className="w-4 h-4 flex-shrink-0" />
@@ -81,7 +74,7 @@ export default function Login() {
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                                 className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl py-3 pl-11 pr-4 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all text-sm"
-                                placeholder="caregiver@panti.com"
+                                placeholder="nama@panti.com"
                             />
                         </div>
                     </div>
@@ -121,6 +114,10 @@ export default function Login() {
                         )}
                     </button>
                 </form>
+
+                <p className="mt-6 text-center text-xs text-slate-500">
+                    Prototipe proyek mahasiswa, bukan alat kesehatan bersertifikat.
+                </p>
             </div>
         </div>
     );
