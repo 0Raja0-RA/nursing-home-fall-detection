@@ -63,9 +63,11 @@ def parse_threshold_cfg(text: str) -> dict:
 
 def analyse(model, img: np.ndarray, cfg: dict) -> dict:
     """Pose lalu sudut/AR dengan fallback yang sama seperti pipeline EXP-009."""
+    """Pose lalu sudut/AR dengan penanganan frame kosong sebagai unknown."""
     res = model(img, verbose=False, conf=cfg["conf"])[0]
     if len(res.boxes) == 0:
         return {"detected": False, "angle": 90.0, "ar": 0.5, "kpts": None, "bbox": None, "src": "no person -> fallback 90"}
+        return {"detected": False, "angle": None, "ar": None, "kpts": None, "bbox": None, "src": "no person detected (unknown)"}
 
     i = int(res.boxes.conf.argmax().item())
     x1, y1, x2, y2 = res.boxes.xyxy[i].tolist()
@@ -80,14 +82,24 @@ def analyse(model, img: np.ndarray, cfg: dict) -> dict:
 
 
 def render_threshold_panel(img: np.ndarray, info: dict, cfg: dict, gt: int, title: str):
-    pred = predict_class(info["angle"], info["ar"], cfg["fall"], cfg["trans"], cfg["ar"])
+    if info["detected"]:
+        pred = predict_class(info["angle"], info["ar"], cfg["fall"], cfg["trans"], cfg["ar"])
+        pred_label = CLASS_NAMES.get(pred, "unknown")
+        angle_str = f"{info['angle']:.0f} deg"
+        ar_str = f"{info['ar']:.2f}"
+    else:
+        pred = -1
+        pred_label = "unknown (no person)"
+        angle_str = "N/A"
+        ar_str = "N/A"
+
     wrong = pred != gt
     out = img.copy()
     h, w = out.shape[:2]
 
     if info["detected"]:
         x1, y1, x2, y2 = map(int, info["bbox"])
-        cv2.rectangle(out, (x1, y1), (x2, y2), CLASS_COLOR[pred], 2)
+        cv2.rectangle(out, (x1, y1), (x2, y2), CLASS_COLOR.get(pred, (180, 180, 180)), 2)
         k = info["kpts"]
         for a, b in SKELETON:
             if k[a][2] > 0.25 and k[b][2] > 0.25:
@@ -102,17 +114,20 @@ def render_threshold_panel(img: np.ndarray, info: dict, cfg: dict, gt: int, titl
 
     out = cv2.resize(out, (THRESHOLD_PANEL_W, int(h * THRESHOLD_PANEL_W / w)))
     if wrong:
-        cv2.rectangle(out, (0, 0), (out.shape[1] - 1, out.shape[0] - 1), (0, 0, 255), 6)
+        # Gunakan border oranye jika undetected (unknown), merah jika misklasifikasi postur
+        border_color = (0, 165, 255) if not info["detected"] else (0, 0, 255)
+        cv2.rectangle(out, (0, 0), (out.shape[1] - 1, out.shape[0] - 1), border_color, 6)
 
+    status_tag = "UNDETECTED" if not info["detected"] else ("WRONG" if wrong else "ok")
     lines = [
         f"{title}  conf>{cfg['conf']:.2f}  fall<{cfg['fall']:.0f} trans<{cfg['trans']:.0f}",
-        f"GT: {CLASS_NAMES[gt]}   PRED: {CLASS_NAMES[pred]}  {'WRONG' if wrong else 'ok'}",
-        f"angle={info['angle']:.0f} deg  AR={info['ar']:.2f}",
+        f"GT: {CLASS_NAMES.get(gt, 'unknown')}   PRED: {pred_label}  {status_tag}",
+        f"angle={angle_str}  AR={ar_str}",
         info["src"],
     ]
     bar = np.full((88, out.shape[1], 3), 25, np.uint8)
     for n, text in enumerate(lines):
-        color = (80, 80, 255) if (n == 1 and wrong) else ((0, 200, 255) if (n == 3 and not info["detected"]) else (235, 235, 235))
+        color = (0, 165, 255) if (n == 1 and not info["detected"]) else ((80, 80, 255) if (n == 1 and wrong) else ((0, 200, 255) if (n == 3 and not info["detected"]) else (235, 235, 235)))
         cv2.putText(bar, text, (6, 18 + 21 * n), cv2.FONT_HERSHEY_SIMPLEX, 0.45, color, 1, cv2.LINE_AA)
     return np.vstack([out, bar]), wrong
 
