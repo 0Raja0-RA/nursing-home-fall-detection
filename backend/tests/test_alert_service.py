@@ -477,6 +477,21 @@ async def test_ambang_mode_dan_foto_ikut_tersimpan(lingkungan):
 
 
 @pytest.mark.asyncio
+async def test_foto_tidak_disimpan_bila_masa_simpan_nol(lingkungan, monkeypatch):
+    """Masa simpan 0: riwayat tanpa foto, tetapi Telegram tetap menerima fotonya."""
+    from app.db.models import AlertSnapshot
+
+    svc = _service()
+    monkeypatch.setattr(svc.settings, "FOTO_MASA_SIMPAN_HARI", 0)
+    await svc.process_confirmed_fall("cam-01", 10.0)
+
+    async with lingkungan["factory"]() as s:
+        alert = (await AlertRepository(s).get_recent_alerts())[0]
+        assert await s.get(AlertSnapshot, alert.id) is None
+    assert lingkungan["telegram"][0]["foto"] == b"\xff\xd8potret-palsu\xff\xd9"
+
+
+@pytest.mark.asyncio
 async def test_status_dan_id_pesan_telegram_dicatat(lingkungan):
     """id pesan dipakai untuk menyunting pesan yang sama saat ada yang menekan tombol."""
     await _service().process_confirmed_fall("cam-01", 10.0)

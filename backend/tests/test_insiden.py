@@ -239,6 +239,31 @@ def test_foto_kejadian_tidak_disimpan_di_cache_browser(uji):
     assert uji.klien.get("/api/alerts/3/snapshot").status_code == 404
 
 
+def test_alasan_foto_tidak_ada(uji, monkeypatch):
+    """Perawat perlu tahu kenapa fotonya tidak ada: tidak pernah tersimpan, atau sudah dihapus."""
+    from app.core.config import get_settings
+
+    def alasan(alert_id):
+        r = uji.klien.get(f"/api/alerts/{alert_id}/snapshot")
+        assert r.status_code == 404
+        return r.json()["detail"]
+
+    monkeypatch.setattr(get_settings(), "FOTO_MASA_SIMPAN_HARI", 100_000)
+    assert alasan(3) == "Foto kejadian tidak tersimpan untuk alert ini."
+    monkeypatch.setattr(get_settings(), "FOTO_MASA_SIMPAN_HARI", 1)
+    assert alasan(3) == "Foto sudah dihapus otomatis karena melewati masa simpan 1 hari."
+    monkeypatch.setattr(get_settings(), "FOTO_MASA_SIMPAN_HARI", 0)
+    assert alasan(3) == "Foto kejadian tidak disimpan di server, sesuai pengaturan masa simpan."
+
+    async def tambah_terlewat():
+        async with uji.factory() as s:
+            s.add(AlertRecord(id=9, camera_id="cam-01", message="uji", fall_duration=0.0, terlewat=True))
+            await s.commit()
+
+    uji.klien.portal.call(tambah_terlewat)
+    assert alasan(9) == "Jatuh ini dicatat manual, jadi tidak ada foto dari kamera."
+
+
 def test_kirim_ulang_telegram_ditolak_bila_belum_dikonfigurasi(uji, monkeypatch):
     import types
 

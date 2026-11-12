@@ -102,6 +102,14 @@ erDiagram
         string dibaca_oleh
         datetime dibaca_pada
     }
+    log_pengaturan {
+        int id PK
+        datetime waktu
+        string oleh "nama disalin"
+        string kunci "sama dengan app_settings.key"
+        string nilai_lama
+        string nilai_baru
+    }
     jeda_kamera {
         int id PK
         string camera_id "rujukan longgar, bukan FK"
@@ -165,7 +173,7 @@ jatuh yang tidak memicu alarm dan dicatat manual (`terlewat`).
 
 ### `alert_snapshots`
 
-Foto kejadian, satu per alert, dengan `alert_id` sama dengan `alerts.id`. Dipisah dari `alerts` supaya daftar riwayat tidak ikut memuat gambar. Foto hanya bisa dibuka lewat API yang wajib login.
+Foto kejadian, satu per alert, dengan `alert_id` sama dengan `alerts.id`. Dipisah dari `alerts` supaya daftar riwayat tidak ikut memuat gambar. Foto hanya bisa dibuka lewat API yang wajib login. Pembersih yang sama dengan klip menghapus foto yang lebih tua dari `FOTO_MASA_SIMPAN_HARI` hari (bawaan 30) setiap jam; nilai 0 berarti foto tidak disimpan sama sekali dan foto yang ada ikut dihapus. Baris `alerts`-nya tetap ada.
 
 ### `users`
 
@@ -192,6 +200,10 @@ Tanda bahwa ringkasan satu shift sudah dibaca shift berikutnya, dengan awal shif
 
 Satu baris setiap kali video asli kamera berprivasi dibuka sementara (15 detik) saat ada alarm: siapa, kamera mana, alarm mana yang menjadi alasannya, dan sampai kapan.
 
+### `log_pengaturan`
+
+Siapa mengubah pengaturan apa, kapan, dari nilai berapa ke berapa: ambang, model deteksi, foto dan latihan Telegram, kabar kamera, eskalasi, dan pola shift. Angka alarm hanya bisa ditafsirkan bila diketahui pengaturan yang berlaku saat itu. Hanya perubahan yang mengganti nilai yang dicatat, dan barisnya tidak pernah diubah (`_catat` di `api/settings.py`).
+
 ### `jeda_kamera`
 
 Riwayat Mode perawatan: jeda deteksi jatuh dan video di satu kamera, misalnya saat penghuni dimandikan. Jatuh di ruang itu tidak terdeteksi selama jeda, jadi setiap jeda dicatat: siapa (`oleh`), mulai kapan, dan sampai kapan. Memperpanjang jeda menggeser `sampai` di baris yang sama. Bila dihentikan lebih awal, `selesai` dan `diakhiri_oleh` diisi; jeda yang berjalan sampai habis membiarkan `selesai` kosong. Jeda yang belum habis dimuat lagi saat backend menyala (`services/mode_perawatan.py`).
@@ -200,7 +212,7 @@ Riwayat Mode perawatan: jeda deteksi jatuh dan video di satu kamera, misalnya sa
 
 - Semua API, video, dan WebSocket wajib login (`wajib_login`, dipasang di `backend/app/main.py`). Kecualinya `/api/auth` (status, masuk, pengunjung, keluar) dan health check. Hanya `/api/users` yang khusus `pengelola` (`wajib_pengelola` di `api/auth.py`). Pembatasan ini dijaga di backend, bukan di database: SQLite tidak punya row-level security.
 - `users.username` unik dan disimpan dalam huruf kecil.
-- Pengunjung pameran (dari QR di stand) tidak punya baris di tabel mana pun. Cookie lihat-sajanya ditandatangani HMAC dengan `VISITOR_TOKEN` dan berlaku 12 jam; token baru dari launcher membatalkan cookie lama. Pengunjung boleh semua GET kecuali `/api/users`, dan metode lain ditolak 403 (`tolak_perubahan_pengunjung` di `api/auth.py`).
+- Pengunjung pameran (dari QR di stand) tidak punya baris di tabel mana pun. Cookie lihat-sajanya ditandatangani HMAC dengan `VISITOR_TOKEN` dan berlaku 12 jam; token baru dari launcher membatalkan cookie lama. Pengunjung boleh GET kecuali `/api/users` dan alat kerja tim yang dijaga `wajib_tim` (ekspor CSV, riwayat perubahan pengaturan, diagnostik kamera), dan metode lain ditolak 403 (`tolak_perubahan_pengunjung` di `api/auth.py`).
 - Nilai seperti `role`, `verdict`, dan `telegram_status` disimpan sebagai teks bebas di database. Validasinya ada di skema Pydantic (`backend/app/models/schemas.py`).
 
 ## Cara skema diperbarui

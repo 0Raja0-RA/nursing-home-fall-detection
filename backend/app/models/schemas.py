@@ -449,6 +449,15 @@ class RingkasanShift(BaseModel):
     dibaca_pada: Optional[datetime] = None
 
 
+class PerubahanPengaturan(BaseModel):
+    waktu: datetime
+    oleh: str
+    kunci: str
+    label: str
+    nilai_lama: Optional[str] = None
+    nilai_baru: Optional[str] = None
+
+
 class PolaShiftUpdate(BaseModel):
     """Body PUT /api/settings/shift: 3 shift (07, 14, 21) atau 2 shift (07, 19)."""
     pola_shift: Literal["2", "3"]
@@ -538,6 +547,9 @@ class SettingsResponse(BaseModel):
     eskalasi_menit: int = 2
     # "3" = shift 07, 14, 21; "2" = shift 07, 19. Dipakai ringkasan shift.
     pola_shift: str = "3"
+    # Masa simpan, ditampilkan di Pengaturan. Diatur di backend/.env.
+    foto_masa_simpan_hari: int = 30
+    klip_masa_simpan_hari: int = 7
 
 
 # ---- Akun ----------------------------------------------------

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Volume2, VolumeX } from 'lucide-react';
 import { api, bacaGalat, PESAN_TERPUTUS } from '../api';
 import { API_BASE } from '../config';
+import { msDari, tanggalJam } from '../waktu';
 import { aktifkanSuara, bunyikan, useStatusSuara } from '../hooks/useAlarmSound';
 
 const KARTU = 'bg-white dark:bg-slate-900 p-4 md:p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4';
@@ -27,6 +28,38 @@ function Kabar({ kabar }) {
             : 'bg-red-500/10 border-red-500/20 text-red-700 dark:text-red-400'}`}>
             {kabar.teks}
         </div>
+    );
+}
+
+const masaSimpan = (hari, nol) => (hari > 0 ? `${hari} hari, lalu dihapus otomatis` : nol);
+
+/**
+ * Siapa mengubah apa dan kapan. Angka alarm di Riwayat Insiden hanya bisa ditafsirkan bila
+ * diketahui ambang dan model yang berlaku saat itu.
+ */
+function RiwayatPerubahan({ riwayat, daftarMode, opsiFoto }) {
+    if (riwayat === 'galat') return <p className="text-sm text-red-700 dark:text-red-400">{PESAN_TERPUTUS}</p>;
+    if (!riwayat) return <p className="text-sm text-slate-500">Memuat…</p>;
+    if (!riwayat.length) return <p className="text-sm text-slate-500">Belum ada perubahan yang tercatat.</p>;
+    const nilai = (r, v) => {
+        if (v == null || v === '') return '–';
+        if (r.kunci === 'detection_mode') return daftarMode.find((m) => m.id === v)?.label || v;
+        if (r.kunci === 'telegram_photo_mode') return opsiFoto.find((o) => o.id === v)?.label || v;
+        return v;
+    };
+    return (
+        <ol className="divide-y divide-slate-200 dark:divide-slate-800">
+            {riwayat.map((r, i) => (
+                <li key={`${r.waktu}-${r.kunci}-${i}`} className="py-2 first:pt-0 last:pb-0">
+                    <p className="text-sm">
+                        <span className="font-medium">{r.label}</span>: {nilai(r, r.nilai_lama)} → {nilai(r, r.nilai_baru)}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                        {r.oleh} · <time dateTime={r.waktu}>{tanggalJam(msDari(r.waktu))}</time>
+                    </p>
+                </li>
+            ))}
+        </ol>
     );
 }
 
@@ -112,6 +145,8 @@ export default function Settings() {
     const [eskalasi, setEskalasi] = useState(2);
     const [polaShift, setPolaShift] = useState('3');
     const [kabarEskalasi, setKabarEskalasi] = useState(null);
+    const [simpan, setSimpan] = useState(null);          // { foto, klip } dalam hari
+    const [riwayat, setRiwayat] = useState(null);        // null = memuat, 'galat', atau daftar
     const suara = useStatusSuara();
 
     const terapkan = (d) => {
@@ -124,6 +159,7 @@ export default function Settings() {
         setEskalasi(d.eskalasi_menit ?? 2);
         setPolaShift(d.pola_shift || '3');
         setTersimpan({ threshold: d.fall_duration_threshold, mode: d.detection_mode });
+        setSimpan({ foto: d.foto_masa_simpan_hari, klip: d.klip_masa_simpan_hari });
     };
 
     const ambil = useCallback(async () => {
@@ -139,11 +175,22 @@ export default function Settings() {
         }
     }, []);
 
+    const ambilRiwayat = useCallback(async () => {
+        try {
+            const r = await api('/api/settings/riwayat');
+            if (!r.ok) throw new Error(String(r.status));
+            setRiwayat(await r.json());
+        } catch {
+            setRiwayat('galat');
+        }
+    }, []);
+
     useEffect(() => {
         // setState-nya terjadi di callback async setelah fetch, bukan sinkron.
         // eslint-disable-next-line react-hooks/set-state-in-effect
         ambil();
-    }, [ambil]);
+        ambilRiwayat();
+    }, [ambil, ambilRiwayat]);
 
     const simpanDeteksi = async (e) => {
         e.preventDefault();
@@ -168,6 +215,7 @@ export default function Settings() {
             }
 
             await ambil();
+            ambilRiwayat();
             setKabar({
                 tipe: 'ok',
                 teks: dilakukan.length ? `Tersimpan: ${dilakukan.join('; ')}.` : 'Tidak ada yang berubah.',
@@ -187,6 +235,7 @@ export default function Settings() {
             const r = await api('/api/settings/telegram', { method: 'PUT', json: isi });
             if (!r.ok) throw new Error(await bacaGalat(r));
             terapkan(await r.json());
+            ambilRiwayat();
             setKabarTg({ tipe: 'ok', teks: 'Tersimpan.', bagian });
         } catch (err) {
             setKabarTg({ tipe: 'galat', teks: `Gagal menyimpan: ${err.message}`, bagian });
@@ -217,6 +266,7 @@ export default function Settings() {
             const r = await api('/api/settings/eskalasi', { method: 'PUT', json: { eskalasi_menit: menit } });
             if (!r.ok) throw new Error(await bacaGalat(r));
             terapkan(await r.json());
+            ambilRiwayat();
             setKabarEskalasi({ tipe: 'ok', teks: 'Tersimpan.' });
         } catch (err) {
             setKabarEskalasi({ tipe: 'galat', teks: `Gagal menyimpan: ${err.message}` });
@@ -231,6 +281,7 @@ export default function Settings() {
             const r = await api('/api/settings/shift', { method: 'PUT', json: { pola_shift: pola } });
             if (!r.ok) throw new Error(await bacaGalat(r));
             terapkan(await r.json());
+            ambilRiwayat();
             setKabarEskalasi({ tipe: 'ok', teks: 'Tersimpan.' });
         } catch (err) {
             setKabarEskalasi({ tipe: 'galat', teks: `Gagal menyimpan: ${err.message}` });
@@ -427,10 +478,31 @@ export default function Settings() {
                         </fieldset>
                     )}
                     <p className="text-xs text-slate-500">
-                        Semua pesan dilindungi supaya tidak bisa diteruskan atau disimpan dari Telegram. Foto lengkapnya
-                        tersimpan di server dan hanya bisa dilihat setelah masuk, di Riwayat Insiden.
+                        Semua pesan dilindungi supaya tidak bisa diteruskan atau disimpan dari Telegram. Foto dan klip
+                        di server hanya bisa dilihat setelah masuk, di Riwayat Insiden.
                     </p>
                     {kabarTg?.bagian === 'privasi' && <Kabar kabar={kabarTg} />}
+                    {simpan && (
+                        <div>
+                            <h3 className="text-sm font-medium mb-1">Masa simpan di server</h3>
+                            <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
+                                <dt className="text-slate-500">Foto kejadian</dt>
+                                <dd>{masaSimpan(simpan.foto, 'tidak disimpan')}</dd>
+                                <dt className="text-slate-500">Klip kejadian</dt>
+                                <dd>{masaSimpan(simpan.klip, 'tidak direkam')}</dd>
+                                <dt className="text-slate-500">Catatan insiden</dt>
+                                <dd>disimpan tanpa batas waktu, untuk laporan</dd>
+                            </dl>
+                            <p className="text-xs text-slate-500 mt-1">
+                                Diubah lewat <code>FOTO_MASA_SIMPAN_HARI</code> dan <code>KLIP_MASA_SIMPAN_HARI</code> di
+                                berkas <code>backend/.env</code>. Angka 0 berarti tidak disimpan sama sekali.
+                            </p>
+                        </div>
+                    )}
+                </Bagian>
+
+                <Bagian id="atur-riwayat" judul="Riwayat perubahan" keterangan="Perubahan pengaturan terbaru lebih dulu, beserta siapa yang mengubahnya.">
+                    <RiwayatPerubahan riwayat={riwayat} daftarMode={daftarMode} opsiFoto={opsiFoto} />
                 </Bagian>
 
                 <Bagian id="atur-tentang" judul="Tentang sistem">

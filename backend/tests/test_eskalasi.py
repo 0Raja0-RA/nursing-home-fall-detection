@@ -143,6 +143,7 @@ async def test_balasan_memakai_reply_parameters(monkeypatch):
 
 def test_pengaturan_eskalasi():
     from app.api import settings as api_settings
+    from app.api.auth import wajib_login
     from app.db.database import get_db
 
     engine = create_async_engine("sqlite+aiosqlite:///:memory:", poolclass=StaticPool)
@@ -159,6 +160,7 @@ def test_pengaturan_eskalasi():
     app = FastAPI()
     app.include_router(api_settings.router, prefix="/api/settings")
     app.dependency_overrides[get_db] = db_uji
+    app.dependency_overrides[wajib_login] = lambda: types.SimpleNamespace(display_name="Siti", role="perawat")
     with TestClient(app) as c:
         c.portal.call(siapkan)
         assert c.get("/api/settings/").json()["eskalasi_menit"] == 2, "bawaan 2 menit"

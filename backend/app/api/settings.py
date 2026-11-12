@@ -11,6 +11,7 @@ Endpoints:
     PUT  /api/settings/eskalasi    — Menit tanpa respons sebelum alarm dieskalasi
     PUT  /api/settings/shift       — Pola shift untuk ringkasan serah terima
     GET  /api/settings/pratinjau-ambang — Episode berbaring dinilai ulang dengan ambang lain
+    GET  /api/settings/riwayat     — Log perubahan pengaturan, terbaru lebih dulu
     POST /api/settings/test-telegram — Kirim notifikasi uji ke Telegram
 
 Semua endpoint wajib login. Perubahan dari ketiga PUT di atas disimpan ke tabel app_settings, bukan hanya ke
@@ -22,6 +23,7 @@ dikira sedang dipakai.
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.auth import wajib_login, wajib_tim
 from app.core.config import get_settings
 from app.db.database import get_db
 from app.db.repository import (
@@ -37,6 +39,7 @@ from app.models.schemas import (
     LABEL_PUTUSAN,
     MODE_FOTO_TELEGRAM,
     EskalasiUpdate,
+    PerubahanPengaturan,
     PolaShiftUpdate,
     PratinjauAmbang,
     ModeUpdate,
@@ -58,6 +61,28 @@ KUNCI_MODE = "detection_mode"
 KUNCI_THRESHOLD = "fall_duration_threshold"
 
 
+LABEL_KUNCI = {
+    KUNCI_THRESHOLD: "Tunggu sebelum alarm (detik)",
+    KUNCI_MODE: "Model deteksi",
+    KUNCI_TG_FOTO: "Foto di pesan Telegram",
+    KUNCI_TG_LATIHAN: "Latihan ke Telegram",
+    KUNCI_TG_KAMERA: "Kabar kamera ke Telegram",
+    KUNCI_ESKALASI: "Eskalasi (menit tanpa respons)",
+    KUNCI_POLA_SHIFT: "Pola shift",
+}
+
+
+async def _catat(db: AsyncSession, oleh: str, kunci: str, lama, baru) -> None:
+    """Simpan satu baris log bila nilainya benar-benar berubah."""
+    from app.db.models import LogPengaturan
+
+    lama = None if lama is None else str(lama)
+    baru = None if baru is None else str(baru)
+    if lama != baru:
+        db.add(LogPengaturan(oleh=oleh, kunci=kunci, nilai_lama=lama, nilai_baru=baru))
+        await db.commit()
+
+
 async def _jawaban(db: AsyncSession) -> SettingsResponse:
     """Potret konfigurasi aktif. Satu tempat, supaya semua endpoint sepakat."""
     settings = get_settings()
@@ -75,6 +100,8 @@ async def _jawaban(db: AsyncSession) -> SettingsResponse:
         false_alarm_reasons=[Pilihan(id=k, label=v) for k, v in ALASAN_PALSU.items()],
         eskalasi_menit=await SettingRepository(db).eskalasi_menit(),
         pola_shift=(await SettingRepository(db).ambil(KUNCI_POLA_SHIFT)) or "3",
+        foto_masa_simpan_hari=settings.FOTO_MASA_SIMPAN_HARI,
+        klip_masa_simpan_hari=settings.KLIP_MASA_SIMPAN_HARI,
     )
 
 
@@ -103,7 +130,7 @@ async def get_current_settings(db: AsyncSession = Depends(get_db)):
 
 
 @router.put("/threshold", response_model=SettingsResponse)
-async def update_threshold(payload: ThresholdUpdate, db: AsyncSession = Depends(get_db)):
+async def update_threshold(payload: ThresholdUpdate, user=Depends(wajib_login), db: AsyncSession = Depends(get_db)):
     """Ubah berapa lama orang harus tergeletak sebelum alarm dikirim.
 
     Nilainya disimpan ke database DAN diteruskan ke state machine setiap kamera
@@ -113,6 +140,7 @@ async def update_threshold(payload: ThresholdUpdate, db: AsyncSession = Depends(
     """
     from app.runtime.registry import registry
 
+    lama = get_settings().FALL_DURATION_THRESHOLD
     get_settings().FALL_DURATION_THRESHOLD = payload.fall_duration_threshold
     await SettingRepository(db).simpan(
         KUNCI_THRESHOLD, str(payload.fall_duration_threshold)
@@ -125,11 +153,12 @@ async def update_threshold(payload: ThresholdUpdate, db: AsyncSession = Depends(
         f"⚙️  Threshold durasi jatuh jadi {payload.fall_duration_threshold} detik "
         f"({len(registry.state_machines)} kamera diperbarui)"
     )
+    await _catat(db, user.display_name, KUNCI_THRESHOLD, f"{lama:g}", f"{payload.fall_duration_threshold:g}")
     return await _jawaban(db)
 
 
 @router.put("/mode", response_model=SettingsResponse)
-async def update_mode(payload: ModeUpdate, db: AsyncSession = Depends(get_db)):
+async def update_mode(payload: ModeUpdate, user=Depends(wajib_login), db: AsyncSession = Depends(get_db)):
     """Ganti model detektor.
 
     State machine semua kamera direset setelah pergantian. Timer yang sudah
@@ -149,6 +178,7 @@ async def update_mode(payload: ModeUpdate, db: AsyncSession = Depends(get_db)):
                    f"Pilihan: {', '.join(sorted(inference_service.MODE_IDS))}.",
         )
 
+    lama = inference_service.mode_aktif()
     inference_service.set_mode(payload.detection_mode)
     await SettingRepository(db).simpan(KUNCI_MODE, payload.detection_mode)
 
@@ -159,13 +189,16 @@ async def update_mode(payload: ModeUpdate, db: AsyncSession = Depends(get_db)):
         f"🔀 Mode deteksi jadi '{payload.detection_mode}' "
         f"({len(registry.state_machines)} state machine direset)"
     )
+    await _catat(db, user.display_name, KUNCI_MODE, lama, payload.detection_mode)
     return await _jawaban(db)
 
 
 @router.put("/telegram", response_model=SettingsResponse)
-async def update_telegram(payload: TelegramSettingsUpdate, db: AsyncSession = Depends(get_db)):
+async def update_telegram(payload: TelegramSettingsUpdate, user=Depends(wajib_login),
+                          db: AsyncSession = Depends(get_db)):
     """Ubah cara pesan Telegram dikirim. Token dan chat id tetap hanya di server."""
     repo = SettingRepository(db)
+    lama = await repo.telegram()
     if payload.photo_mode is not None:
         await repo.simpan(KUNCI_TG_FOTO, payload.photo_mode)
     if payload.send_drills is not None:
@@ -173,7 +206,32 @@ async def update_telegram(payload: TelegramSettingsUpdate, db: AsyncSession = De
     if payload.camera_offline is not None:
         await repo.simpan(KUNCI_TG_KAMERA, "1" if payload.camera_offline else "0")
     log.info(f"⚙️  Pengaturan Telegram diubah: {payload.model_dump(exclude_none=True)}")
+    if payload.photo_mode is not None:
+        await _catat(db, user.display_name, KUNCI_TG_FOTO, lama.photo_mode, payload.photo_mode)
+    if payload.send_drills is not None:
+        await _catat(db, user.display_name, KUNCI_TG_LATIHAN, _ya(lama.send_drills), _ya(payload.send_drills))
+    if payload.camera_offline is not None:
+        await _catat(db, user.display_name, KUNCI_TG_KAMERA, _ya(lama.camera_offline), _ya(payload.camera_offline))
     return await _jawaban(db)
+
+
+def _ya(nilai: bool) -> str:
+    return "nyala" if nilai else "mati"
+
+
+@router.get("/riwayat", response_model=list[PerubahanPengaturan])
+async def riwayat_perubahan(limit: int = Query(20, ge=1, le=200), _tim=Depends(wajib_tim),
+                            db: AsyncSession = Depends(get_db)):
+    """Perubahan pengaturan terbaru lebih dulu: siapa, kapan, dari nilai berapa ke berapa."""
+    from sqlalchemy import select
+
+    from app.db.models import LogPengaturan
+
+    baris = (await db.execute(
+        select(LogPengaturan).order_by(LogPengaturan.waktu.desc(), LogPengaturan.id.desc()).limit(limit)
+    )).scalars().all()
+    return [PerubahanPengaturan(waktu=b.waktu, oleh=b.oleh, kunci=b.kunci, label=LABEL_KUNCI.get(b.kunci, b.kunci),
+                                nilai_lama=b.nilai_lama, nilai_baru=b.nilai_baru) for b in baris]
 
 
 @router.get("/pratinjau-ambang", response_model=PratinjauAmbang)
@@ -189,22 +247,26 @@ async def pratinjau_ambang(
 
 
 @router.put("/shift", response_model=SettingsResponse)
-async def update_pola_shift(payload: PolaShiftUpdate, db: AsyncSession = Depends(get_db)):
+async def update_pola_shift(payload: PolaShiftUpdate, user=Depends(wajib_login), db: AsyncSession = Depends(get_db)):
     """Pola shift untuk ringkasan serah terima: 3 shift (07, 14, 21) atau 2 shift (07, 19)."""
+    lama = (await SettingRepository(db).ambil(KUNCI_POLA_SHIFT)) or "3"
     await SettingRepository(db).simpan(KUNCI_POLA_SHIFT, payload.pola_shift)
     log.info(f"⚙️  Pola shift jadi {payload.pola_shift} shift")
+    await _catat(db, user.display_name, KUNCI_POLA_SHIFT, lama, payload.pola_shift)
     return await _jawaban(db)
 
 
 @router.put("/eskalasi", response_model=SettingsResponse)
-async def update_eskalasi(payload: EskalasiUpdate, db: AsyncSession = Depends(get_db)):
+async def update_eskalasi(payload: EskalasiUpdate, user=Depends(wajib_login), db: AsyncSession = Depends(get_db)):
     """Ubah berapa menit alarm boleh tanpa respons sebelum dieskalasi.
 
     Angkanya berbeda antarproduk (Ascom memakai 30 detik, 60 detik, dan 5 menit), dan
     belum ada yang teruji untuk panti, jadi nilainya diatur dari dashboard dan diuji
     lewat uji mini.
     """
+    lama = await SettingRepository(db).eskalasi_menit()
     await SettingRepository(db).simpan(KUNCI_ESKALASI, str(payload.eskalasi_menit))
+    await _catat(db, user.display_name, KUNCI_ESKALASI, lama, payload.eskalasi_menit)
     log.info(f"⚙️  Eskalasi alarm jadi {payload.eskalasi_menit} menit tanpa respons")
     return await _jawaban(db)
 

@@ -256,9 +256,24 @@ async def get_snapshot(alert_id: int, db: AsyncSession = Depends(get_db)):
     """
     foto = await db.get(AlertSnapshot, alert_id)
     if foto is None:
-        raise HTTPException(status_code=404, detail="Foto kejadian tidak tersimpan untuk alert ini.")
+        raise HTTPException(status_code=404, detail=await _alasan_tanpa_foto(db, alert_id))
     return Response(content=foto.jpeg, media_type="image/jpeg",
                     headers={"Cache-Control": "no-store"})
+
+
+async def _alasan_tanpa_foto(db: AsyncSession, alert_id: int) -> str:
+    from app.core.config import get_settings
+    from app.core.logging import utc_now_naive
+
+    alert = await db.get(AlertRecord, alert_id)
+    hari = get_settings().FOTO_MASA_SIMPAN_HARI
+    if alert is not None and alert.terlewat:
+        return "Jatuh ini dicatat manual, jadi tidak ada foto dari kamera."
+    if hari <= 0:
+        return "Foto kejadian tidak disimpan di server, sesuai pengaturan masa simpan."
+    if alert is not None and alert.created_at and alert.created_at < utc_now_naive() - timedelta(days=hari):
+        return f"Foto sudah dihapus otomatis karena melewati masa simpan {hari} hari."
+    return "Foto kejadian tidak tersimpan untuk alert ini."
 
 
 _TANPA_KLIP = {

@@ -252,3 +252,20 @@ class AksesVideo(Base):
     oleh = Column(String, nullable=False)
     mulai = Column(DateTime, nullable=False, default=utc_now_naive)
     sampai = Column(DateTime, nullable=False)
+
+
+class LogPengaturan(Base):
+    """Siapa mengubah pengaturan apa, kapan, dari nilai berapa ke berapa.
+
+    Angka alarm hanya bisa ditafsirkan bila diketahui ambang dan model yang berlaku saat
+    itu, dan perubahan pengaturan keselamatan harus bisa ditelusuri.
+    """
+
+    __tablename__ = "log_pengaturan"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    waktu = Column(DateTime, nullable=False, default=utc_now_naive, index=True)
+    oleh = Column(String, nullable=False)
+    kunci = Column(String, nullable=False)
+    nilai_lama = Column(String, nullable=True)
+    nilai_baru = Column(String, nullable=True)

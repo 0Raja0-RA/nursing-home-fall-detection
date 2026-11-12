@@ -24,7 +24,8 @@ from app.services import klip
 @pytest.fixture
 def setelan(monkeypatch, tmp_path):
     """Folder klip sementara dan masa simpan yang bisa diubah per tes."""
-    nilai = types.SimpleNamespace(KLIP_DIR=str(tmp_path / "klip"), KLIP_MASA_SIMPAN_HARI=7)
+    nilai = types.SimpleNamespace(KLIP_DIR=str(tmp_path / "klip"), KLIP_MASA_SIMPAN_HARI=7,
+                                  FOTO_MASA_SIMPAN_HARI=30)
     monkeypatch.setattr(klip, "get_settings", lambda: nilai)
     return nilai
 
@@ -169,3 +170,26 @@ async def test_pembersih_menandai_klip_yang_dihapus(db):
     os.utime(klip.jalur(1), (lama, lama))
     await klip.bersihkan()
     assert (await _alert(db)).klip_status == "dihapus"
+
+
+@pytest.mark.asyncio
+async def test_foto_kejadian_kedaluwarsa_dihapus(db, setelan):
+    from datetime import timedelta
+
+    from app.core.logging import utc_now_naive
+    from app.db.models import AlertSnapshot
+
+    sekarang = utc_now_naive()
+    async with db.factory() as s:
+        s.add(AlertRecord(id=2, camera_id="cam-01", message="uji", fall_duration=3.0))
+        s.add(AlertSnapshot(alert_id=1, jpeg=b"lama", created_at=sekarang - timedelta(days=31)))
+        s.add(AlertSnapshot(alert_id=2, jpeg=b"baru", created_at=sekarang - timedelta(days=29)))
+        await s.commit()
+
+    assert await klip.hapus_foto_kedaluwarsa(sekarang) == 1
+    async with db.factory() as s:
+        assert await s.get(AlertSnapshot, 1) is None
+        assert (await s.get(AlertSnapshot, 2)).jpeg == b"baru"
+
+    setelan.FOTO_MASA_SIMPAN_HARI = 0
+    assert await klip.hapus_foto_kedaluwarsa(sekarang + timedelta(seconds=1)) == 1, "0: semua foto dihapus"

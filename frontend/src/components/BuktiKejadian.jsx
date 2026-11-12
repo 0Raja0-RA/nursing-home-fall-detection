@@ -26,14 +26,26 @@ function indeksTerdekat(frame, t) {
     return terbaik;
 }
 
-/** Foto saat alarm; kejadian lama atau yang kameranya belum mengirim gambar tidak punya foto. */
+/**
+ * Foto saat alarm. Bila tidak ada (kamera belum mengirim gambar, atau fotonya sudah lewat
+ * masa simpan), alasannya diminta dari server, karena hanya server yang tahu masa simpannya.
+ */
 function FotoKejadian({ alert }) {
-    const [gagal, setGagal] = useState(false);
+    const [gagal, setGagal] = useState(null);       // null = belum gagal; teks = alasannya
+    const tampilkanAlasan = async () => {
+        setGagal('Foto tidak tersimpan untuk kejadian ini.');
+        try {
+            const r = await api(`/api/alerts/${alert.id}/snapshot`);
+            if (!r.ok) setGagal(await bacaGalat(r));
+        } catch {
+            // Alasan umum di atas tetap tampil.
+        }
+    };
     if (gagal) {
         return (
-            <div className="aspect-video rounded-xl bg-slate-100 dark:bg-slate-800 flex flex-col items-center justify-center gap-2 text-sm text-slate-500">
+            <div className="aspect-video rounded-xl bg-slate-100 dark:bg-slate-800 flex flex-col items-center justify-center gap-2 px-4 text-center text-sm text-slate-500">
                 <ImageOff className="w-6 h-6" aria-hidden="true" />
-                Foto tidak tersimpan untuk kejadian ini.
+                {gagal}
             </div>
         );
     }
@@ -41,7 +53,7 @@ function FotoKejadian({ alert }) {
         <img
             src={`${API_BASE}/api/alerts/${alert.id}/snapshot`}
             alt={`Foto kejadian di ${alert.camera_name || alert.camera_id}`}
-            onError={() => setGagal(true)}
+            onError={tampilkanAlasan}
             className="w-full rounded-xl bg-slate-950"
         />
     );

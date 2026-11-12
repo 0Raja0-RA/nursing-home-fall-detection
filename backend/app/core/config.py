@@ -131,6 +131,9 @@ class Settings(BaseSettings):
     # Insiden dan dihapus otomatis setelah sekian hari. 0 = tidak merekam klip, dan
     # klip yang sudah ada ikut dihapus. Klip tidak pernah dikirim ke Telegram.
     KLIP_MASA_SIMPAN_HARI: int = 7
+    # Foto kejadian (satu per alert) dihapus otomatis setelah sekian hari. 0 = foto tidak
+    # disimpan di riwayat (Telegram tetap menerima fotonya) dan foto yang ada ikut dihapus.
+    FOTO_MASA_SIMPAN_HARI: int = 30
     # Folder klip. Path relatif dihitung dari folder backend.
     KLIP_DIR: str = "klip"
 

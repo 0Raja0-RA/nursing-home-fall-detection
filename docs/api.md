@@ -83,7 +83,7 @@ tetap di antrean Perlu tindakan sampai dinilai.
 | GET | `/api/alerts/ekspor` | Unduh CSV, filter sama dengan daftar tanpa `skip`/`limit`, urut dari yang terlama. Akun tim saja, pengunjung `403`. Kolomnya di bawah |
 | GET | `/api/alerts/count` | Hitung total alert, filter `acknowledged` opsional |
 | GET | `/api/alerts/{id}` | Detail satu alert |
-| GET | `/api/alerts/{id}/snapshot` | Foto kejadian (JPEG, tanpa diburamkan, `Cache-Control: no-store`). `404` bila tidak tersimpan |
+| GET | `/api/alerts/{id}/snapshot` | Foto kejadian (JPEG, tanpa diburamkan, `Cache-Control: no-store`). `404` beserta sebabnya: tidak tersimpan, sudah lewat `FOTO_MASA_SIMPAN_HARI`, masa simpannya 0, atau jatuh yang dicatat manual. |
 | GET | `/api/alerts/{id}/klip` | Klip sebelum dan sesudah kejadian: `{detik_tergeletak, dihapus_pada, frame: [{t, jpeg}]}`, dengan `t` detik relatif terhadap alarm dan `jpeg` base64 (`Cache-Control: no-store`). `404` beserta sebabnya bila tidak ada; keadaannya ada di `klip_status` alert |
 | PUT | `/api/alerts/{id}/claim` | "Saya ke sana". Klaim oleh orang lain ditolak `409` beserta nama dan jamnya |
 | PUT | `/api/alerts/{id}/ack` | "Tandai Ditangani". Body opsional `{"verdict", "reason", "note"}` |
@@ -196,13 +196,14 @@ terputus menunjukkan sejak kapan ia buta.
 
 | Method | Endpoint | Keterangan |
 |---|---|---|
-| GET | `/api/settings/` | Konfigurasi aktif, pilihan model, pengaturan Telegram, daftar putusan dan alasan |
+| GET | `/api/settings/` | Konfigurasi aktif, pilihan model, pengaturan Telegram, daftar putusan dan alasan, serta masa simpan `foto_masa_simpan_hari` dan `klip_masa_simpan_hari` (hanya dibaca; diatur di `backend/.env`) |
 | PUT | `/api/settings/threshold` | `{"fall_duration_threshold": 3}` (lebih dari 0, paling besar 60) |
 | PUT | `/api/settings/mode` | `{"detection_mode": "pose"}` atau `bbox`; mereset hitungan semua kamera |
 | PUT | `/api/settings/telegram` | `{"photo_mode", "send_drills", "camera_offline"}`, semuanya opsional |
 | GET | `/api/settings/pratinjau-ambang` | `?ambang=5&hari=30`: episode berbaring sungguhan dinilai ulang dengan ambang lain. `berbunyi`, `hilang` (alarm yang tidak lagi berbunyi, per putusan), `belum_tentu` (alarm yang ditutup sebelum ambang itu), `tambahan` (episode yang dulu tidak berbunyi, belum pernah dinilai) |
 | PUT | `/api/settings/shift` | `{"pola_shift": "3"}` (shift 07, 14, 21) atau `"2"` (07, 19), jam setempat komputer backend |
 | PUT | `/api/settings/eskalasi` | `{"eskalasi_menit": 1-30}`: menit tanpa "Saya ke sana" sebelum banner menulis lamanya dan grup Telegram menerima pengingat. Bawaan 2; ikut dikembalikan `GET /api/settings/` |
+| GET | `/api/settings/riwayat` | `?limit=20` (1 sampai 200): perubahan pengaturan, terbaru dulu, berisi `waktu`, `oleh`, `kunci`, `label`, `nilai_lama`, `nilai_baru`. Hanya perubahan yang benar-benar mengganti nilai yang dicatat. Akun tim saja, pengunjung `403` |
 | POST | `/api/settings/test-telegram` | Kirim pesan uji ke grup |
 
 `photo_mode`: `buram` (bawaan), `utuh` (tertutup sampai diketuk), atau `tanpa`.

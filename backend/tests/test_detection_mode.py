@@ -9,6 +9,8 @@ Tidak memuat model YOLO sungguhan dan tidak membuka kamera, jadi bisa dijalankan
 di mana saja.
 """
 
+import types
+
 import numpy as np
 import pytest
 import pytest_asyncio
@@ -122,6 +124,8 @@ def test_ganti_mode_tidak_memuat_model_apa_pun():
 
 # ---- Penyimpanan ke database -------------------------------
 
+PENGELOLA = types.SimpleNamespace(display_name="Pengelola Uji", role="pengelola")
+
 @pytest_asyncio.fixture
 async def sesi() -> AsyncSession:
     engine = create_async_engine("sqlite+aiosqlite:///:memory:")
@@ -191,7 +195,7 @@ async def test_ganti_mode_mereset_timer_yang_sedang_berjalan(sesi: AsyncSession)
 
     registry.state_machines["cam-uji"] = fsm
     try:
-        await api_settings.update_mode(ModeUpdate(detection_mode=MODE_BBOX), sesi)
+        await api_settings.update_mode(ModeUpdate(detection_mode=MODE_BBOX), user=PENGELOLA, db=sesi)
         assert fsm.state == FallState.MONITORING
         assert fsm.fall_duration == 0.0
     finally:
@@ -211,7 +215,7 @@ async def test_threshold_baru_diteruskan_ke_kamera_yang_menyala(sesi: AsyncSessi
     registry.state_machines["cam-uji"] = fsm
     try:
         await api_settings.update_threshold(
-            ThresholdUpdate(fall_duration_threshold=4.0), sesi
+            ThresholdUpdate(fall_duration_threshold=4.0), user=PENGELOLA, db=sesi
         )
         assert fsm.fall_duration_threshold == pytest.approx(4.0)
         assert await SettingRepository(sesi).ambil("fall_duration_threshold") == "4.0"

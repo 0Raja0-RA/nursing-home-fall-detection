@@ -135,10 +135,11 @@ berasal dari riset referensi UI/UX proyek ini (audit 41 temuan, rencana Tahap 1 
    dan dikabarkan ke grup. Alarm yang sudah terbuka tidak ikut tertutup.
 7. **Privasi lebih dulu.** Foto di Telegram bawaannya diburamkan dan semua pesan
    dilindungi dari penerusan. Foto lengkap dan klip kejadian hanya bisa dibuka setelah
-   masuk, klip tidak pernah dikirim ke Telegram, dan klip dihapus otomatis setelah masa
-   simpannya (bawaan 7 hari). Tampilan video diatur per kamera: utuh, buram, atau kerangka
-   saja; kamera baru bawaannya buram. Saat ada alarm, perawat yang masuk bisa membuka video
-   asli 15 detik, dan setiap pembukaan dicatat. Tidak ada pengenalan wajah.
+   masuk, klip tidak pernah dikirim ke Telegram, dan foto serta klip dihapus otomatis setelah
+   masa simpannya (bawaan 30 dan 7 hari, terlihat di Pengaturan). Tampilan video diatur per
+   kamera: utuh, buram, atau kerangka saja; kamera baru bawaannya buram. Saat ada alarm,
+   perawat yang masuk bisa membuka video asli 15 detik, dan setiap pembukaan dicatat. Tidak
+   ada pengenalan wajah.
 8. **Latihan tidak boleh tertukar dengan kejadian nyata.** Latihan berwarna biru, bernada
    lain, tidak dinilai, tidak ikut dihitung, dan secara bawaan tidak dikirim ke Telegram.
 
@@ -185,7 +186,9 @@ daftar, jadi perawat mencatatnya manual lewat "Catat jatuh terlewat" di Riwayat 
 itu tidak dihitung sebagai alarm, tetapi menjadi penyebut recall: "Jatuh terdeteksi 9 dari 10".
 
 Riwayat Insiden menampilkan lima kartu untuk rentang yang dipilih: perlu tindakan, median
-waktu respons, alarm palsu dari yang dinilai, Telegram gagal, dan jatuh terdeteksi. Pratinjau ambang di
+waktu respons, alarm palsu dari yang dinilai, Telegram gagal, dan jatuh terdeteksi. Setiap
+perubahan pengaturan dicatat dengan nama pengubah dan nilai lama serta barunya, dan tampil di
+Pengaturan, supaya angka sebelum dan sesudah perubahan ambang atau model tidak tercampur. Pratinjau ambang di
 Pengaturan menilai ulang episode berbaring 30 hari terakhir: bila ambang dinaikkan, ia
 menyebut alarm yang hilang beserta putusannya, termasuk jatuh sungguhan; bila diturunkan, ia
 menyebut alarm tambahan yang belum pernah dinilai.

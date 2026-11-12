@@ -84,7 +84,8 @@ class AlertService:
                 klip_status="merekam" if klip.aktif() else None,
             )
             # 2. Simpan ke Database, berikut frame beranotasi yang sudah ada di registry.
-            db_alert = await AlertRepository(session).create_alert(alert_data, foto=foto)
+            simpan_foto = foto if self.settings.FOTO_MASA_SIMPAN_HARI > 0 else None
+            db_alert = await AlertRepository(session).create_alert(alert_data, foto=simpan_foto)
             data = alert_ke_dict(db_alert)
 
         # Klip dari sebelum orangnya tergeletak sampai beberapa detik sesudah alarm.

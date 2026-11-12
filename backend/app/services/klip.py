@@ -209,7 +209,26 @@ async def rekam(alert_id: int, camera_id: str, waktu_alarm: float, detik_tergele
     await _catat([alert_id], "tersimpan", detik)
 
 
+async def hapus_foto_kedaluwarsa(sekarang: Optional[datetime] = None) -> int:
+    """Hapus foto kejadian yang melewati FOTO_MASA_SIMPAN_HARI (semua bila 0). Returns: jumlahnya."""
+    from sqlalchemy import delete
+
+    from app.core.logging import utc_now_naive
+    from app.db.database import get_session_factory
+    from app.db.models import AlertSnapshot
+
+    hari = get_settings().FOTO_MASA_SIMPAN_HARI
+    batas = (sekarang or utc_now_naive()) - timedelta(days=max(0, hari))
+    async with get_session_factory()() as db:
+        hasil = await db.execute(delete(AlertSnapshot).where(AlertSnapshot.created_at < batas))
+        await db.commit()
+    return hasil.rowcount or 0
+
+
 async def bersihkan() -> None:
+    foto = await hapus_foto_kedaluwarsa()
+    if foto:
+        log.info(f"{foto} foto kejadian dihapus karena melewati masa simpan.")
     dihapus = await asyncio.to_thread(hapus_kedaluwarsa)
     if dihapus:
         log.info(f"Klip dihapus karena melewati masa simpan: alert {', '.join(map(str, sorted(dihapus)))}")
@@ -217,7 +236,7 @@ async def bersihkan() -> None:
 
 
 async def jalankan_pembersih(jeda: float = 3600.0) -> None:
-    """Pekerja latar: hapus klip kedaluwarsa saat backend menyala, lalu setiap jam."""
+    """Pekerja latar: hapus klip dan foto kejadian kedaluwarsa saat backend menyala, lalu setiap jam."""
     while True:
         try:
             await bersihkan()
