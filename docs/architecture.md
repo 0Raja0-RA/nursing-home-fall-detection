@@ -189,6 +189,11 @@ Pengaturan menilai ulang episode berbaring 30 hari terakhir: bila ambang dinaikk
 menyebut alarm yang hilang beserta putusannya, termasuk jatuh sungguhan; bila diturunkan, ia
 menyebut alarm tambahan yang belum pernah dinilai.
 
+Layar dinding (`/dinding`, dibuka dari Pemantauan) untuk layar besar di ruang jaga: baca saja,
+semua kamera sekaligus tanpa rotasi halaman, kamera yang alarm di depan, paling banyak empat
+pita alarm dengan siapa yang menuju lokasi, dan denah unit berwarna per ruang bila letaknya
+sudah diatur di Daftar Kamera.
+
 Tab Ringkasan shift di Riwayat Insiden menyiapkan serah terima: angka alarm shift itu, alarm
 yang masih perlu ditindaklanjuti shift berikutnya, catatan perawat, ruang yang tidak terpantau
 karena Mode perawatan atau kamera terputus, dan tanda sudah dibaca. Bawaannya shift sebelumnya.

@@ -93,6 +93,8 @@ def _gabung(record: CameraRecord) -> CameraInfo:
         rotate=record.rotate,
         enabled=record.enabled,
         privasi=record.privasi or "utuh",
+        denah_baris=record.denah_baris,
+        denah_kolom=record.denah_kolom,
         stream_url=f"/api/cameras/{record.id}/stream",
     )
 

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Clock, Eye, EyeOff, FlaskConical, Send, Video, VideoOff, Volume2, VolumeX, X } from 'lucide-react';
+import { Clock, Eye, EyeOff, FlaskConical, Monitor, Send, Video, VideoOff, Volume2, VolumeX, X } from 'lucide-react';
 import { api, bacaGalat, PESAN_TERPUTUS } from '../api';
 import { API_BASE } from '../config';
 import { usePengunjung } from '../context/auth';
@@ -8,47 +8,9 @@ import { useLive } from '../context/LiveContext';
 import { aktifkanSuara, bunyikan, useStatusSuara } from '../hooks/useAlarmSound';
 import { usePengaturan } from '../hooks/usePengaturan';
 import StatusKamera from '../components/StatusKamera';
+import StreamImg from '../components/StreamImg';
 import { bacaStatus, jamDari, mmss } from '../statusKamera';
 import { msDari, useJam } from '../waktu';
-
-/**
- * Gambar MJPEG dari backend, yang melepas koneksinya saat dilepas dari DOM.
- *
- * MJPEG adalah respons HTTP yang tidak pernah selesai. Kalau elemen <img>-nya
- * dibuang tanpa mengosongkan src lebih dulu, browser menahan koneksi itu tetap
- * terbuka. Dengan beberapa kamera dan beberapa kali berpindah halaman, batas ~6
- * koneksi per host milik Chrome habis -- fetch berikutnya menggantung dan seluruh
- * dashboard terlihat membeku, padahal backend baik-baik saja.
- */
-function StreamImg({ src, alt, kunci, onUkuran }) {
-    const ref = useRef(null);
-    useEffect(() => {
-        const el = ref.current;
-        if (!el) return;
-        // src dipasang di sini, bukan lewat atribut JSX. React.StrictMode menjalankan
-        // efek dua kali di mode dev (pasang -> bersihkan -> pasang lagi); kalau src
-        // ditulis di JSX, pembersihan pertama membatalkan permintaan dan React tidak
-        // pernah memasangnya kembali karena prop-nya dianggap tidak berubah. Akibatnya
-        // gambar kosong selamanya dengan net::ERR_ABORTED.
-        el.src = src;
-        // Ukuran gambar dibaca berkala, bukan dari onload: MJPEG tidak selalu memicu
-        // onload, dan ukurannya berubah bila rotasi kamera diganti. Sampai ukurannya
-        // diketahui dibaca tiap 0,3 detik, supaya kartu cepat berhenti berubah tinggi;
-        // sesudahnya cukup tiap 2 detik. Efek ini hanya bergantung pada nilai yang
-        // stabil, supaya aliran videonya tidak diulang.
-        let t = null;
-        const baca = (selang) => {
-            t = setTimeout(() => {
-                const ada = el.naturalWidth && el.naturalHeight;
-                if (ada) onUkuran?.(kunci, el.naturalWidth, el.naturalHeight);
-                baca(ada ? 2000 : 300);
-            }, selang);
-        };
-        baca(300);
-        return () => { clearTimeout(t); el.src = ''; };
-    }, [src, kunci, onUkuran]);
-    return <img ref={ref} alt={alt} className="absolute inset-0 w-full h-full object-contain" />;
-}
 
 const CHIP = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs whitespace-nowrap';
 const CHIP_TENANG = `${CHIP} bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300`;
@@ -270,14 +232,23 @@ export default function SimulationDashboard() {
                     <h1 className="text-xl md:text-2xl font-bold">Pemantauan Kamera</h1>
                     <p className="text-xs md:text-sm text-slate-500">Status setiap kamera, diperbarui langsung.</p>
                 </div>
-                {!pengunjung && <button
+                {!pengunjung && <div className="flex flex-wrap gap-2">
+                <Link
+                    to="/dinding"
+                    target="_blank"
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition-colors"
+                >
+                    <Monitor className="w-4 h-4" aria-hidden="true" /> Layar dinding
+                </Link>
+                <button
                     type="button"
                     onClick={() => setPanelLatihan((b) => !b)}
                     aria-expanded={panelLatihan}
                     className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition-colors"
                 >
                     <FlaskConical className="w-4 h-4" aria-hidden="true" /> Mode latihan
-                </button>}
+                </button>
+                </div>}
             </div>
 
             {/* Ringkasan: perawat tahu keadaan semua kamera tanpa memindai tiap kartu. */}

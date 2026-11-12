@@ -40,6 +40,9 @@ class CameraRecord(Base):
     # yang ditayangkan, disimpan sebagai foto dan klip, dan dikirim ke Telegram. Kamera
     # baru bawaannya buram; kamera yang sudah ada sebelum kolom ini tetap utuh.
     privasi = Column(String, nullable=False, default="buram", server_default="utuh")
+    # Letak ruang di denah unit pada layar dinding (mulai 1). Kosong = belum diletakkan.
+    denah_baris = Column(Integer, nullable=True)
+    denah_kolom = Column(Integer, nullable=True)
     created_at = Column(DateTime, default=utc_now_naive)
 
 

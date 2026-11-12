@@ -166,7 +166,7 @@ pengingat terakhir di `eskalasi_terakhir`. Waktu disimpan UTC tanpa zona.
 | GET | `/api/cameras/` | Kamera terdaftar beserta status runtime-nya |
 | POST | `/api/cameras/` | Daftarkan kamera baru; sumbernya diperiksa dulu |
 | GET | `/api/cameras/{id}` | Satu kamera |
-| PATCH | `/api/cameras/{id}` | Ubah `name`, `source`, `rotate`, `enabled`, `privasi` (`utuh`, `buram`, `kerangka`); kamera dinyalakan ulang bila perlu, `privasi` berlaku seketika |
+| PATCH | `/api/cameras/{id}` | Ubah `name`, `source`, `rotate`, `enabled`, `denah_baris`/`denah_kolom` (1-12, `0` mengeluarkan dari denah), `privasi` (`utuh`, `buram`, `kerangka`); kamera dinyalakan ulang bila perlu, `privasi` berlaku seketika |
 | DELETE | `/api/cameras/{id}` | Matikan dan hapus kamera. Nomornya tidak dipakai lagi |
 | GET | `/api/cameras/{id}/stream` | Video MJPEG dengan kotak deteksi, dalam tampilan privasi kamera. `?asli=true` memakai video asli selama sedang dibuka; pengunjung `403` |
 | POST | `/api/cameras/{id}/buka-asli` | Video asli kamera berprivasi selama 15 detik, hanya saat ada alarm yang belum ditangani di ruang itu (`409` bila tidak). Akun tim saja; setiap pembukaan dicatat di `akses_video`. Waktu habisnya di `asli_sampai` |

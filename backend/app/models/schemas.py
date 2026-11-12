@@ -270,6 +270,9 @@ class CameraUpdate(BaseModel):
     rotate: Optional[int] = None
     enabled: Optional[bool] = None
     privasi: Optional[Privasi] = None
+    # Letak di denah unit (1-12). Kirim 0 untuk mengeluarkan kamera dari denah.
+    denah_baris: Optional[int] = Field(None, ge=0, le=12)
+    denah_kolom: Optional[int] = Field(None, ge=0, le=12)
 
     @field_validator("name", "source")
     @classmethod
@@ -301,6 +304,8 @@ class CameraInfo(CameraStatus):
     enabled: bool = True
     stream_url: str = Field(..., description="Path endpoint MJPEG untuk kamera ini")
     privasi: str = "utuh"
+    denah_baris: Optional[int] = None
+    denah_kolom: Optional[int] = None
     # Video asli sedang dibuka sementara sampai waktu ini (UTC). Kosong = tidak.
     asli_sampai: Optional[datetime] = None
 

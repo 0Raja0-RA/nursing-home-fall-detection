@@ -135,3 +135,11 @@ def test_ubah_privasi_berlaku_tanpa_menyalakan_ulang(api):
     assert r.status_code == 200 and r.json()["privasi"] == "kerangka"
     assert api.kamera["cam-01"].privasi == "kerangka"
     assert api.klien.patch("/api/cameras/cam-01", json={"privasi": "telanjang"}).status_code == 422
+
+
+def test_letak_denah(api):
+    r = api.klien.patch("/api/cameras/cam-01", json={"denah_baris": 2, "denah_kolom": 3})
+    assert (r.json()["denah_baris"], r.json()["denah_kolom"]) == (2, 3)
+    r = api.klien.patch("/api/cameras/cam-01", json={"denah_baris": 0, "denah_kolom": 0})
+    assert (r.json()["denah_baris"], r.json()["denah_kolom"]) == (None, None), "0 mengeluarkan dari denah"
+    assert api.klien.patch("/api/cameras/cam-01", json={"denah_baris": 13}).status_code == 422

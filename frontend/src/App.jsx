@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, NavLink, Navigate, useLocation,
 import { LayoutDashboard, History, Settings as SettingsIcon, Video, Sun, Moon, LogOut, Menu, X, Loader2, ServerOff } from 'lucide-react';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { LiveProvider, useLive } from './context/LiveContext';
+import LayarDinding from './pages/LayarDinding';
 import { AuthProvider } from './context/AuthContext';
 import { useAuth, usePengunjung } from './context/auth';
 import { API_BASE } from './config';
@@ -252,6 +253,8 @@ export default function App() {
             <Route path="/lihat" element={<Login />} />
             {/* Dashboard Area untuk Caregiver */}
             <Route path="/dashboard/*" element={<Terlindungi><DashboardLayout /></Terlindungi>} />
+            {/* Layar besar di ruang jaga: baca saja, tanpa menu samping. */}
+            <Route path="/dinding" element={<Terlindungi><LiveProvider><LayarDinding /></LiveProvider></Terlindungi>} />
           </Routes>
         </Router>
       </AuthProvider>

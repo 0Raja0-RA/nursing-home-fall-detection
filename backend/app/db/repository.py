@@ -175,6 +175,9 @@ class CameraRepository:
         if record is None:
             return None
         for field, value in data.model_dump(exclude_unset=True, exclude_none=True).items():
+            # 0 di letak denah berarti dikeluarkan dari denah.
+            if field in ("denah_baris", "denah_kolom") and value == 0:
+                value = None
             setattr(record, field, value)
         await self.session.commit()
         await self.session.refresh(record)

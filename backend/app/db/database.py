@@ -63,6 +63,8 @@ async def get_db() -> AsyncSession:
 _KOLOM_SUSULAN: dict[str, list[tuple[str, str]]] = {
     "cameras": [
         ("privasi", "VARCHAR NOT NULL DEFAULT 'utuh'"),
+        ("denah_baris", "INTEGER"),
+        ("denah_kolom", "INTEGER"),
     ],
     "alerts": [
         ("notified", "BOOLEAN DEFAULT 0"),

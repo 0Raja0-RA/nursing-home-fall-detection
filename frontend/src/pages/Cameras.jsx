@@ -191,6 +191,28 @@ function PanelKamera({ cam, t, onUbah, onHapus, onTutup }) {
                         mengikuti tampilan ini.
                     </p>
                 </fieldset>
+                <fieldset className="mt-3">
+                    <legend className="text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
+                        Letak di denah unit pada layar dinding
+                    </legend>
+                    <div className="flex flex-wrap items-center gap-2 text-sm">
+                        {[['denah_baris', 'Baris'], ['denah_kolom', 'Kolom']].map(([kunci, label]) => (
+                            <label key={kunci} className="inline-flex items-center gap-2">
+                                {label}
+                                <select
+                                    value={cam[kunci] || 0}
+                                    disabled={Boolean(sibuk)}
+                                    onChange={(e) => ubah({ [kunci]: Number(e.target.value) }, 'denah')}
+                                    className="bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1.5"
+                                >
+                                    <option value={0}>–</option>
+                                    {Array.from({ length: 8 }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n}</option>)}
+                                </select>
+                            </label>
+                        ))}
+                        <span className="text-xs text-slate-500">Kosongkan salah satunya untuk mengeluarkan ruang ini dari denah.</span>
+                    </div>
+                </fieldset>
             </div>
 
             <form onSubmit={(e) => { e.preventDefault(); ubah({ name: nama }, 'nama'); }} className="flex flex-col sm:flex-row gap-2 sm:items-end">

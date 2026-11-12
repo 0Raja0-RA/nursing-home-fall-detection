@@ -19,6 +19,8 @@ erDiagram
         int rotate "0, 90, 180, 270"
         bool enabled
         string privasi "utuh | buram | kerangka"
+        int denah_baris
+        int denah_kolom
         datetime created_at
     }
     akses_video {
@@ -125,6 +127,7 @@ Daftar kamera. Disimpan di database supaya alamat kamera HP bisa diganti dari da
 
 - `id` dibentuk `cam-NN`. Nomornya tidak pernah dipakai ulang, walaupun kameranya sudah dihapus (lihat `camera_last_number`).
 - `source` hanya berlaku di laptop yang menjalankan backend. Contohnya, `0` adalah webcam laptop itu.
+- `denah_baris` dan `denah_kolom` meletakkan ruang di denah unit pada layar dinding (mulai 1); kosong berarti belum diletakkan.
 - `privasi` menentukan yang ditayangkan, disimpan sebagai foto dan klip, dan dikirim ke Telegram: `utuh`, `buram`, atau `kerangka` (kerangka dan kotak deteksi di latar gelap). Model selalu membaca gambar asli. Kamera baru bawaannya `buram`; kamera yang sudah ada sebelum kolom ini tetap `utuh`.
 
 ### `app_settings`
