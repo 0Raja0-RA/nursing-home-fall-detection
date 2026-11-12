@@ -12,7 +12,7 @@ yang tersedia.
 |---|---|---|
 | Waktu sampai diakui | Kolom `detik_sampai_respons`: dari alarm sampai `Saya ke sana`, atau sampai `Tandai Ditangani` bila tidak ada yang mengklaim | CSV dari Riwayat Insiden |
 | Waktu sampai di lokasi | Stopwatch pengamat, dari alarm muncul sampai peserta masuk ruang uji | Lembar pengamatan |
-| Persentase alarm benar | Alarm pada skenario jatuh dibagi semua alarm. Catat juga skenario jatuh yang tidak memicu alarm | CSV dan daftar skenario |
+| Persentase alarm benar | Alarm pada skenario jatuh dibagi semua alarm. Skenario jatuh yang tidak memicu alarm dicatat lewat `Catat jatuh terlewat` | CSV dan daftar skenario |
 | Ketepatan putusan peserta | Putusan dan alasan peserta dibandingkan dengan kenyataan skenario | CSV dan daftar skenario |
 | Keyakinan pengguna | Skala 1–5 sesudah tiap alarm dan di akhir sesi | Kuesioner |
 
@@ -72,7 +72,8 @@ sendiri dari kamera. Daftar skenario tidak diperlihatkan.
    - Fasilitator memberi isyarat ke aktor tanpa diketahui peserta, dan mencatat jamnya.
    - Pengamat menyalakan stopwatch saat banner atau bunyi alarm muncul, lalu mencatat
      detik saat peserta masuk ruang uji. Bila tidak ada alarm dalam 60 detik, tulis
-     "tidak ada alarm".
+     "tidak ada alarm", dan sesudah sesi catat skenario itu di Riwayat Insiden lewat
+     `Catat jatuh terlewat`, dengan jam isyaratnya sebagai perkiraan waktu kejadian.
    - Peserta merespons seperti biasa: melihat kamera, mengklaim, berjalan ke ruang uji,
      menolong (cukup menyentuh bahu aktor), lalu menutup alarm dengan putusan dari
      dashboard atau Telegram, mana saja yang ia pilih.
@@ -117,7 +118,8 @@ Usability Scale (SUS).
      angka ekstrem.
    - **Waktu sampai di lokasi:** median dari lembar pengamatan, dengan cara yang sama.
    - **Alarm benar:** tulis dalam angka mutlak, misalnya "9 dari 12 alarm terjadi pada
-     skenario jatuh", ditambah jumlah skenario jatuh yang terlewat. Persentase dari
+     skenario jatuh", ditambah jumlah skenario jatuh yang terlewat (baris CSV dengan
+     `terlewat` = `ya`; kartu "Jatuh terdeteksi" menampilkan keduanya). Persentase dari
      jumlah sekecil ini mudah menyesatkan.
    - **Ketepatan putusan:** berapa putusan (`putusan`, `alasan_palsu`) yang sesuai
      kenyataan skenario.

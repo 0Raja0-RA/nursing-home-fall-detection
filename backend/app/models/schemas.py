@@ -138,6 +138,8 @@ class AlertResponse(AlertBase):
     # Pengingat Telegram yang sudah terkirim karena belum ada yang merespons.
     eskalasi_ke: Optional[int] = None
     eskalasi_terakhir: Optional[datetime] = None
+    # Jatuh yang tidak memicu alarm, dicatat manual. Bukan alarm.
+    terlewat: bool = False
 
     model_config = {"from_attributes": True}
 
@@ -398,6 +400,8 @@ class MetrikInsiden(BaseModel):
     median_respons_detik: Optional[float] = None
     jumlah_respons: int = 0
     telegram_gagal: int = 0
+    # Jatuh yang tidak memicu alarm, dicatat manual. Dengan jatuh, memberi recall.
+    terlewat: int = 0
 
 
 class PratinjauAmbang(BaseModel):
@@ -411,6 +415,13 @@ class PratinjauAmbang(BaseModel):
                                    description="Alarm yang tidak lagi berbunyi, per putusan")
     belum_tentu: int = Field(0, description="Alarm yang ditutup sebelum mencapai ambang ini")
     tambahan: int = Field(0, description="Episode yang dulu tidak berbunyi tetapi akan berbunyi")
+
+
+class KejadianTerlewat(BaseModel):
+    """Body POST /api/alerts/terlewat: jatuh yang tidak memicu alarm."""
+    camera_id: str = Field(..., min_length=1)
+    waktu: datetime = Field(..., description="Perkiraan waktu kejadian; tanpa zona dibaca UTC")
+    catatan: Optional[str] = Field(None, max_length=CATATAN_MAKS)
 
 
 class JedaShift(BaseModel):

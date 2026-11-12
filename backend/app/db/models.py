@@ -140,6 +140,10 @@ class AlertRecord(Base):
     eskalasi_ke = Column(Integer, nullable=True)
     eskalasi_terakhir = Column(DateTime, nullable=True)
 
+    # Jatuh yang tidak memicu alarm, dicatat manual oleh tim. Bukan alarm, jadi tidak ikut
+    # angka alarm; dipakai untuk menghitung berapa jatuh yang terdeteksi (recall).
+    terlewat = Column(Boolean, nullable=False, default=False, server_default="0")
+
 
 class AlertSnapshot(Base):
     """Foto kejadian, satu per alert.

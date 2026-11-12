@@ -51,6 +51,10 @@ def hitung_metrik(alerts) -> "MetrikInsiden":
 
     from app.models.schemas import MetrikInsiden
 
+    # Jatuh terlewat hanya dihitung selama putusannya tetap jatuh: catatan yang belakangan diubah,
+    # mis. ternyata bukan jatuh, keluar dari penyebut recall.
+    terlewat = sum(1 for a in alerts if getattr(a, "terlewat", False) and a.verdict == Putusan.JATUH.value)
+    alerts = [a for a in alerts if not getattr(a, "terlewat", False)]
     respons = []
     for a in alerts:
         pertama = min((t for t in (a.claimed_at, a.acknowledged_at) if t is not None), default=None)
@@ -70,6 +74,7 @@ def hitung_metrik(alerts) -> "MetrikInsiden":
         median_respons_detik=round(statistics.median(respons), 1) if respons else None,
         jumlah_respons=len(respons),
         telegram_gagal=hitung(lambda a: a.telegram_status == "gagal"),
+        terlewat=terlewat,
     )
 
 

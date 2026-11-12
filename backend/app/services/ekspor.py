@@ -21,7 +21,7 @@ from app.db.models import AlertRecord
 from app.models.schemas import ALASAN_PALSU, LABEL_PUTUSAN
 
 KOLOM = [
-    "id", "waktu_alarm", "ruang", "kamera_id", "latihan",
+    "id", "waktu_alarm", "ruang", "kamera_id", "latihan", "terlewat",
     "mode_deteksi", "ambang_detik", "lama_tergeletak_detik",
     "diklaim_oleh", "waktu_klaim", "ditangani_oleh", "waktu_ditangani",
     # Respons pertama: klaim "Saya ke sana", atau penutupan bila tidak ada yang mengklaim.
@@ -71,14 +71,15 @@ def csv_insiden(alerts: Iterable[AlertRecord]) -> str:
     tulis = csv.writer(buf, lineterminator="\r\n")
     tulis.writerow(KOLOM)
     for a in alerts:
-        respons = min((t for t in (a.claimed_at, a.acknowledged_at) if t is not None), default=None)
+        manual = bool(getattr(a, "terlewat", False))
+        respons = None if manual else min((t for t in (a.claimed_at, a.acknowledged_at) if t is not None), default=None)
         baris = [
             str(a.id), _waktu(a.created_at), a.camera_name or a.camera_id, a.camera_id,
-            "ya" if a.simulated else "tidak",
+            "ya" if a.simulated else "tidak", "ya" if manual else "tidak",
             a.detection_mode or "", _angka(a.threshold_sec), _angka(a.fall_duration),
             a.claimed_by or "", _waktu(a.claimed_at),
             a.acknowledged_by or "", _waktu(a.acknowledged_at),
-            _detik(a.created_at, respons), _detik(a.created_at, a.acknowledged_at),
+            _detik(a.created_at, respons), "" if manual else _detik(a.created_at, a.acknowledged_at),
             LABEL_PUTUSAN.get(a.verdict, a.verdict or ""),
             ALASAN_PALSU.get(a.verdict_reason, a.verdict_reason or ""),
             a.verdict_by or "", _waktu(a.verdict_at),

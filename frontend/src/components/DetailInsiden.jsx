@@ -190,7 +190,7 @@ export default function DetailInsiden({ alert, onTutup, onBerubah }) {
                 </header>
 
                 <div className="p-4 space-y-6">
-                    <BuktiKejadian alert={alert} />
+                    {!alert.terlewat && <BuktiKejadian alert={alert} />}
 
                     {!alert.acknowledged && !pengunjung && (
                         <section className="space-y-2">
@@ -214,14 +214,21 @@ export default function DetailInsiden({ alert, onTutup, onBerubah }) {
                     <section>
                         <h3 className="text-sm font-semibold mb-3">Linimasa</h3>
                         <ol className="space-y-3 border-l border-slate-200 dark:border-slate-700 ml-1">
-                            <BarisWaktu judul={`Terbaca berbaring ${Math.round(alert.fall_duration)} detik, alarm berbunyi`} waktu={alert.created_at} />
+                            <BarisWaktu judul={alert.terlewat
+                                ? 'Jatuh tidak terdeteksi sistem (perkiraan waktu kejadian)'
+                                : `Terbaca berbaring ${Math.round(alert.fall_duration)} detik, alarm berbunyi`} waktu={alert.created_at} />
                             {alert.claimed_by && (
                                 <BarisWaktu judul={`${alert.claimed_by} menuju lokasi`} waktu={alert.claimed_at} dari={alert.created_at} />
                             )}
-                            {alert.acknowledged && (
+                            {/* Catatan manual: jam pencatatan saja. Selisihnya dari perkiraan waktu kejadian
+                                bukan waktu respons, jadi tidak ditulis "sesudah terdeteksi". */}
+                            {alert.acknowledged && (alert.terlewat ? (
+                                <BarisWaktu judul={`Dicatat manual${alert.acknowledged_by ? ` oleh ${alert.acknowledged_by}` : ''}`}
+                                    waktu={alert.acknowledged_at} />
+                            ) : (
                                 <BarisWaktu judul={`Ditangani${alert.acknowledged_by ? ` oleh ${alert.acknowledged_by}` : ''}`}
                                     waktu={alert.acknowledged_at} dari={alert.created_at} />
-                            )}
+                            ))}
                             {alert.verdict && (
                                 <BarisWaktu
                                     judul={`Putusan: ${labelPutusan(alert.verdict)}${alert.verdict === 'palsu' ? `, ${labelAlasan(alert.verdict_reason).toLowerCase()}` : ''}`}

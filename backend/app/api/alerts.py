@@ -7,6 +7,7 @@ Endpoints:
     GET  /api/alerts/                — Daftar alert, dengan filter antrean
     GET  /api/alerts/ekspor          — Unduh CSV dengan filter yang sama (tim saja)
     GET  /api/alerts/metrik          — Kartu angka untuk rentang waktu (tanpa latihan)
+    POST /api/alerts/terlewat        — Catat jatuh yang tidak memicu alarm
     GET  /api/alerts/ringkasan       — Jumlah per kelompok, untuk tab dan lencana
     GET  /api/alerts/count           — Hitung total alert (lama, tetap dipertahankan)
     GET  /api/alerts/{id}            — Detail satu alert
@@ -24,7 +25,7 @@ yang ditutup tanpa putusan tetap di antrean Perlu tindakan sampai dinilai.
 """
 
 import asyncio
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Annotated, Literal, Optional
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Response, status
@@ -40,6 +41,7 @@ from app.models.schemas import (
     AckRequest,
     AlertResponse,
     AlertSummary,
+    KejadianTerlewat,
     MetrikInsiden,
     NoteUpdate,
     Putusan,
@@ -171,13 +173,46 @@ async def metrik(
     return insiden.hitung_metrik((await db.execute(query)).scalars().all())
 
 
+@router.post("/terlewat", response_model=AlertResponse, status_code=status.HTTP_201_CREATED)
+async def catat_terlewat(payload: KejadianTerlewat, user=Depends(wajib_login), db: AsyncSession = Depends(get_db)):
+    """Catat jatuh yang tidak memicu alarm, misalnya penghuni ditemukan di lantai.
+
+    Tanpa catatan ini, jatuh yang terlewat tidak pernah muncul di riwayat, sehingga
+    tidak bisa dihitung berapa jatuh yang benar-benar terdeteksi. Entrinya langsung
+    berputusan jatuh sungguhan dan tidak ikut dihitung sebagai alarm.
+    """
+    from app.core.logging import utc_now_naive
+    from app.db.models import CameraRecord
+
+    waktu = payload.waktu.astimezone(timezone.utc).replace(tzinfo=None) if payload.waktu.tzinfo else payload.waktu
+    sekarang = utc_now_naive()
+    if waktu > sekarang + timedelta(minutes=1):
+        raise HTTPException(status_code=422, detail="Waktu kejadian tidak boleh di masa depan.")
+    kamera = await db.get(CameraRecord, payload.camera_id)
+    if kamera is None:
+        raise HTTPException(status_code=404, detail="Camera not found")
+    alert = AlertRecord(
+        camera_id=kamera.id, camera_name=kamera.name, severity="critical",
+        message="Jatuh tidak terdeteksi sistem, dicatat manual.", fall_duration=0.0,
+        acknowledged=True, acknowledged_at=sekarang, acknowledged_by=user.display_name,
+        verdict=Putusan.JATUH.value, verdict_by=user.display_name, verdict_at=sekarang,
+        caregiver_note=_rapikan_catatan(payload.catatan), created_at=waktu, terlewat=True,
+    )
+    db.add(alert)
+    await db.commit()
+    await db.refresh(alert)
+    log.info(f"[{kamera.id}] jatuh terlewat dicatat {user.display_name} untuk {waktu:%Y-%m-%d %H:%M} UTC")
+    return alert
+
+
 @router.get("/ringkasan", response_model=AlertSummary)
 async def ringkasan(db: AsyncSession = Depends(get_db)):
     """Jumlah per kelompok untuk tab Riwayat Insiden dan lencana di menu."""
     async def hitung(*syarat) -> int:
         return await db.scalar(select(func.count(AlertRecord.id)).where(*syarat)) or 0
 
-    sungguhan = AlertRecord.simulated.is_(False)
+    # Alarm sungguhan: bukan latihan, dan bukan jatuh terlewat yang dicatat manual.
+    sungguhan = and_(AlertRecord.simulated.is_(False), AlertRecord.terlewat.is_(False))
     belum_ditangani = await hitung(_TERBUKA)
     belum_dinilai = await hitung(_BELUM_DINILAI)
     return AlertSummary(

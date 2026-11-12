@@ -180,11 +180,12 @@ tidak ada, bukan menampilkan ruang kosong.
 
 Waktu respons dihitung juga untuk alarm palsu, karena perawat tidak tahu statusnya
 sebelum memeriksa. Latihan keluar dari semua angka. Persentase selalu disertai jumlah
-absolut, misalnya "3 dari 12". Recall tidak bisa dihitung dari putusan, karena jatuh
-yang terlewat tidak pernah muncul di daftar.
+absolut, misalnya "3 dari 12". Jatuh yang tidak memicu alarm tidak pernah muncul sendiri di
+daftar, jadi perawat mencatatnya manual lewat "Catat jatuh terlewat" di Riwayat Insiden. Catatan
+itu tidak dihitung sebagai alarm, tetapi menjadi penyebut recall: "Jatuh terdeteksi 9 dari 10".
 
-Riwayat Insiden menampilkan empat kartu untuk rentang yang dipilih: perlu tindakan, median
-waktu respons, alarm palsu dari yang dinilai, dan Telegram gagal. Pratinjau ambang di
+Riwayat Insiden menampilkan lima kartu untuk rentang yang dipilih: perlu tindakan, median
+waktu respons, alarm palsu dari yang dinilai, Telegram gagal, dan jatuh terdeteksi. Pratinjau ambang di
 Pengaturan menilai ulang episode berbaring 30 hari terakhir: bila ambang dinaikkan, ia
 menyebut alarm yang hilang beserta putusannya, termasuk jatuh sungguhan; bila diturunkan, ia
 menyebut alarm tambahan yang belum pernah dinilai.

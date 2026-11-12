@@ -79,7 +79,7 @@ tetap di antrean Perlu tindakan sampai dinilai.
 |---|---|---|
 | GET | `/api/alerts/` | Daftar alert, terbaru dulu. Filter di bawah |
 | GET | `/api/alerts/ringkasan` | Jumlah per kelompok, untuk tab dan lencana menu |
-| GET | `/api/alerts/metrik` | Kartu angka Riwayat Insiden, `sejak` opsional: `total`, `jatuh`, `palsu`, `belum_yakin`, `belum_dinilai`, `belum_ditangani`, `median_respons_detik` (sampai klaim, atau penutupan bila tidak diklaim; alarm palsu ikut), `jumlah_respons`, `telegram_gagal`. Latihan tidak dihitung |
+| GET | `/api/alerts/metrik` | Kartu angka Riwayat Insiden, `sejak` opsional: `total`, `jatuh`, `palsu`, `belum_yakin`, `belum_dinilai`, `belum_ditangani`, `median_respons_detik` (sampai klaim, atau penutupan bila tidak diklaim; alarm palsu ikut), `jumlah_respons`, `telegram_gagal`, `terlewat` (jatuh yang dicatat manual dan putusannya tetap `jatuh`; tidak termasuk `total`). Latihan tidak dihitung |
 | GET | `/api/alerts/ekspor` | Unduh CSV, filter sama dengan daftar tanpa `skip`/`limit`, urut dari yang terlama. Akun tim saja, pengunjung `403`. Kolomnya di bawah |
 | GET | `/api/alerts/count` | Hitung total alert, filter `acknowledged` opsional |
 | GET | `/api/alerts/{id}` | Detail satu alert |
@@ -90,6 +90,7 @@ tetap di antrean Perlu tindakan sampai dinilai.
 | PUT | `/api/alerts/{id}/verdict` | Isi atau ubah putusan belakangan. `409` bila belum ditangani |
 | PUT | `/api/alerts/{id}/note` | Tambah atau ubah catatan perawat; teks kosong menghapusnya |
 | POST | `/api/alerts/{id}/telegram` | Kirim ulang pesan Telegram yang gagal (`202`); hasilnya terlihat di `telegram_status` |
+| POST | `/api/alerts/terlewat` | Catat jatuh yang tidak memicu alarm (`201`): `{"camera_id", "waktu", "catatan"}`, dengan `waktu` perkiraan kejadian (tanpa zona dibaca UTC). Tersimpan sebagai alert `terlewat` yang langsung ditangani dan berputusan `jatuh` atas nama pencatat. Waktu di masa depan `422`, kamera tidak dikenal `404`, pengunjung `403` |
 
 Filter `GET /api/alerts/`:
 
@@ -106,10 +107,11 @@ CSV `GET /api/alerts/ekspor` berawalan BOM UTF-8 supaya terbaca Excel. Waktu dit
 zona waktu komputer backend. `detik_sampai_respons` dihitung sampai klaim, atau sampai
 penutupan bila tidak ada yang mengklaim. Sel yang diawali `=`, `+`, `-`, atau `@` diberi
 tanda kutip tunggal supaya tidak dijalankan sebagai rumus. Kolom: `id`, `waktu_alarm`,
-`ruang`, `kamera_id`, `latihan`, `mode_deteksi`, `ambang_detik`, `lama_tergeletak_detik`,
+`ruang`, `kamera_id`, `latihan`, `terlewat`, `mode_deteksi`, `ambang_detik`, `lama_tergeletak_detik`,
 `diklaim_oleh`, `waktu_klaim`, `ditangani_oleh`, `waktu_ditangani`, `detik_sampai_respons`,
 `detik_sampai_ditangani`, `putusan`, `alasan_palsu`, `dinilai_oleh`, `waktu_dinilai`,
-`telegram`, `catatan`. Dipakai untuk [uji mini](uji-mini.md).
+`telegram`, `catatan`. Pada baris `terlewat`, kedua kolom detik dikosongkan, karena tidak ada
+alarm yang direspons. Dipakai untuk [uji mini](uji-mini.md).
 | `acknowledged` | `true` / `false` (lama, tetap didukung) |
 
 Putusan (`verdict`): `jatuh`, `palsu`, `belum_yakin`, atau `null` (belum dinilai).
@@ -145,7 +147,8 @@ Contoh alert:
   "klip_status": "tersimpan",
   "klip_detik": 12.7,
   "eskalasi_ke": null,
-  "eskalasi_terakhir": null
+  "eskalasi_terakhir": null,
+  "terlewat": false
 }
 ```
 
@@ -155,7 +158,9 @@ Nama penangan lewat Telegram berakhiran `(Telegram)`. `telegram_status`: `mengir
 atau kosong pada alert lama (lihat `notified`). `klip_status`: `merekam`, `tersimpan`,
 `kosong`, `gagal`, `dihapus`, atau kosong bila tidak direkam. `eskalasi_ke`: berapa pengingat
 Telegram yang sudah terkirim karena belum ada yang merespons (paling banyak 3), dengan jam
-pengingat terakhir di `eskalasi_terakhir`. Waktu disimpan UTC tanpa zona.
+pengingat terakhir di `eskalasi_terakhir`. `terlewat`: jatuh yang tidak memicu alarm dan dicatat
+manual; `created_at`-nya perkiraan waktu kejadian, dan tidak ada foto, klip, atau pesan Telegram.
+Waktu disimpan UTC tanpa zona.
 
 ---
 

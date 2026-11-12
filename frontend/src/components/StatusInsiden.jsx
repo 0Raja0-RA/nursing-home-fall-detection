@@ -24,6 +24,14 @@ export function StatusPenanganan({ alert }) {
             </span>
         );
     }
+    if (alert.terlewat) {
+        return (
+            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-700 dark:text-slate-300">
+                <CheckCircle2 className="w-3.5 h-3.5 text-slate-500" aria-hidden="true" />
+                Dicatat manual{alert.acknowledged_by ? ` oleh ${alert.acknowledged_by}` : ''}
+            </span>
+        );
+    }
     const respons = selisihDetik(alert.created_at, alert.claimed_at || alert.acknowledged_at);
     return (
         <span className="inline-flex flex-col text-xs">
@@ -80,6 +88,7 @@ export function StatusPutusan({ alert }) {
 export function StatusTelegram({ alert }) {
     const s = alert.telegram_status || (alert.notified ? 'terkirim' : null);
     const teks = 'inline-flex items-center gap-1.5 text-xs';
+    if (alert.terlewat) return <span className={`${teks} text-slate-500`}>Tanpa pesan (dicatat manual)</span>;
     if (s === 'terkirim') return <span className={`${teks} text-slate-600 dark:text-slate-300`}><Send className="w-3.5 h-3.5" aria-hidden="true" /> Terkirim</span>;
     if (s === 'mengirim') return <span className={`${teks} text-slate-600 dark:text-slate-300`}><Loader2 className="w-3.5 h-3.5 motion-safe:animate-spin" aria-hidden="true" /> Mengirim</span>;
     if (s === 'gagal') return <span className={`${teks} font-semibold text-slate-800 dark:text-slate-100`}><AlertCircle className="w-3.5 h-3.5" aria-hidden="true" /> Gagal terkirim</span>;

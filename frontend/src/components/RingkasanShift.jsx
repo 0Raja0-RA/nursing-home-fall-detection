@@ -94,7 +94,8 @@ export default function RingkasanShift({ onBuka }) {
 
             <section className={BAGIAN} aria-label="Angka shift">
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                    <Angka judul="Alarm" nilai={m.total} keterangan={data.latihan ? `ditambah ${data.latihan} latihan` : 'tanpa latihan'} />
+                    <Angka judul="Alarm" nilai={m.total} keterangan={[data.latihan ? `ditambah ${data.latihan} latihan` : 'tanpa latihan',
+                        m.terlewat ? `${m.terlewat} jatuh terlewat` : ''].filter(Boolean).join(' · ')} />
                     <Angka judul="Median waktu respons" nilai={m.median_respons_detik != null ? durasiTeks(m.median_respons_detik) : '–'}
                         keterangan={m.jumlah_respons ? `dari ${m.jumlah_respons} alarm` : null} />
                     <Angka judul="Alarm palsu" nilai={dinilai ? `${m.palsu} dari ${dinilai}` : '–'} keterangan="dari yang dinilai" />

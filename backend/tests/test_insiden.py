@@ -352,3 +352,37 @@ def test_metrik_kartu_riwayat(uji):
     assert m["median_respons_detik"] == 95.0 and m["jumlah_respons"] == 2
     m = uji.klien.get("/api/alerts/metrik", params={"sejak": "2026-11-12T00:00:00"}).json()
     assert (m["total"], m["median_respons_detik"]) == (1, 40.0)
+
+
+# ---- Jatuh terlewat yang dicatat manual ---------------------------------------
+
+def test_catat_jatuh_terlewat(uji):
+    from app.db.models import CameraRecord
+
+    async def kamera():
+        async with uji.factory() as s:
+            s.add(CameraRecord(id="cam-01", name="Kamar 101", source="0"))
+            await s.commit()
+    uji.klien.portal.call(kamera)
+    sebelum = uji.klien.get("/api/alerts/ringkasan").json()["total"]
+
+    r = uji.klien.post("/api/alerts/terlewat", json={
+        "camera_id": "cam-01", "waktu": "2026-11-12T06:30:00", "catatan": "  Ditemukan di lantai kamar mandi  "})
+    assert r.status_code == 201
+    a = r.json()
+    assert (a["terlewat"], a["verdict"], a["acknowledged"], a["camera_name"]) == (True, "jatuh", True, "Kamar 101")
+    assert (a["acknowledged_by"], a["caregiver_note"]) == ("Siti", "Ditemukan di lantai kamar mandi")
+
+    assert uji.klien.post("/api/alerts/terlewat", json={"camera_id": "cam-01", "waktu": "2099-01-01T00:00:00"}).status_code == 422
+    assert uji.klien.post("/api/alerts/terlewat", json={"camera_id": "cam-99", "waktu": "2026-11-12T06:30:00"}).status_code == 404
+
+    m = uji.klien.get("/api/alerts/metrik").json()
+    assert (m["total"], m["terlewat"], m["jatuh"]) == (2, 1, 0), "entri terlewat bukan alarm"
+    assert uji.klien.get("/api/alerts/ringkasan").json()["total"] == sebelum
+    assert all(b["id"] != str(a["id"]) for b in _baris_csv(uji.klien.get("/api/alerts/ekspor", params={"status": "perlu_tindakan"})))
+    [baris] = [b for b in _baris_csv(uji.klien.get("/api/alerts/ekspor")) if b["id"] == str(a["id"])]
+    assert (baris["terlewat"], baris["detik_sampai_respons"], baris["detik_sampai_ditangani"]) == ("ya", "", "")
+
+    # Catatan yang belakangan dinilai bukan jatuh keluar dari hitungan jatuh terlewat.
+    assert uji.klien.put(f"/api/alerts/{a['id']}/verdict", json={"verdict": "belum_yakin"}).status_code == 200
+    assert uji.klien.get("/api/alerts/metrik").json()["terlewat"] == 0

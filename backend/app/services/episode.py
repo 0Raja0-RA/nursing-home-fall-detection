@@ -103,7 +103,7 @@ async def pratinjau(db: AsyncSession, ambang: float, ambang_kini: float, hari: i
     )).scalars().all()
     alerts = (await db.execute(
         select(AlertRecord).where(AlertRecord.created_at >= batas - timedelta(minutes=10),
-                                  AlertRecord.simulated.is_(False))
+                                  AlertRecord.simulated.is_(False), AlertRecord.terlewat.is_(False))
     )).scalars().all()
 
     def putusan_episode(ep: EpisodeBerbaring) -> str:

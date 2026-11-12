@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ChevronRight, Download, FlaskConical, Inbox, Loader2 } from 'lucide-react';
+import { ChevronRight, Download, FlaskConical, Inbox, Loader2, Plus } from 'lucide-react';
 import { api, bacaGalat, PESAN_TERPUTUS } from '../api';
 import { usePengunjung } from '../context/auth';
 import { useLive } from '../context/LiveContext';
@@ -60,7 +60,7 @@ function KartuMetrik({ metrik, perluTindakan, labelRentang, keAntrean, kePalsu }
     return (
         <section aria-label={`Angka ${labelRentang}, tanpa latihan`} className="mb-5">
             <p className="text-xs text-slate-500 mb-2">Angka {labelRentang.toLowerCase()}, tanpa latihan.</p>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
                 <Kartu judul="Perlu tindakan" nilai={perluTindakan ?? '–'} tegas={perluTindakan > 0}
                     keterangan="belum ditangani atau belum dinilai" onPilih={keAntrean} />
                 <Kartu judul="Median waktu respons"
@@ -74,6 +74,13 @@ function KartuMetrik({ metrik, perluTindakan, labelRentang, keAntrean, kePalsu }
                     onPilih={kePalsu} />
                 <Kartu judul="Telegram gagal" nilai={metrik.telegram_gagal} tegas={metrik.telegram_gagal > 0}
                     keterangan={`dari ${metrik.total} alarm`} />
+                {/* Recall: jatuh yang memicu alarm dibanding semua jatuh yang diketahui, termasuk yang
+                    terlewat dan dicatat manual. Tanpa catatan terlewat, angka ini tidak bisa dihitung. */}
+                <Kartu judul="Jatuh terdeteksi"
+                    nilai={metrik.jatuh + metrik.terlewat ? `${metrik.jatuh} dari ${metrik.jatuh + metrik.terlewat}` : '–'}
+                    keterangan={metrik.jatuh + metrik.terlewat
+                        ? `${metrik.terlewat} terlewat, dicatat manual`
+                        : 'belum ada jatuh yang dinilai atau dicatat'} />
             </div>
         </section>
     );
@@ -84,7 +91,103 @@ function Ruang({ alert }) {
         <span className="inline-flex items-center gap-2 font-medium whitespace-nowrap">
             {alert.camera_name || alert.camera_id}
             {alert.simulated && <FlaskConical className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" aria-label="Latihan" />}
+            {alert.terlewat && (
+                <span className="text-[11px] px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200 font-semibold">
+                    terlewat
+                </span>
+            )}
         </span>
+    );
+}
+
+const INPUT = 'w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500';
+const dua = (n) => String(n).padStart(2, '0');
+
+/**
+ * Catat jatuh yang tidak memicu alarm, misalnya penghuni ditemukan di lantai. Tanpa catatan
+ * ini, jatuh yang terlewat tidak pernah muncul di riwayat dan recall tidak bisa dihitung.
+ */
+function FormTerlewat({ kamera, onSelesai, onBatal }) {
+    const [ruang, setRuang] = useState('');
+    const terpilih = ruang || kamera[0]?.[0] || '';     // daftar kamera bisa datang sesudah formulir dibuka
+    const [waktu, setWaktu] = useState('');
+    const [catatan, setCatatan] = useState('');
+    const [sibuk, setSibuk] = useState(false);
+    const [galat, setGalat] = useState('');
+
+    const isiSekarang = () => {
+        const d = new Date();
+        setWaktu(`${d.getFullYear()}-${dua(d.getMonth() + 1)}-${dua(d.getDate())}T${dua(d.getHours())}:${dua(d.getMinutes())}`);
+    };
+
+    const kirim = async (e) => {
+        e.preventDefault();
+        setSibuk(true);
+        setGalat('');
+        try {
+            const r = await api('/api/alerts/terlewat', {
+                method: 'POST', json: { camera_id: terpilih, waktu: new Date(waktu).toISOString(), catatan },
+            });
+            if (!r.ok) throw new Error(await bacaGalat(r));
+            onSelesai(await r.json());
+        } catch (err) {
+            setGalat(err instanceof TypeError ? PESAN_TERPUTUS : err.message);
+        } finally {
+            setSibuk(false);
+        }
+    };
+
+    return (
+        <form onSubmit={kirim} className="mb-5 p-4 rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 space-y-3">
+            <div>
+                <h2 className="font-semibold">Catat jatuh yang tidak memicu alarm</h2>
+                <p className="text-xs text-slate-500">
+                    Misalnya penghuni ditemukan di lantai tanpa ada alarm. Catatan ini langsung berputusan jatuh
+                    sungguhan dan tidak dihitung sebagai alarm.
+                </p>
+            </div>
+            <div className="grid sm:grid-cols-2 gap-3">
+                {kamera.length ? (
+                    <label className="text-sm font-medium">
+                        Ruang
+                        <select value={terpilih} onChange={(e) => setRuang(e.target.value)} required className={`${INPUT} mt-1`}>
+                            {kamera.map(([id, nama]) => <option key={id} value={id}>{nama}</option>)}
+                        </select>
+                    </label>
+                ) : (
+                    <p className="text-sm text-slate-500 self-center">
+                        Belum ada kamera terdaftar. Tambahkan dulu di Daftar Kamera.
+                    </p>
+                )}
+                {/* Tombol di luar <label>: label tanpa htmlFor menamai elemen pertama di dalamnya,
+                    dan itu tombolnya, bukan kolom waktunya. */}
+                <div className="text-sm font-medium">
+                    <div className="flex items-center justify-between gap-2">
+                        <label htmlFor="terlewat-waktu">Perkiraan waktu kejadian</label>
+                        <button type="button" onClick={isiSekarang} className="min-h-6 px-1 text-xs font-semibold underline underline-offset-2">
+                            Isi jam sekarang
+                        </button>
+                    </div>
+                    <input id="terlewat-waktu" type="datetime-local" value={waktu} onChange={(e) => setWaktu(e.target.value)}
+                        required className={`${INPUT} mt-1`} />
+                </div>
+            </div>
+            <label className="block text-sm font-medium">
+                Catatan
+                <textarea value={catatan} onChange={(e) => setCatatan(e.target.value)} rows={2} maxLength={500}
+                    placeholder="Mis. ditemukan di lantai kamar mandi, sadar, dibantu duduk" className={`${INPUT} mt-1`} />
+            </label>
+            {galat && <p role="alert" className="text-sm text-red-700 dark:text-red-400">{galat}</p>}
+            <div className="flex gap-2">
+                <button type="submit" disabled={sibuk || !terpilih}
+                    className="min-h-10 px-4 rounded-lg bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 text-sm font-semibold disabled:opacity-60">
+                    {sibuk ? 'Menyimpan…' : 'Simpan'}
+                </button>
+                <button type="button" onClick={onBatal} className="min-h-10 px-4 rounded-lg border border-slate-300 dark:border-slate-700 text-sm font-semibold">
+                    Batal
+                </button>
+            </div>
+        </form>
     );
 }
 
@@ -113,6 +216,8 @@ export default function AlertHistory() {
     const [galat, setGalat] = useState('');
     const [kamera, setKamera] = useState([]);
     const [metrik, setMetrik] = useState(null);
+    const [formTerlewat, setFormTerlewat] = useState(false);
+    const [kabarTerlewat, setKabarTerlewat] = useState('');
     // Disimpan sebagai objek, bukan id saja: insiden yang baru ditutup keluar dari
     // tab Perlu tindakan, tetapi lacinya tidak boleh ikut tertutup tiba-tiba.
     const [detail, setDetail] = useState(null);
@@ -246,16 +351,39 @@ export default function AlertHistory() {
                     </p>
                 </div>
                 {!pengunjung && tab !== 'shift' && (
+                    <div className="flex flex-wrap gap-2 self-start shrink-0">
+                    <button type="button" onClick={() => { setFormTerlewat((f) => !f); setKabarTerlewat(''); }}
+                        aria-expanded={formTerlewat}
+                        className="min-h-10 px-3 rounded-lg border border-slate-300 dark:border-slate-700 text-sm font-semibold inline-flex items-center gap-2 hover:bg-slate-100 dark:hover:bg-slate-800">
+                        <Plus className="w-4 h-4" aria-hidden="true" /> Catat jatuh terlewat
+                    </button>
                     <button type="button" onClick={unduh} disabled={mengunduh}
                         title="Semua insiden sesuai tab dan filter di bawah, untuk uji mini atau laporan"
-                        className="self-start shrink-0 min-h-10 px-3 rounded-lg border border-slate-300 dark:border-slate-700 text-sm font-semibold inline-flex items-center gap-2 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-60">
+                        className="min-h-10 px-3 rounded-lg border border-slate-300 dark:border-slate-700 text-sm font-semibold inline-flex items-center gap-2 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-60">
                         {mengunduh
                             ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
                             : <Download className="w-4 h-4" aria-hidden="true" />}
                         Unduh CSV
                     </button>
+                    </div>
                 )}
             </div>
+
+            {formTerlewat && !pengunjung && (
+                <FormTerlewat
+                    // Hanya kamera terdaftar: ruang yang kameranya sudah dihapus tidak bisa dicatat.
+                    kamera={kamera.map((k) => [k.id, k.nama])}
+                    onBatal={() => setFormTerlewat(false)}
+                    onSelesai={(a) => {
+                        setFormTerlewat(false);
+                        setKabarTerlewat(`Tercatat: jatuh terlewat di ${a.camera_name || a.camera_id}.`);
+                        segarkanRingkasan();
+                        ambil();
+                        ambilMetrik();
+                    }}
+                />
+            )}
+            {kabarTerlewat && <p role="status" className="mb-4 text-sm text-emerald-700 dark:text-emerald-400">{kabarTerlewat}</p>}
 
             {galatUnduh && (
                 <p role="alert" className="mb-4 text-sm text-red-700 dark:text-red-400">

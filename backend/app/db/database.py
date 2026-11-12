@@ -87,6 +87,7 @@ _KOLOM_SUSULAN: dict[str, list[tuple[str, str]]] = {
         ("klip_detik", "FLOAT"),
         ("eskalasi_ke", "INTEGER"),
         ("eskalasi_terakhir", "DATETIME"),
+        ("terlewat", "BOOLEAN NOT NULL DEFAULT 0"),
     ],
 }
 

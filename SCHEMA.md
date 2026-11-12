@@ -64,6 +64,7 @@ erDiagram
         float klip_detik
         int eskalasi_ke "pengingat Telegram yang terkirim"
         datetime eskalasi_terakhir
+        bool terlewat "jatuh yang dicatat manual"
         datetime created_at
     }
     alert_snapshots {
@@ -149,7 +150,8 @@ Rahasia seperti token bot dan ID chat Telegram tidak disimpan di sini. Keduanya 
 
 ### `alerts`
 
-Riwayat insiden. Satu baris untuk satu alarm yang dikonfirmasi state machine.
+Riwayat insiden. Satu baris untuk satu alarm yang dikonfirmasi state machine, atau untuk satu
+jatuh yang tidak memicu alarm dan dicatat manual (`terlewat`).
 
 - **Kejadian:** `camera_id`, `camera_name`, `message`, `severity`, `fall_duration`, `created_at`. Nilai `simulated` = latihan, bukan kejadian sungguhan.
 - **Penanganan:** `claimed_by`/`claimed_at` diisi saat ada yang menekan "Saya ke sana". `acknowledged`, `acknowledged_by`, dan `acknowledged_at` diisi saat alarm ditandai ditangani. `caregiver_note` berisi catatan perawat.
@@ -157,6 +159,7 @@ Riwayat insiden. Satu baris untuk satu alarm yang dikonfirmasi state machine.
 - **Keadaan sistem saat kejadian:** `threshold_sec` dan `detection_mode`. Tanpa keduanya, angka alarm palsu tidak bisa ditafsirkan.
 - **Telegram:** `telegram_status` bernilai `mengirim`, `terkirim`, `gagal`, `mati`, atau `dilewati`. `telegram_message_id` dipakai untuk menyunting pesan yang sama, dan `telegram_foto` menandai pesan berupa foto. Pada alert lama, `telegram_status` NULL dan yang berlaku adalah `notified`.
 - **Eskalasi:** `eskalasi_ke` menghitung pengingat Telegram yang sudah terkirim karena alarm belum direspons, dan `eskalasi_terakhir` jam pengingat terakhir. Pengingat dikirim setiap `eskalasi_menit` menit, paling banyak tiga kali, hanya untuk alarm yang pesan Telegram-nya terkirim (`services/eskalasi.py`).
+- **Jatuh terlewat:** `terlewat = true` berarti jatuh ini tidak memicu alarm dan dicatat manual dari Riwayat Insiden. `created_at` berisi perkiraan waktu kejadian, `verdict` langsung `jatuh`, dan pencatatnya mengisi `acknowledged_by` dan `verdict_by`. Baris ini tidak dihitung sebagai alarm, tetapi menjadi penyebut recall (jatuh terdeteksi dari semua jatuh yang diketahui) selama putusannya tetap `jatuh`; bila belakangan diubah, misalnya ternyata bukan jatuh, ia keluar dari hitungan.
 - **Klip:** `klip_status` bernilai `merekam` (menunggu detik-detik sesudah alarm), `tersimpan`, `kosong` (kamera tidak mengirim gambar di sekitar kejadian), `gagal`, atau `dihapus` (lewat masa simpan). NULL berarti tidak direkam: alert lama, atau perekaman dimatikan. `klip_detik` adalah panjang klipnya. Berkas klipnya sendiri tidak ada di database, tetapi di folder `KLIP_DIR` (bawaan `backend/klip/`, diabaikan git), satu ZIP berisi JPEG per alert, dan dihapus otomatis setelah `KLIP_MASA_SIMPAN_HARI` hari.
 - Nama ruang (`camera_name`) dan nama orang (`*_by`) **disalin, bukan dirujuk**. Riwayat harus tetap menyebut tempat dan orangnya walaupun kameranya dihapus atau akunnya dinonaktifkan. Pada alert lama, `camera_name` bisa NULL, dan `camera_id` dipakai sebagai cadangan.
 
