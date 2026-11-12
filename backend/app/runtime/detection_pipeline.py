@@ -18,6 +18,7 @@ from app.services.camera_service import CameraService
 from app.runtime.registry import registry
 from app.services.inference_service import run_inference
 from app.services import klip, mode_perawatan
+from app.services.episode import pencatat as pencatat_episode
 from app.services.overlay import anotasi, ke_jpeg
 from app.services.state_machine import FallStateMachine
 from app.websocket.ws_manager import manager
@@ -162,6 +163,7 @@ async def camera_pipeline(camera: CameraService, fsm: FallStateMachine):
             # Frame tidak tersedia atau kamera offline
             fsm.update(Observation.OFFLINE)
             jejak = None
+            pencatat_episode.amati(camera.camera_id, fsm.state, fsm.fall_duration, False)
 
             # Broadcast offline status
             status = CameraStatus(
@@ -186,6 +188,7 @@ async def camera_pipeline(camera: CameraService, fsm: FallStateMachine):
         # gambar yang masuk ke penyangga klip. Kameranya tetap menyala supaya pemantauan
         # bisa langsung berjalan lagi.
         if jeda is not None:
+            pencatat_episode.amati(camera.camera_id, fsm.state, fsm.fall_duration, False)
             status = CameraStatus(
                 camera_id=camera.camera_id,
                 is_active=True,
@@ -219,6 +222,9 @@ async def camera_pipeline(camera: CameraService, fsm: FallStateMachine):
                 
         # Update FSM dengan observasi terbaru
         new_state = fsm.update(observation)
+        # Catat lama tiap episode berbaring, untuk pratinjau ambang di Pengaturan.
+        pencatat_episode.amati(camera.camera_id, new_state, fsm.fall_duration,
+                               registry.sedang_disimulasikan(camera.camera_id))
 
         # Perbarui jejak orang yang memicu timer. Lokasinya hanya dicatat kalau
         # memang ada orang yang terbaca tergeletak; saat simulasi tanpa orang

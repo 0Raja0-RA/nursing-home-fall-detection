@@ -75,6 +75,16 @@ erDiagram
         datetime created_at
         datetime expires_at
     }
+    episode_berbaring {
+        int id PK
+        string camera_id "rujukan longgar, bukan FK"
+        datetime mulai
+        datetime selesai
+        float durasi_maks
+        bool alarm
+        bool latihan
+        bool dipotong "direset oleh Tandai Ditangani"
+    }
     jeda_kamera {
         int id PK
         string camera_id "rujukan longgar, bukan FK"
@@ -89,6 +99,7 @@ erDiagram
     alerts ||..o| alert_snapshots : "satu foto per alert"
     users ||..o{ sessions : "user_id"
     cameras ||..o{ jeda_kamera : "camera_id (tanpa FK)"
+    cameras ||..o{ episode_berbaring : "camera_id (tanpa FK)"
 ```
 
 Semua garisnya putus-putus, karena database ini tidak memasang foreign key sama sekali (`models.py` tidak memakai `ForeignKey`). Hubungan antartabel dijaga oleh kode.
@@ -145,6 +156,10 @@ Akun per orang, karena tombol "Saya ke sana" harus menyebut siapa yang menuju lo
 ### `sessions`
 
 Sesi masuk. Yang disimpan hanya hash token, sedangkan tokennya sendiri ada di cookie HttpOnly. Sesi berlaku 30 hari (`UMUR_SESI` di `api/auth.py`), dan sesi kedaluwarsa dibersihkan saat ada yang masuk.
+
+### `episode_berbaring`
+
+Satu baris untuk setiap masa seseorang terbaca berbaring sampai hitungan dimulai: kapan, berapa lama paling jauh (`durasi_maks`), dan apakah sampai berbunyi (`alarm`). Dipakai pratinjau ambang di Pengaturan, karena kejadian yang berhenti sebelum ambang tidak pernah menjadi alarm. `dipotong` berarti hitungannya direset oleh Tandai Ditangani, jadi lama sebenarnya tidak diketahui. Dicatat pipeline (`services/episode.py`); pasangannya di `alerts` dicari lewat kamera dan waktu, bukan kunci.
 
 ### `jeda_kamera`
 

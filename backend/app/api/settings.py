@@ -9,6 +9,7 @@ Endpoints:
     PUT  /api/settings/mode        — Ganti model detektor (bbox / pose)
     PUT  /api/settings/telegram    — Foto Telegram, kirim latihan, kabar kamera putus
     PUT  /api/settings/eskalasi    — Menit tanpa respons sebelum alarm dieskalasi
+    GET  /api/settings/pratinjau-ambang — Episode berbaring dinilai ulang dengan ambang lain
     POST /api/settings/test-telegram — Kirim notifikasi uji ke Telegram
 
 Semua endpoint wajib login. Perubahan dari ketiga PUT di atas disimpan ke tabel app_settings, bukan hanya ke
@@ -17,7 +18,7 @@ bawaan tanpa pemberitahuan -- dan saat demo, yang berjalan bukan pengaturan yang
 dikira sedang dipakai.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
@@ -34,6 +35,7 @@ from app.models.schemas import (
     LABEL_PUTUSAN,
     MODE_FOTO_TELEGRAM,
     EskalasiUpdate,
+    PratinjauAmbang,
     ModeUpdate,
     Pilihan,
     SettingsResponse,
@@ -168,6 +170,18 @@ async def update_telegram(payload: TelegramSettingsUpdate, db: AsyncSession = De
         await repo.simpan(KUNCI_TG_KAMERA, "1" if payload.camera_offline else "0")
     log.info(f"⚙️  Pengaturan Telegram diubah: {payload.model_dump(exclude_none=True)}")
     return await _jawaban(db)
+
+
+@router.get("/pratinjau-ambang", response_model=PratinjauAmbang)
+async def pratinjau_ambang(
+    ambang: float = Query(..., gt=0, le=60, description="Ambang yang ingin dicoba, detik"),
+    hari: int = Query(30, ge=1, le=365),
+    db: AsyncSession = Depends(get_db),
+):
+    """Apa yang terjadi pada episode berbaring beberapa hari terakhir dengan ambang lain:
+    alarm mana yang hilang (beserta putusannya) dan berapa tambahan yang belum pernah dinilai."""
+    from app.services.episode import pratinjau
+    return await pratinjau(db, ambang, get_settings().FALL_DURATION_THRESHOLD, hari)
 
 
 @router.put("/eskalasi", response_model=SettingsResponse)

@@ -176,6 +176,8 @@ async def tutup_insiden_kamera(alert: AlertRecord, db: AsyncSession) -> bool:
     if lebih_baru:
         return False
 
+    from app.services.episode import pencatat
+    pencatat.tandai_dipotong(alert.camera_id)
     fsm.reset()
     # Simulasi yang masih berjalan akan langsung memicu timer lagi, jadi ikut
     # diakhiri: "ditangani" berarti kejadiannya -- simulasi atau bukan -- selesai.

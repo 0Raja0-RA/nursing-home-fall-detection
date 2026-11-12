@@ -79,6 +79,7 @@ tetap di antrean Perlu tindakan sampai dinilai.
 |---|---|---|
 | GET | `/api/alerts/` | Daftar alert, terbaru dulu. Filter di bawah |
 | GET | `/api/alerts/ringkasan` | Jumlah per kelompok, untuk tab dan lencana menu |
+| GET | `/api/alerts/metrik` | Kartu angka Riwayat Insiden, `sejak` opsional: `total`, `jatuh`, `palsu`, `belum_yakin`, `belum_dinilai`, `belum_ditangani`, `median_respons_detik` (sampai klaim, atau penutupan bila tidak diklaim; alarm palsu ikut), `jumlah_respons`, `telegram_gagal`. Latihan tidak dihitung |
 | GET | `/api/alerts/ekspor` | Unduh CSV, filter sama dengan daftar tanpa `skip`/`limit`, urut dari yang terlama. Akun tim saja, pengunjung `403`. Kolomnya di bawah |
 | GET | `/api/alerts/count` | Hitung total alert, filter `acknowledged` opsional |
 | GET | `/api/alerts/{id}` | Detail satu alert |
@@ -190,6 +191,7 @@ terputus menunjukkan sejak kapan ia buta.
 | PUT | `/api/settings/threshold` | `{"fall_duration_threshold": 3}` (lebih dari 0, paling besar 60) |
 | PUT | `/api/settings/mode` | `{"detection_mode": "pose"}` atau `bbox`; mereset hitungan semua kamera |
 | PUT | `/api/settings/telegram` | `{"photo_mode", "send_drills", "camera_offline"}`, semuanya opsional |
+| GET | `/api/settings/pratinjau-ambang` | `?ambang=5&hari=30`: episode berbaring sungguhan dinilai ulang dengan ambang lain. `berbunyi`, `hilang` (alarm yang tidak lagi berbunyi, per putusan), `belum_tentu` (alarm yang ditutup sebelum ambang itu), `tambahan` (episode yang dulu tidak berbunyi, belum pernah dinilai) |
 | PUT | `/api/settings/eskalasi` | `{"eskalasi_menit": 1-30}`: menit tanpa "Saya ke sana" sebelum banner menulis lamanya dan grup Telegram menerima pengingat. Bawaan 2; ikut dikembalikan `GET /api/settings/` |
 | POST | `/api/settings/test-telegram` | Kirim pesan uji ke grup |
 

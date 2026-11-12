@@ -6,7 +6,7 @@ import { useLive } from '../context/LiveContext';
 import DetailInsiden from '../components/DetailInsiden';
 import { StatusPenanganan, StatusPutusan, StatusTelegram } from '../components/StatusInsiden';
 import { PUTUSAN } from '../putusan';
-import { msDari, tanggalJam, useJam, waktuRelatif } from '../waktu';
+import { durasiTeks, msDari, tanggalJam, useJam, waktuRelatif } from '../waktu';
 
 const RENTANG = [
     { id: '1', label: '24 jam terakhir' },
@@ -28,6 +28,53 @@ function Waktu({ iso, sekarang, bertumpuk = false }) {
                 ? <span className="block text-xs text-slate-500">{tanggalJam(ms)}</span>
                 : <span className="text-slate-500"> · {tanggalJam(ms)}</span>}
         </time>
+    );
+}
+
+// flex-col: isi tombol tidak ditengahkan vertikal, jadi sejajar dengan kartu biasa.
+const KARTU = 'flex flex-col text-left rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-sm';
+
+/** Satu kartu angka. Bila `onPilih` ada, kartunya sekaligus tombol filter. */
+function Kartu({ judul, nilai, keterangan, onPilih, tegas = false }) {
+    const isi = (
+        <>
+            <span className="block text-xs text-slate-500">{judul}</span>
+            <span className={`block text-2xl font-bold tabular-nums mt-1 ${tegas ? 'text-red-700 dark:text-red-400' : ''}`}>{nilai}</span>
+            <span className="block text-xs text-slate-500 mt-0.5">{keterangan}</span>
+        </>
+    );
+    return onPilih
+        ? <button type="button" onClick={onPilih} className={`${KARTU} hover:border-slate-400 dark:hover:border-slate-600`}>{isi}</button>
+        : <div className={KARTU}>{isi}</div>;
+}
+
+/**
+ * Empat angka untuk rentang yang dipilih, tanpa latihan. Persen selalu disertai jumlah
+ * mutlak, karena dari jumlah kecil persen mudah menyesatkan.
+ */
+function KartuMetrik({ metrik, perluTindakan, labelRentang, keAntrean, kePalsu }) {
+    if (!metrik) return null;
+    const dinilai = metrik.jatuh + metrik.palsu + metrik.belum_yakin;
+    const persen = dinilai ? Math.round((metrik.palsu / dinilai) * 100) : null;
+    return (
+        <section aria-label={`Angka ${labelRentang}, tanpa latihan`} className="mb-5">
+            <p className="text-xs text-slate-500 mb-2">Angka {labelRentang.toLowerCase()}, tanpa latihan.</p>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <Kartu judul="Perlu tindakan" nilai={perluTindakan ?? '–'} tegas={perluTindakan > 0}
+                    keterangan="belum ditangani atau belum dinilai" onPilih={keAntrean} />
+                <Kartu judul="Median waktu respons"
+                    nilai={metrik.median_respons_detik != null ? durasiTeks(metrik.median_respons_detik) : '–'}
+                    keterangan={metrik.jumlah_respons ? `dari ${metrik.jumlah_respons} alarm, sampai ada yang ke sana` : 'belum ada alarm yang direspons'} />
+                <Kartu judul="Alarm palsu"
+                    nilai={dinilai ? `${metrik.palsu} dari ${dinilai}` : '–'}
+                    keterangan={dinilai
+                        ? `${persen}% dari yang dinilai${metrik.belum_dinilai ? `; ${metrik.belum_dinilai} belum dinilai` : ''}`
+                        : 'belum ada alarm yang dinilai'}
+                    onPilih={kePalsu} />
+                <Kartu judul="Telegram gagal" nilai={metrik.telegram_gagal} tegas={metrik.telegram_gagal > 0}
+                    keterangan={`dari ${metrik.total} alarm`} />
+            </div>
+        </section>
     );
 }
 
@@ -64,6 +111,7 @@ export default function AlertHistory() {
     const [memuat, setMemuat] = useState(true);
     const [galat, setGalat] = useState('');
     const [kamera, setKamera] = useState([]);
+    const [metrik, setMetrik] = useState(null);
     // Disimpan sebagai objek, bukan id saja: insiden yang baru ditutup keluar dari
     // tab Perlu tindakan, tetapi lacinya tidak boleh ikut tertutup tiba-tiba.
     const [detail, setDetail] = useState(null);
@@ -139,6 +187,22 @@ export default function AlertHistory() {
         return () => clearInterval(t);
     }, [ambil, alarmAktif]);
 
+    // Kartu angka mengikuti rentang waktu yang dipilih, dan ikut segar bersama daftar.
+    const ambilMetrik = useCallback(async () => {
+        const q = new URLSearchParams();
+        if (rentang !== 'semua') q.set('sejak', new Date(Date.now() - Number(rentang) * 86400e3).toISOString());
+        try {
+            const r = await api(`/api/alerts/metrik?${q}`);
+            if (r.ok) setMetrik(await r.json());
+        } catch { /* kartu tetap menampilkan angka terakhir */ }
+    }, [rentang]);
+
+    useEffect(() => {
+        // setState-nya terjadi di callback async setelah fetch selesai, bukan sinkron.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        ambilMetrik();
+    }, [ambilMetrik, alarmAktif, ringkasan]);
+
     useEffect(() => {
         api('/api/cameras/')
             .then((r) => (r.ok ? r.json() : []))
@@ -198,6 +262,14 @@ export default function AlertHistory() {
                 </p>
             )}
 
+            <KartuMetrik
+                metrik={metrik}
+                perluTindakan={ringkasan?.perlu_tindakan}
+                labelRentang={RENTANG.find((r) => r.id === rentang)?.label || ''}
+                keAntrean={() => { setTab('perlu_tindakan'); setBatas(PER_HALAMAN); }}
+                kePalsu={() => { setTab('semua'); setPutusan('palsu'); setBatas(PER_HALAMAN); }}
+            />
+
             <div className="flex flex-col lg:flex-row lg:items-center gap-3 mb-4">
                 <div role="tablist" aria-label="Kelompok insiden" className="inline-flex self-start shrink-0 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-1 gap-1">
                     <button type="button" role="tab" aria-selected={tab === 'perlu_tindakan'}
@@ -240,12 +312,6 @@ export default function AlertHistory() {
                 </div>
             </div>
 
-            {tab === 'semua' && ringkasan && ringkasan.total > 0 && (
-                <p className="mb-4 text-sm text-slate-600 dark:text-slate-400 tabular-nums">
-                    Dari {ringkasan.total} alarm sungguhan: {ringkasan.jatuh} jatuh sungguhan, {ringkasan.palsu} alarm palsu,
-                    {' '}{ringkasan.total - ringkasan.jatuh - ringkasan.palsu} belum dinilai atau belum yakin.
-                </p>
-            )}
 
             {galat && (
                 <div role="alert" className="mb-4 p-4 rounded-xl border border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-400 text-sm">

@@ -6,6 +6,7 @@ REST endpoints untuk insiden (alert jatuh) dan penanganannya. Semua wajib login.
 Endpoints:
     GET  /api/alerts/                — Daftar alert, dengan filter antrean
     GET  /api/alerts/ekspor          — Unduh CSV dengan filter yang sama (tim saja)
+    GET  /api/alerts/metrik          — Kartu angka untuk rentang waktu (tanpa latihan)
     GET  /api/alerts/ringkasan       — Jumlah per kelompok, untuk tab dan lencana
     GET  /api/alerts/count           — Hitung total alert (lama, tetap dipertahankan)
     GET  /api/alerts/{id}            — Detail satu alert
@@ -23,6 +24,7 @@ yang ditutup tanpa putusan tetap di antrean Perlu tindakan sampai dinilai.
 """
 
 import asyncio
+import statistics
 from datetime import datetime
 from typing import Annotated, Literal, Optional
 
@@ -39,6 +41,7 @@ from app.models.schemas import (
     AckRequest,
     AlertResponse,
     AlertSummary,
+    MetrikInsiden,
     NoteUpdate,
     Putusan,
     VerdictUpdate,
@@ -155,6 +158,36 @@ async def ekspor_csv(
     return Response(content=csv_insiden(alerts), media_type="text/csv; charset=utf-8",
                     headers={"Content-Disposition": f'attachment; filename="{nama}"',
                              "Cache-Control": "no-store"})
+
+
+@router.get("/metrik", response_model=MetrikInsiden)
+async def metrik(
+    sejak: Optional[datetime] = Query(None, description="Batas bawah created_at (UTC)"),
+    db: AsyncSession = Depends(get_db),
+):
+    """Kartu angka Riwayat Insiden untuk rentang waktu yang dipilih. Latihan tidak dihitung."""
+    query = select(AlertRecord).where(AlertRecord.simulated.is_(False))
+    if sejak:
+        query = query.where(AlertRecord.created_at >= sejak.replace(tzinfo=None))
+    alerts = (await db.execute(query)).scalars().all()
+
+    respons = []
+    for a in alerts:
+        pertama = min((t for t in (a.claimed_at, a.acknowledged_at) if t is not None), default=None)
+        if pertama is not None:
+            respons.append(max(0.0, (pertama - a.created_at).total_seconds()))
+    hitung = lambda syarat: sum(1 for a in alerts if syarat(a))      # noqa: E731
+    return MetrikInsiden(
+        total=len(alerts),
+        jatuh=hitung(lambda a: a.verdict == Putusan.JATUH.value),
+        palsu=hitung(lambda a: a.verdict == Putusan.PALSU.value),
+        belum_yakin=hitung(lambda a: a.verdict == Putusan.BELUM_YAKIN.value),
+        belum_dinilai=hitung(lambda a: a.acknowledged and not a.verdict),
+        belum_ditangani=hitung(lambda a: not a.acknowledged),
+        median_respons_detik=round(statistics.median(respons), 1) if respons else None,
+        jumlah_respons=len(respons),
+        telegram_gagal=hitung(lambda a: a.telegram_status == "gagal"),
+    )
 
 
 @router.get("/ringkasan", response_model=AlertSummary)

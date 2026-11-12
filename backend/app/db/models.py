@@ -197,3 +197,24 @@ class JedaKamera(Base):
     oleh = Column(String, nullable=True)
     selesai = Column(DateTime, nullable=True)          # diisi bila dihentikan lebih awal
     diakhiri_oleh = Column(String, nullable=True)
+
+
+class EpisodeBerbaring(Base):
+    """Satu masa seseorang terbaca berbaring sampai hitungan dimulai, untuk pratinjau ambang.
+
+    Alarm saja tidak cukup untuk menilai ambang: kejadian yang berhenti sebelum ambang
+    tidak pernah menjadi alarm. Lihat app/services/episode.py.
+    """
+
+    __tablename__ = "episode_berbaring"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    camera_id = Column(String, nullable=False, index=True)
+    mulai = Column(DateTime, nullable=False, index=True)
+    selesai = Column(DateTime, nullable=False)
+    durasi_maks = Column(Float, nullable=False)        # detik, paling jauh hitungannya
+    alarm = Column(Boolean, nullable=False, default=False)
+    latihan = Column(Boolean, nullable=False, default=False)
+    # Hitungan direset oleh "Tandai Ditangani", bukan karena orangnya bangun:
+    # lama sebenarnya tidak diketahui.
+    dipotong = Column(Boolean, nullable=False, default=False)

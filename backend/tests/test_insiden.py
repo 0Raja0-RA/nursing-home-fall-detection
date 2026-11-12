@@ -339,3 +339,16 @@ def test_klip_kejadian(uji, monkeypatch, tmp_path):
     assert r.status_code == 200 and r.headers["cache-control"] == "no-store"
     assert [f["t"] for f in r.json()["frame"]] == [0.0, 0.25]
     assert uji.klien.get("/api/alerts/99/klip").status_code == 404
+
+
+def test_metrik_kartu_riwayat(uji):
+    awal = datetime(2026, 11, 12, 7, 0, 0)
+    _isi(uji, 1, claimed_by="Siti", claimed_at=awal + timedelta(seconds=40), acknowledged=True,
+         acknowledged_at=awal + timedelta(seconds=90), verdict="palsu", verdict_reason="lainnya")
+    _isi(uji, 3, acknowledged=True, acknowledged_at=datetime(2026, 11, 11, 7, 2, 30), verdict="jatuh")
+
+    m = uji.klien.get("/api/alerts/metrik").json()
+    assert (m["total"], m["palsu"], m["jatuh"], m["telegram_gagal"]) == (2, 1, 1, 1), "latihan tidak dihitung"
+    assert m["median_respons_detik"] == 95.0 and m["jumlah_respons"] == 2
+    m = uji.klien.get("/api/alerts/metrik", params={"sejak": "2026-11-12T00:00:00"}).json()
+    assert (m["total"], m["median_respons_detik"]) == (1, 40.0)

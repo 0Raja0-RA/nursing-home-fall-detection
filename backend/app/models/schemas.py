@@ -336,6 +336,34 @@ class ScanResponse(BaseModel):
 
 # ---- Settings ----------------------------------------------
 
+class MetrikInsiden(BaseModel):
+    """Angka untuk kartu di Riwayat Insiden. Latihan tidak dihitung."""
+    total: int = 0                      # alarm sungguhan dalam rentang
+    jatuh: int = 0
+    palsu: int = 0
+    belum_yakin: int = 0
+    belum_dinilai: int = 0              # sudah ditangani, putusan kosong
+    belum_ditangani: int = 0
+    # Dari alarm sampai klaim, atau sampai penutupan bila tidak diklaim. Ikut dihitung
+    # untuk alarm palsu, karena perawat tidak tahu statusnya sebelum memeriksa.
+    median_respons_detik: Optional[float] = None
+    jumlah_respons: int = 0
+    telegram_gagal: int = 0
+
+
+class PratinjauAmbang(BaseModel):
+    """Episode berbaring beberapa hari terakhir, dinilai ulang dengan ambang lain."""
+    ambang: float
+    ambang_kini: float
+    hari: int
+    episode: int = Field(0, description="Episode berbaring sungguhan yang tercatat")
+    berbunyi: int = Field(0, description="Yang akan memicu alarm pada ambang ini")
+    hilang: dict[str, int] = Field(default_factory=dict,
+                                   description="Alarm yang tidak lagi berbunyi, per putusan")
+    belum_tentu: int = Field(0, description="Alarm yang ditutup sebelum mencapai ambang ini")
+    tambahan: int = Field(0, description="Episode yang dulu tidak berbunyi tetapi akan berbunyi")
+
+
 class EskalasiUpdate(BaseModel):
     """Body PUT /api/settings/eskalasi."""
     eskalasi_menit: int = Field(..., ge=1, le=30, description="Menit tanpa respons sebelum eskalasi")

@@ -30,6 +30,68 @@ function Kabar({ kabar }) {
     );
 }
 
+/**
+ * Pratinjau ambang dari episode berbaring 30 hari terakhir: alarm yang hilang bila ambang
+ * dinaikkan (beserta putusannya, termasuk jatuh sungguhan), dan alarm tambahan yang belum
+ * pernah dinilai bila diturunkan. Latihan tidak dihitung.
+ */
+function PratinjauAmbang({ ambang, ambangKini }) {
+    const [hasil, setHasil] = useState(null);
+    useEffect(() => {
+        let batal = false;
+        // Ditunda sebentar supaya menggeser slider tidak mengirim satu permintaan per langkah.
+        const t = setTimeout(async () => {
+            try {
+                const r = await api(`/api/settings/pratinjau-ambang?ambang=${ambang}`);
+                if (r.ok && !batal) setHasil(await r.json());
+            } catch { /* pratinjau tidak wajib */ }
+        }, 400);
+        return () => {
+            batal = true;
+            clearTimeout(t);
+        };
+    }, [ambang]);
+
+    if (!hasil || Number(hasil.ambang) !== Number(ambang)) return null;
+    if (!hasil.episode) {
+        return (
+            <p className="text-xs text-slate-500 mt-2">
+                Pratinjau: belum ada episode berbaring yang tercatat dalam 30 hari terakhir. Angkanya mulai
+                terisi setelah sistem berjalan beberapa hari.
+            </p>
+        );
+    }
+    const naik = Number(ambang) > Number(ambangKini);
+    const turun = Number(ambang) < Number(ambangKini);
+    const jatuh = hasil.hilang.jatuh || 0;
+    const palsu = hasil.hilang.palsu || 0;
+    const hilang = Object.values(hasil.hilang).reduce((x, y) => x + y, 0);
+    let teks = `Pada ${ambang} detik, ${hasil.berbunyi} dari ${hasil.episode} episode berbaring memicu alarm.`;
+    if (naik) {
+        const rincian = [[palsu, 'alarm palsu'], [jatuh, 'jatuh sungguhan'], [hilang - palsu - jatuh, 'belum dinilai atau belum yakin']]
+            .filter(([n]) => n > 0).map(([n, label]) => `${n} ${label}`);
+        teks = hilang ? `${hilang} alarm tidak akan berbunyi: ${rincian.join(', ')}.` : 'Tidak ada alarm yang hilang.';
+        if (hasil.belum_tentu) teks += ` ${hasil.belum_tentu} alarm lain belum tentu, karena ditutup sebelum ${ambang} detik.`;
+    } else if (turun) {
+        teks = hasil.tambahan
+            ? `Ada ${hasil.tambahan} alarm tambahan dari orang yang dulu bangun sebelum ${ambangKini} detik. Belum ada yang menilai apakah itu jatuh.`
+            : 'Tidak ada alarm tambahan.';
+    }
+    return (
+        <div role="status" className="mt-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 p-3 text-xs space-y-1">
+            <p className="font-semibold text-slate-700 dark:text-slate-300">
+                Pratinjau dari {hasil.episode} episode berbaring, 30 hari terakhir
+            </p>
+            <p className="text-slate-600 dark:text-slate-400">{teks}</p>
+            {naik && jatuh > 0 && (
+                <p className="font-semibold text-amber-700 dark:text-amber-400">
+                    Termasuk {jatuh} jatuh sungguhan yang tidak akan dikabarkan.
+                </p>
+            )}
+        </div>
+    );
+}
+
 export default function Settings() {
     const [threshold, setThreshold] = useState(10);
     const [mode, setMode] = useState('');
@@ -223,6 +285,7 @@ export default function Settings() {
                                 Alarm berbunyi setelah seseorang terbaca berbaring selama {threshold} detik. Lebih pendek,
                                 lebih banyak alarm palsu. Lebih panjang, pertolongan bisa terlambat.
                             </p>
+                            <PratinjauAmbang ambang={threshold} ambangKini={tersimpan.threshold} />
                         </div>
 
                         <Kabar kabar={kabar} />

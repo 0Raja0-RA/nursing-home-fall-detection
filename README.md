@@ -274,6 +274,7 @@ Semua endpoint wajib login, kecuali health check, `/api/auth/status`, `/api/auth
 | GET    | `/api/alerts/`               | Daftar alert, dengan filter antrean                 |
 | GET    | `/api/alerts/ringkasan`      | Jumlah per kelompok untuk tab dan lencana           |
 | GET    | `/api/alerts/ekspor`         | Unduh CSV insiden sesuai filter (akun tim)          |
+| GET    | `/api/alerts/metrik`         | Kartu angka untuk rentang waktu, tanpa latihan      |
 | GET    | `/api/alerts/count`          | Hitung total alert                                  |
 | GET    | `/api/alerts/{id}`           | Detail satu alert                                   |
 | GET    | `/api/alerts/{id}/snapshot`  | Foto kejadian                                       |
@@ -297,6 +298,7 @@ Semua endpoint wajib login, kecuali health check, `/api/auth/status`, `/api/auth
 | PUT    | `/api/settings/mode`         | Ganti model detektor (`bbox` / `pose`)              |
 | PUT    | `/api/settings/telegram`     | Foto Telegram, kirim latihan, kabar kamera putus    |
 | PUT    | `/api/settings/eskalasi`     | Menit tanpa respons sebelum alarm dieskalasi        |
+| GET    | `/api/settings/pratinjau-ambang` | Episode berbaring dinilai ulang dengan ambang lain |
 | POST   | `/api/cameras/{id}/simulate-fall` | Paksa simulasi jatuh (untuk demo)              |
 | POST   | `/api/cameras/{id}/jeda`     | Mode perawatan: jeda atau perpanjang `{menit}`      |
 | DELETE | `/api/cameras/{id}/jeda`     | Hentikan Mode perawatan lebih awal                  |
