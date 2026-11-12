@@ -82,5 +82,9 @@ class AlertRecord(Base):
     # ditangani, atau belakangan dari halaman Riwayat Insiden -- dalam keadaan
     # darurat perawat menolong dulu, baru menulis.
     caregiver_note = Column(String, nullable=True)
+    # Nama ruang saat kejadian. Disalin, bukan dirujuk, karena kamera bisa diganti
+    # namanya atau dihapus, sedangkan riwayat harus tetap menyebut tempat kejadiannya.
+    # NULL pada alert yang dibuat sebelum kolom ini ada; pakai camera_id sebagai cadangan.
+    camera_name = Column(String, nullable=True)
     created_at = Column(DateTime, default=utc_now_naive)
     acknowledged_at = Column(DateTime, nullable=True)

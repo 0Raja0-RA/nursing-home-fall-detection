@@ -20,7 +20,7 @@ import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
-from app.db.models import Base
+from app.db.models import AlertRecord, Base
 from app.db.repository import CameraRepository
 from app.models.schemas import CameraCreate, CameraUpdate
 from app.services.camera_service import sumber_adalah_file, validasi_sumber
@@ -94,18 +94,126 @@ async def sesi() -> AsyncSession:
 
 
 @pytest.mark.asyncio
-async def test_id_kamera_berurutan_dan_slot_kosong_dipakai_ulang(sesi: AsyncSession):
+async def test_id_kamera_berurutan_dan_nomor_tidak_dipakai_ulang(sesi: AsyncSession):
     repo = CameraRepository(sesi)
 
     for n in range(1, 4):
         rec = await repo.create_camera(CameraCreate(name=f"Kamar {n}", source=f"rtsp://10.0.0.{n}:554/s"))
         assert rec.id == f"cam-{n:02d}"
 
-    # Hapus yang di tengah: id-nya harus dipakai ulang, bukan melompat ke cam-04.
+    # Hapus yang di tengah: nomornya tidak boleh terpakai lagi.
     assert await repo.delete_camera("cam-02") is True
     rec = await repo.create_camera(CameraCreate(name="Pengganti", source="rtsp://10.0.0.9:554/s"))
-    assert rec.id == "cam-02"
+    assert rec.id == "cam-04"
     assert await repo.count() == 3
+
+
+@pytest.mark.asyncio
+async def test_nomor_tidak_dipakai_ulang_setelah_semua_kamera_dihapus(sesi: AsyncSession):
+    """Kasus yang teramati: sesudah semua dihapus, kamera baru kembali menjadi cam-01."""
+    repo = CameraRepository(sesi)
+    await repo.create_camera(CameraCreate(name="A", source="rtsp://10.0.0.1:554/s"))
+    await repo.create_camera(CameraCreate(name="B", source="rtsp://10.0.0.2:554/s"))
+    await repo.delete_camera("cam-01")
+    await repo.delete_camera("cam-02")
+
+    rec = await repo.create_camera(CameraCreate(name="Baru", source="rtsp://10.0.0.3:554/s"))
+    assert rec.id == "cam-03"
+
+
+@pytest.mark.asyncio
+async def test_nomor_tetap_tercatat_setelah_backend_restart(tmp_path: Path):
+    """Penanda harus tersimpan di berkas database, bukan hanya di memori."""
+    url = f"sqlite+aiosqlite:///{(tmp_path / 'uji.db').as_posix()}"
+
+    engine = create_async_engine(url)
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    async with sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)() as s:
+        repo = CameraRepository(s)
+        await repo.create_camera(CameraCreate(name="A", source="rtsp://10.0.0.1:554/s"))
+        await repo.delete_camera("cam-01")
+    await engine.dispose()
+
+    engine = create_async_engine(url)
+    async with sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)() as s:
+        rec = await CameraRepository(s).create_camera(CameraCreate(name="B", source="rtsp://10.0.0.2:554/s"))
+    await engine.dispose()
+    assert rec.id == "cam-02"
+
+
+@pytest.mark.asyncio
+async def test_database_lama_melewati_nomor_yang_masih_ada_di_riwayat(sesi: AsyncSession):
+    """Database lama belum punya penanda, tetapi alertnya masih merujuk cam-07."""
+    sesi.add(AlertRecord(camera_id="cam-07", message="riwayat lama", fall_duration=10.0))
+    await sesi.commit()
+
+    rec = await CameraRepository(sesi).create_camera(CameraCreate(name="Baru", source="rtsp://10.0.0.1:554/s"))
+    assert rec.id == "cam-08"
+
+
+@pytest.mark.asyncio
+async def test_id_eksplisit_ikut_tercatat(sesi: AsyncSession):
+    repo = CameraRepository(sesi)
+    await repo.create_camera(CameraCreate(name="A", source="rtsp://10.0.0.1:554/s"), camera_id="cam-05")
+    await repo.delete_camera("cam-05")
+
+    rec = await repo.create_camera(CameraCreate(name="B", source="rtsp://10.0.0.2:554/s"))
+    assert rec.id == "cam-06"
+
+
+@pytest.mark.asyncio
+async def test_urutan_daftar_mengikuti_angka_bukan_huruf(sesi: AsyncSession):
+    repo = CameraRepository(sesi)
+    await repo.create_camera(CameraCreate(name="A", source="rtsp://10.0.0.1:554/s"), camera_id="cam-100")
+    await repo.create_camera(CameraCreate(name="B", source="rtsp://10.0.0.2:554/s"), camera_id="cam-99")
+
+    assert [k.id for k in await repo.list_cameras()] == ["cam-99", "cam-100"]
+
+
+@pytest_asyncio.fixture
+async def pabrik_sesi(monkeypatch):
+    """Database sementara untuk muat_dari_db, tanpa membuka kamera sungguhan."""
+    from app.runtime import camera_manager
+
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    factory = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+    async def mulai_palsu(record):
+        return True
+
+    monkeypatch.setattr("app.db.database.get_session_factory", lambda: factory)
+    monkeypatch.setattr(camera_manager, "mulai_kamera", mulai_palsu)
+    yield factory
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_kamera_bawaan_database_baru_tetap_cam_01(pabrik_sesi):
+    from app.runtime import camera_manager
+
+    await camera_manager.muat_dari_db()
+
+    async with pabrik_sesi() as s:
+        assert [k.id for k in await CameraRepository(s).list_cameras()] == ["cam-01"]
+
+
+@pytest.mark.asyncio
+async def test_kamera_bawaan_saat_restart_tidak_memakai_nomor_lama(pabrik_sesi):
+    """Semua kamera dihapus lalu backend restart: kamera bawaan tidak boleh jadi cam-01 lagi."""
+    from app.runtime import camera_manager
+
+    async with pabrik_sesi() as s:
+        repo = CameraRepository(s)
+        await repo.create_camera(CameraCreate(name="Lama", source="rtsp://10.0.0.1:554/s"))
+        await repo.delete_camera("cam-01")
+
+    await camera_manager.muat_dari_db()
+
+    async with pabrik_sesi() as s:
+        assert [k.id for k in await CameraRepository(s).list_cameras()] == ["cam-02"]
 
 
 @pytest.mark.asyncio

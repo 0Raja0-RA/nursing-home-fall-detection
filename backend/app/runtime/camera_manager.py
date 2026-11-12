@@ -127,7 +127,7 @@ async def muat_dari_db() -> None:
                 rotate=settings.CAMERA_ROTATE,
                 enabled=True,
             )
-            records = [await repo.create_camera(bawaan, camera_id="cam-01")]
+            records = [await repo.create_camera(bawaan)]
             log.info(f"Tabel kamera kosong, mendaftarkan bawaan dari CAMERA_SOURCE={settings.CAMERA_SOURCE}")
 
     aktif = 0

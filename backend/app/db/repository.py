@@ -5,15 +5,26 @@ Repository layer untuk operasi ke database.
 Semua query SQL harus melalui layer ini agar konsisten.
 """
 
+import re
 from datetime import datetime
 from typing import Sequence
 
-from sqlalchemy import delete, select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import utc_now_naive
 from app.db.models import AlertRecord, AppSetting, CameraRecord
 from app.models.schemas import AlertCreate, CameraCreate, CameraUpdate
+
+# Nomor kamera tertinggi yang pernah dipakai. Disimpan di app_settings karena harus
+# bertahan walaupun semua kamera dihapus, dan tabel itu sudah ada di setiap database.
+KUNCI_NOMOR_KAMERA = "camera_last_number"
+
+
+def _nomor_kamera(camera_id: str) -> int:
+    """Angka di dalam id seperti cam-07. Id berbentuk lain dihitung 0."""
+    cocok = re.fullmatch(r"cam-(\d+)", camera_id)
+    return int(cocok.group(1)) if cocok else 0
 
 
 class AlertRepository:
@@ -26,6 +37,7 @@ class AlertRepository:
         """Buat record alert baru."""
         db_obj = AlertRecord(
             camera_id=data.camera_id,
+            camera_name=data.camera_name,
             severity=data.severity.value,
             message=data.message,
             fall_duration=data.fall_duration,
@@ -76,8 +88,11 @@ class CameraRepository:
         self.session = session
 
     async def list_cameras(self) -> Sequence[CameraRecord]:
-        """Ambil semua kamera terdaftar, urut berdasarkan id (cam-01, cam-02, ...)."""
-        stmt = select(CameraRecord).order_by(CameraRecord.id)
+        """Ambil semua kamera terdaftar, urut berdasarkan id (cam-01, cam-02, ...).
+
+        Panjang id dibandingkan lebih dulu, supaya cam-100 tetap sesudah cam-99.
+        """
+        stmt = select(CameraRecord).order_by(func.length(CameraRecord.id), CameraRecord.id)
         result = await self.session.execute(stmt)
         return result.scalars().all()
 
@@ -90,29 +105,43 @@ class CameraRepository:
         result = await self.session.execute(select(CameraRecord.id))
         return len(result.scalars().all())
 
-    async def next_id(self) -> str:
-        """Hasilkan id kamera berikutnya: cam-01, cam-02, dan seterusnya.
+    async def _nomor_tertinggi(self) -> int:
+        """Nomor kamera tertinggi yang pernah dipakai.
 
-        Nomor yang sudah dipakai dilewati, dan slot kosong di tengah dipakai ulang
-        supaya id tetap pendek setelah ada kamera yang dihapus.
+        Kamera dan alert ikut diperiksa untuk database lama yang belum punya penanda:
+        nomor yang masih dirujuk riwayatnya tidak boleh terpakai lagi.
         """
-        result = await self.session.execute(select(CameraRecord.id))
-        terpakai = set(result.scalars().all())
-        n = 1
-        while f"cam-{n:02d}" in terpakai:
-            n += 1
-        return f"cam-{n:02d}"
+        penanda = await self.session.get(AppSetting, KUNCI_NOMOR_KAMERA)
+        kamera = (await self.session.execute(select(CameraRecord.id))).scalars().all()
+        alert = (await self.session.execute(select(AlertRecord.camera_id).distinct())).scalars().all()
+        return max([
+            int(penanda.value) if penanda else 0,
+            *map(_nomor_kamera, kamera),
+            *map(_nomor_kamera, alert),
+        ])
 
     async def create_camera(self, data: CameraCreate, camera_id: str | None = None) -> CameraRecord:
-        """Daftarkan kamera baru."""
+        """Daftarkan kamera baru. Tanpa camera_id, dipakai nomor berikutnya: cam-01, cam-02, dst.
+
+        Nomor yang pernah dipakai tidak dipakai lagi, walaupun kameranya sudah dihapus.
+        Alert merujuk kamera lewat id ini, jadi nomor yang didaur ulang membuat kejadian
+        lama seolah terjadi di ruang yang baru.
+        """
+        tertinggi = await self._nomor_tertinggi()
+        camera_id = camera_id or f"cam-{tertinggi + 1:02d}"
         db_obj = CameraRecord(
-            id=camera_id or await self.next_id(),
+            id=camera_id,
             name=data.name,
             source=data.source,
             rotate=data.rotate,
             enabled=data.enabled,
         )
         self.session.add(db_obj)
+        # Ditulis dalam transaksi yang sama dengan kameranya.
+        await self.session.merge(AppSetting(
+            key=KUNCI_NOMOR_KAMERA,
+            value=str(max(tertinggi, _nomor_kamera(camera_id))),
+        ))
         await self.session.commit()
         await self.session.refresh(db_obj)
         return db_obj

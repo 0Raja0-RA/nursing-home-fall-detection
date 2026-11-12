@@ -97,6 +97,13 @@ def test_catatan_muncul_di_daftar_riwayat(klien):
     assert daftar[0]["caregiver_note"] == "Dibantu duduk."
 
 
+def test_alert_tanpa_nama_ruang_tetap_terbaca(klien):
+    """Alert lama belum punya nama ruang; camera_id menjadi cadangan untuk tampilan."""
+    alert = klien.get("/api/alerts/").json()[0]
+    assert alert["camera_name"] is None
+    assert alert["camera_id"] == "cam-01"
+
+
 def test_catatan_terlalu_panjang_ditolak(klien):
     r = klien.put("/api/alerts/1/note", json={"note": "x" * 501})
     assert r.status_code == 422
@@ -139,3 +146,29 @@ async def test_database_lama_mendapat_kolom_catatan_tanpa_kehilangan_riwayat(eng
 
     assert "caregiver_note" in kolom
     assert isi == [("riwayat lama", None)]
+
+
+@pytest.mark.asyncio
+async def test_database_lama_mendapat_kolom_nama_ruang_tanpa_kehilangan_riwayat(engine_lama):
+    from app.db.database import _tambal_kolom
+
+    async with engine_lama.begin() as conn:
+        await conn.execute(text(
+            "CREATE TABLE alerts (id INTEGER PRIMARY KEY, camera_id VARCHAR NOT NULL, "
+            "severity VARCHAR NOT NULL, message VARCHAR NOT NULL, fall_duration FLOAT NOT NULL, "
+            "acknowledged BOOLEAN, notified BOOLEAN, simulated BOOLEAN NOT NULL DEFAULT 0, "
+            "caregiver_note VARCHAR, created_at DATETIME, acknowledged_at DATETIME)"))
+        await conn.execute(text(
+            "INSERT INTO alerts (camera_id, severity, message, fall_duration, caregiver_note) "
+            "VALUES ('cam-02', 'critical', 'riwayat lama', 12.0, 'Dibantu duduk.')"))
+
+    async with engine_lama.begin() as conn:
+        await _tambal_kolom(conn)
+        # Dijalankan dua kali seperti saat backend restart: tidak boleh gagal.
+        await _tambal_kolom(conn)
+
+    async with engine_lama.begin() as conn:
+        isi = (await conn.execute(text(
+            "SELECT camera_id, camera_name, message, caregiver_note FROM alerts"))).fetchall()
+
+    assert isi == [("cam-02", None, "riwayat lama", "Dibantu duduk.")]

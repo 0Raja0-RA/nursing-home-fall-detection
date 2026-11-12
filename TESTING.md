@@ -23,6 +23,8 @@ Lalu buka di browser:
 | Dokumentasi API | <http://127.0.0.1:8000/docs> |
 | Dashboard | <http://localhost:5173> |
 
+`cam-01` adalah kamera pertama pada database baru. Nomor kamera yang dihapus tidak dipakai lagi, jadi kalau kamera pernah dihapus, lihat nomornya di `GET /api/cameras/`.
+
 ---
 
 ## 1. Persiapan (sekali saja)
@@ -99,7 +101,7 @@ Buka **Kelola Kamera** di sidebar.
   menghilangkan keharusan membaca alamat IP dari layar HP setiap kali berpindah WiFi.
 - **Rotasi** — dropdown di tiap baris (0/90/180/270, searah jarum jam). Nilainya **per
   kamera**, jadi kamera HP bisa 90° sementara webcam laptop tetap 0°.
-- **Hapus** — ikon tempat sampah. Kamera langsung dimatikan.
+- **Hapus** — ikon tempat sampah. Kamera langsung dimatikan. Nomornya tidak dipakai lagi, supaya riwayat alert lama tetap menunjuk kamera yang benar.
 
 Kamera yang terdaftar otomatis muncul di halaman **Simulasi Live**, lengkap dengan stream
 dan bounding box-nya.

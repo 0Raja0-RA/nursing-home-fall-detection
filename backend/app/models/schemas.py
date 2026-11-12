@@ -58,6 +58,9 @@ class AlertSeverity(str, Enum):
 class AlertBase(BaseModel):
     """Base schema untuk alert."""
     camera_id: str = Field(..., description="ID kamera sumber deteksi")
+    camera_name: Optional[str] = Field(
+        None, description="Nama ruang saat kejadian. Kosong pada alert lama; pakai camera_id sebagai cadangan."
+    )
     severity: AlertSeverity = AlertSeverity.CRITICAL
     message: str = Field(..., description="Deskripsi alert")
 

@@ -57,6 +57,9 @@ class AlertService:
         message_text = f"{awalan}Terdeteksi jatuh pada {nama_kamera} selama {duration:.1f} detik."
         alert_data = AlertCreate(
             camera_id=camera_id,
+            # _nama_kamera jatuh ke camera_id kalau namanya tidak terbaca, dan itu
+            # bukan nama ruang, jadi kolomnya dibiarkan kosong.
+            camera_name=nama_kamera if nama_kamera != camera_id else None,
             severity=AlertSeverity.CRITICAL,
             message=message_text,
             fall_duration=duration,

@@ -18,7 +18,7 @@ from sqlalchemy.orm import sessionmaker
 
 from app.db.models import Base
 from app.db.repository import AlertRepository, CameraRepository
-from app.models.schemas import CameraCreate
+from app.models.schemas import AlertResponse, CameraCreate, CameraUpdate
 from app.services import alert_service as mod
 
 
@@ -89,6 +89,36 @@ async def test_alert_tersimpan_dengan_nama_kamar(lingkungan):
     assert "Kamar 01 - Jenderal Ilham" in alerts[0].message
     assert alerts[0].camera_id == "cam-01"
     assert alerts[0].fall_duration == pytest.approx(12.3)
+
+
+@pytest.mark.asyncio
+async def test_alert_tetap_menyebut_ruang_saat_kejadian(lingkungan):
+    """Kamera diganti namanya, dihapus, lalu kamera baru didaftarkan: riwayat tidak berubah."""
+    await _service().process_confirmed_fall("cam-01", 12.3)
+
+    async with lingkungan["factory"]() as s:
+        repo = CameraRepository(s)
+        await repo.update_camera("cam-01", CameraUpdate(name="Gudang"))
+        await repo.delete_camera("cam-01")
+        baru = await repo.create_camera(CameraCreate(name="Kamar Baru", source="rtsp://10.0.0.9:554/s"))
+        alerts = await AlertRepository(s).get_recent_alerts()
+
+    assert baru.id != "cam-01"
+    assert alerts[0].camera_id == "cam-01"
+    assert alerts[0].camera_name == "Kamar 01 - Jenderal Ilham"
+    assert AlertResponse.model_validate(alerts[0]).camera_name == "Kamar 01 - Jenderal Ilham"
+
+
+@pytest.mark.asyncio
+async def test_nama_ruang_kosong_kalau_kamera_tidak_dikenal(lingkungan):
+    """camera_id bukan nama ruang, jadi tidak boleh tersimpan sebagai nama."""
+    await _service().process_confirmed_fall("cam-99", 10.0)
+
+    async with lingkungan["factory"]() as s:
+        alerts = await AlertRepository(s).get_recent_alerts()
+
+    assert alerts[0].camera_id == "cam-99"
+    assert alerts[0].camera_name is None
 
 
 @pytest.mark.asyncio
