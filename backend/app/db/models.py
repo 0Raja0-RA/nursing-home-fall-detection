@@ -218,3 +218,13 @@ class EpisodeBerbaring(Base):
     # Hitungan direset oleh "Tandai Ditangani", bukan karena orangnya bangun:
     # lama sebenarnya tidak diketahui.
     dipotong = Column(Boolean, nullable=False, default=False)
+
+
+class SerahTerima(Base):
+    """Tanda bahwa ringkasan satu shift sudah dibaca shift berikutnya."""
+
+    __tablename__ = "serah_terima"
+
+    shift_mulai = Column(DateTime, primary_key=True)   # UTC, awal shift yang diringkas
+    dibaca_oleh = Column(String, nullable=False)
+    dibaca_pada = Column(DateTime, nullable=False, default=utc_now_naive)

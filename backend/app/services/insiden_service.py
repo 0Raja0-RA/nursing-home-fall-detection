@@ -41,6 +41,38 @@ def alert_ke_dict(alert: AlertRecord) -> dict:
     return AlertResponse.model_validate(alert).model_dump(mode="json")
 
 
+def hitung_metrik(alerts) -> "MetrikInsiden":
+    """Angka kartu dan ringkasan shift dari alert sungguhan (latihan sudah disaring pemanggil).
+
+    Waktu respons sampai klaim, atau sampai penutupan bila tidak diklaim. Alarm palsu ikut
+    dihitung, karena perawat tidak tahu statusnya sebelum memeriksa.
+    """
+    import statistics
+
+    from app.models.schemas import MetrikInsiden
+
+    respons = []
+    for a in alerts:
+        pertama = min((t for t in (a.claimed_at, a.acknowledged_at) if t is not None), default=None)
+        if pertama is not None:
+            respons.append(max(0.0, (pertama - a.created_at).total_seconds()))
+
+    def hitung(syarat) -> int:
+        return sum(1 for a in alerts if syarat(a))
+
+    return MetrikInsiden(
+        total=len(alerts),
+        jatuh=hitung(lambda a: a.verdict == Putusan.JATUH.value),
+        palsu=hitung(lambda a: a.verdict == Putusan.PALSU.value),
+        belum_yakin=hitung(lambda a: a.verdict == Putusan.BELUM_YAKIN.value),
+        belum_dinilai=hitung(lambda a: a.acknowledged and not a.verdict),
+        belum_ditangani=hitung(lambda a: not a.acknowledged),
+        median_respons_detik=round(statistics.median(respons), 1) if respons else None,
+        jumlah_respons=len(respons),
+        telegram_gagal=hitung(lambda a: a.telegram_status == "gagal"),
+    )
+
+
 def jam(waktu) -> str:
     """Jam setempat 14.32 dari waktu UTC tanpa zona."""
     from datetime import timezone

@@ -192,6 +192,7 @@ terputus menunjukkan sejak kapan ia buta.
 | PUT | `/api/settings/mode` | `{"detection_mode": "pose"}` atau `bbox`; mereset hitungan semua kamera |
 | PUT | `/api/settings/telegram` | `{"photo_mode", "send_drills", "camera_offline"}`, semuanya opsional |
 | GET | `/api/settings/pratinjau-ambang` | `?ambang=5&hari=30`: episode berbaring sungguhan dinilai ulang dengan ambang lain. `berbunyi`, `hilang` (alarm yang tidak lagi berbunyi, per putusan), `belum_tentu` (alarm yang ditutup sebelum ambang itu), `tambahan` (episode yang dulu tidak berbunyi, belum pernah dinilai) |
+| PUT | `/api/settings/shift` | `{"pola_shift": "3"}` (shift 07, 14, 21) atau `"2"` (07, 19), jam setempat komputer backend |
 | PUT | `/api/settings/eskalasi` | `{"eskalasi_menit": 1-30}`: menit tanpa "Saya ke sana" sebelum banner menulis lamanya dan grup Telegram menerima pengingat. Bawaan 2; ikut dikembalikan `GET /api/settings/` |
 | POST | `/api/settings/test-telegram` | Kirim pesan uji ke grup |
 
@@ -199,6 +200,18 @@ terputus menunjukkan sejak kapan ia buta.
 `send_drills` (bawaan `false`): latihan ikut dikirim ke Telegram. `camera_offline`
 (bawaan `true`): kabari grup saat kamera terputus lebih dari 30 detik dan saat pulih.
 Token bot dan ID grup hanya bisa diatur di `backend/.env`.
+
+---
+
+## Ringkasan shift
+
+Untuk serah terima antarshift. Batas shift memakai jam setempat komputer backend dan pola
+di Pengaturan.
+
+| Method | Endpoint | Keterangan |
+|---|---|---|
+| GET | `/api/ringkasan-shift/?geser=-1` | Shift berjalan (`0`), sebelumnya (`-1`), dan seterusnya sampai `-90`. Isinya `nama`, `mulai`, `selesai`, `berjalan`, `metrik` (sama dengan `/api/alerts/metrik`), `latihan`, `perlu_tindakan` dan `catatan` (alert), `jeda` (Mode perawatan yang beririsan), `kamera_terputus` (hanya shift berjalan), `dibaca_oleh`, `dibaca_pada` |
+| POST | `/api/ringkasan-shift/dibaca?geser=-1` | Tanda sudah dibaca untuk shift yang sudah selesai. Pembaca pertama yang dicatat |
 
 ---
 

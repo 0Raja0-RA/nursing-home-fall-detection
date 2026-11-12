@@ -110,6 +110,7 @@ export default function Settings() {
     const [kabar, setKabar] = useState(null);           // deteksi: { tipe: 'ok' | 'galat', teks }
     const [kabarTg, setKabarTg] = useState(null);       // { tipe, teks, bagian: 'telegram' | 'privasi' }
     const [eskalasi, setEskalasi] = useState(2);
+    const [polaShift, setPolaShift] = useState('3');
     const [kabarEskalasi, setKabarEskalasi] = useState(null);
     const suara = useStatusSuara();
 
@@ -121,6 +122,7 @@ export default function Settings() {
         setTg(d.telegram);
         setOpsiFoto(d.photo_modes || []);
         setEskalasi(d.eskalasi_menit ?? 2);
+        setPolaShift(d.pola_shift || '3');
         setTersimpan({ threshold: d.fall_duration_threshold, mode: d.detection_mode });
     };
 
@@ -213,6 +215,20 @@ export default function Settings() {
         setEskalasi(menit);
         try {
             const r = await api('/api/settings/eskalasi', { method: 'PUT', json: { eskalasi_menit: menit } });
+            if (!r.ok) throw new Error(await bacaGalat(r));
+            terapkan(await r.json());
+            setKabarEskalasi({ tipe: 'ok', teks: 'Tersimpan.' });
+        } catch (err) {
+            setKabarEskalasi({ tipe: 'galat', teks: `Gagal menyimpan: ${err.message}` });
+            ambil();
+        }
+    };
+
+    const ubahPolaShift = async (pola) => {
+        setKabarEskalasi(null);
+        setPolaShift(pola);
+        try {
+            const r = await api('/api/settings/shift', { method: 'PUT', json: { pola_shift: pola } });
             if (!r.ok) throw new Error(await bacaGalat(r));
             terapkan(await r.json());
             setKabarEskalasi({ tipe: 'ok', teks: 'Tersimpan.' });
@@ -338,6 +354,21 @@ export default function Settings() {
                         menerima pengingat sebagai balasan ke pesan alarm, setiap {eskalasi} menit, paling banyak 3 kali.
                         Belum ada angka yang teruji untuk panti, jadi sesuaikan dengan hasil uji mini.
                     </p>
+                    <div className="flex flex-wrap items-center gap-3 pt-2">
+                        <label htmlFor="pola-shift" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                            Shift untuk ringkasan serah terima
+                        </label>
+                        <select
+                            id="pola-shift"
+                            value={polaShift}
+                            onChange={(e) => ubahPolaShift(e.target.value)}
+                            disabled={memuat}
+                            className="bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                        >
+                            <option value="3">3 shift: 07.00, 14.00, 21.00</option>
+                            <option value="2">2 shift: 07.00, 19.00</option>
+                        </select>
+                    </div>
                     <Kabar kabar={kabarEskalasi} />
                 </Bagian>
 

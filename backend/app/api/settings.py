@@ -9,6 +9,7 @@ Endpoints:
     PUT  /api/settings/mode        — Ganti model detektor (bbox / pose)
     PUT  /api/settings/telegram    — Foto Telegram, kirim latihan, kabar kamera putus
     PUT  /api/settings/eskalasi    — Menit tanpa respons sebelum alarm dieskalasi
+    PUT  /api/settings/shift       — Pola shift untuk ringkasan serah terima
     GET  /api/settings/pratinjau-ambang — Episode berbaring dinilai ulang dengan ambang lain
     POST /api/settings/test-telegram — Kirim notifikasi uji ke Telegram
 
@@ -25,6 +26,7 @@ from app.core.config import get_settings
 from app.db.database import get_db
 from app.db.repository import (
     KUNCI_ESKALASI,
+    KUNCI_POLA_SHIFT,
     KUNCI_TG_FOTO,
     KUNCI_TG_KAMERA,
     KUNCI_TG_LATIHAN,
@@ -35,6 +37,7 @@ from app.models.schemas import (
     LABEL_PUTUSAN,
     MODE_FOTO_TELEGRAM,
     EskalasiUpdate,
+    PolaShiftUpdate,
     PratinjauAmbang,
     ModeUpdate,
     Pilihan,
@@ -71,6 +74,7 @@ async def _jawaban(db: AsyncSession) -> SettingsResponse:
         verdicts=[Pilihan(id=k, label=v) for k, v in LABEL_PUTUSAN.items()],
         false_alarm_reasons=[Pilihan(id=k, label=v) for k, v in ALASAN_PALSU.items()],
         eskalasi_menit=await SettingRepository(db).eskalasi_menit(),
+        pola_shift=(await SettingRepository(db).ambil(KUNCI_POLA_SHIFT)) or "3",
     )
 
 
@@ -182,6 +186,14 @@ async def pratinjau_ambang(
     alarm mana yang hilang (beserta putusannya) dan berapa tambahan yang belum pernah dinilai."""
     from app.services.episode import pratinjau
     return await pratinjau(db, ambang, get_settings().FALL_DURATION_THRESHOLD, hari)
+
+
+@router.put("/shift", response_model=SettingsResponse)
+async def update_pola_shift(payload: PolaShiftUpdate, db: AsyncSession = Depends(get_db)):
+    """Pola shift untuk ringkasan serah terima: 3 shift (07, 14, 21) atau 2 shift (07, 19)."""
+    await SettingRepository(db).simpan(KUNCI_POLA_SHIFT, payload.pola_shift)
+    log.info(f"⚙️  Pola shift jadi {payload.pola_shift} shift")
+    return await _jawaban(db)
 
 
 @router.put("/eskalasi", response_model=SettingsResponse)

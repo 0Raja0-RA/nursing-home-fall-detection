@@ -85,6 +85,11 @@ erDiagram
         bool latihan
         bool dipotong "direset oleh Tandai Ditangani"
     }
+    serah_terima {
+        datetime shift_mulai PK "awal shift, UTC"
+        string dibaca_oleh
+        datetime dibaca_pada
+    }
     jeda_kamera {
         int id PK
         string camera_id "rujukan longgar, bukan FK"
@@ -123,6 +128,7 @@ Pengaturan dari dashboard yang harus bertahan setelah restart. Bentuknya pasanga
 | `telegram_photo_mode` | Cara foto dikirim ke Telegram (`buram` bawaan, `utuh`, ...) | `db/repository.py` |
 | `telegram_send_drills` | `1` bila latihan ikut dikirim ke Telegram | `db/repository.py` |
 | `telegram_camera_offline` | `1` bila kamera terputus atau dijeda dikabarkan ke Telegram (bawaan `1`) | `db/repository.py` |
+| `pola_shift` | `3` (shift 07, 14, 21) atau `2` (07, 19), untuk ringkasan shift (bawaan `3`) | `api/settings.py` |
 | `eskalasi_menit` | Menit tanpa "Saya ke sana" sebelum alarm dieskalasi (bawaan `2`) | `api/settings.py` |
 
 Rahasia seperti token bot dan ID chat Telegram tidak disimpan di sini. Keduanya tetap di `backend/.env`.
@@ -160,6 +166,10 @@ Sesi masuk. Yang disimpan hanya hash token, sedangkan tokennya sendiri ada di co
 ### `episode_berbaring`
 
 Satu baris untuk setiap masa seseorang terbaca berbaring sampai hitungan dimulai: kapan, berapa lama paling jauh (`durasi_maks`), dan apakah sampai berbunyi (`alarm`). Dipakai pratinjau ambang di Pengaturan, karena kejadian yang berhenti sebelum ambang tidak pernah menjadi alarm. `dipotong` berarti hitungannya direset oleh Tandai Ditangani, jadi lama sebenarnya tidak diketahui. Dicatat pipeline (`services/episode.py`); pasangannya di `alerts` dicari lewat kamera dan waktu, bukan kunci.
+
+### `serah_terima`
+
+Tanda bahwa ringkasan satu shift sudah dibaca shift berikutnya, dengan awal shift (UTC) sebagai kunci. Hanya pembaca pertama yang dicatat. Isi ringkasannya sendiri tidak disimpan, tetapi dihitung dari `alerts` dan `jeda_kamera` setiap kali dibuka (`services/shift.py`).
 
 ### `jeda_kamera`
 

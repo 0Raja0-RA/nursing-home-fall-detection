@@ -4,6 +4,7 @@ import { api, bacaGalat, PESAN_TERPUTUS } from '../api';
 import { usePengunjung } from '../context/auth';
 import { useLive } from '../context/LiveContext';
 import DetailInsiden from '../components/DetailInsiden';
+import RingkasanShift from '../components/RingkasanShift';
 import { StatusPenanganan, StatusPutusan, StatusTelegram } from '../components/StatusInsiden';
 import { PUTUSAN } from '../putusan';
 import { durasiTeks, msDari, tanggalJam, useJam, waktuRelatif } from '../waktu';
@@ -244,7 +245,7 @@ export default function AlertHistory() {
                         Setiap alarm, siapa yang menangani, dan apakah benar jatuh.
                     </p>
                 </div>
-                {!pengunjung && (
+                {!pengunjung && tab !== 'shift' && (
                     <button type="button" onClick={unduh} disabled={mengunduh}
                         title="Semua insiden sesuai tab dan filter di bawah, untuk uji mini atau laporan"
                         className="self-start shrink-0 min-h-10 px-3 rounded-lg border border-slate-300 dark:border-slate-700 text-sm font-semibold inline-flex items-center gap-2 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-60">
@@ -262,13 +263,13 @@ export default function AlertHistory() {
                 </p>
             )}
 
-            <KartuMetrik
+            {tab !== 'shift' && <KartuMetrik
                 metrik={metrik}
                 perluTindakan={ringkasan?.perlu_tindakan}
                 labelRentang={RENTANG.find((r) => r.id === rentang)?.label || ''}
                 keAntrean={() => { setTab('perlu_tindakan'); setBatas(PER_HALAMAN); }}
                 kePalsu={() => { setTab('semua'); setPutusan('palsu'); setBatas(PER_HALAMAN); }}
-            />
+            />}
 
             <div className="flex flex-col lg:flex-row lg:items-center gap-3 mb-4">
                 <div role="tablist" aria-label="Kelompok insiden" className="inline-flex self-start shrink-0 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-1 gap-1">
@@ -283,9 +284,14 @@ export default function AlertHistory() {
                         className={tabKelas(tab === 'semua')}>
                         Semua
                     </button>
+                    <button type="button" role="tab" aria-selected={tab === 'shift'}
+                        onClick={() => setTab('shift')}
+                        className={tabKelas(tab === 'shift')}>
+                        Ringkasan shift
+                    </button>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2 lg:ml-auto">
+                {tab !== 'shift' && <div className="flex flex-wrap items-center gap-2 lg:ml-auto">
                     <label className="sr-only" htmlFor="filter-ruang">Ruang</label>
                     <select id="filter-ruang" value={kameraId} onChange={gantiFilter(setKameraId)} className={SELECT}>
                         <option value="">Semua ruang</option>
@@ -309,7 +315,7 @@ export default function AlertHistory() {
                             </label>
                         </>
                     )}
-                </div>
+                </div>}
             </div>
 
 
@@ -319,7 +325,9 @@ export default function AlertHistory() {
                 </div>
             )}
 
-            {memuat && !daftar.length ? (
+            {tab === 'shift' ? (
+                <RingkasanShift onBuka={setDetail} />
+            ) : memuat && !daftar.length ? (
                 <div className="p-10 text-center text-sm text-slate-500 flex items-center justify-center gap-2">
                     <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> Memuat riwayat…
                 </div>

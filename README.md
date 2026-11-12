@@ -299,6 +299,9 @@ Semua endpoint wajib login, kecuali health check, `/api/auth/status`, `/api/auth
 | PUT    | `/api/settings/telegram`     | Foto Telegram, kirim latihan, kabar kamera putus    |
 | PUT    | `/api/settings/eskalasi`     | Menit tanpa respons sebelum alarm dieskalasi        |
 | GET    | `/api/settings/pratinjau-ambang` | Episode berbaring dinilai ulang dengan ambang lain |
+| PUT    | `/api/settings/shift`        | Pola shift: 3 shift (07, 14, 21) atau 2 (07, 19)    |
+| GET    | `/api/ringkasan-shift/`      | Ringkasan shift untuk serah terima (`geser=-1`)     |
+| POST   | `/api/ringkasan-shift/dibaca` | Tandai ringkasan shift yang selesai sudah dibaca   |
 | POST   | `/api/cameras/{id}/simulate-fall` | Paksa simulasi jatuh (untuk demo)              |
 | POST   | `/api/cameras/{id}/jeda`     | Mode perawatan: jeda atau perpanjang `{menit}`      |
 | DELETE | `/api/cameras/{id}/jeda`     | Hentikan Mode perawatan lebih awal                  |

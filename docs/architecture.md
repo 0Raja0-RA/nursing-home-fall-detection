@@ -186,3 +186,7 @@ waktu respons, alarm palsu dari yang dinilai, dan Telegram gagal. Pratinjau amba
 Pengaturan menilai ulang episode berbaring 30 hari terakhir: bila ambang dinaikkan, ia
 menyebut alarm yang hilang beserta putusannya, termasuk jatuh sungguhan; bila diturunkan, ia
 menyebut alarm tambahan yang belum pernah dinilai.
+
+Tab Ringkasan shift di Riwayat Insiden menyiapkan serah terima: angka alarm shift itu, alarm
+yang masih perlu ditindaklanjuti shift berikutnya, catatan perawat, ruang yang tidak terpantau
+karena Mode perawatan atau kamera terputus, dan tanda sudah dibaca. Bawaannya shift sebelumnya.

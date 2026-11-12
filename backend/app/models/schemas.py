@@ -7,7 +7,7 @@ representasi data internal.
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
+from typing import Literal, Optional
 
 import re
 
@@ -364,6 +364,36 @@ class PratinjauAmbang(BaseModel):
     tambahan: int = Field(0, description="Episode yang dulu tidak berbunyi tetapi akan berbunyi")
 
 
+class JedaShift(BaseModel):
+    camera_name: str
+    mulai: datetime
+    sampai: datetime
+    oleh: Optional[str] = None
+    dihentikan_oleh: Optional[str] = None
+
+
+class RingkasanShift(BaseModel):
+    """Ringkasan satu shift untuk serah terima. Waktu dalam UTC, seperti di tempat lain."""
+    nama: str
+    geser: int
+    mulai: datetime
+    selesai: datetime
+    berjalan: bool
+    metrik: "MetrikInsiden"
+    latihan: int = 0
+    perlu_tindakan: list["AlertResponse"] = Field(default_factory=list)
+    catatan: list["AlertResponse"] = Field(default_factory=list)
+    jeda: list[JedaShift] = Field(default_factory=list)
+    kamera_terputus: list[str] = Field(default_factory=list)
+    dibaca_oleh: Optional[str] = None
+    dibaca_pada: Optional[datetime] = None
+
+
+class PolaShiftUpdate(BaseModel):
+    """Body PUT /api/settings/shift: 3 shift (07, 14, 21) atau 2 shift (07, 19)."""
+    pola_shift: Literal["2", "3"]
+
+
 class EskalasiUpdate(BaseModel):
     """Body PUT /api/settings/eskalasi."""
     eskalasi_menit: int = Field(..., ge=1, le=30, description="Menit tanpa respons sebelum eskalasi")
@@ -446,6 +476,8 @@ class SettingsResponse(BaseModel):
     # Menit tanpa "Saya ke sana" sebelum banner menulis "Belum ada yang merespons" dengan
     # lamanya dan grup Telegram menerima pengingat.
     eskalasi_menit: int = 2
+    # "3" = shift 07, 14, 21; "2" = shift 07, 19. Dipakai ringkasan shift.
+    pola_shift: str = "3"
 
 
 # ---- Akun ----------------------------------------------------

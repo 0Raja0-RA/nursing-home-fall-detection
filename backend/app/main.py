@@ -21,7 +21,7 @@ from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
-from app.api import alerts, auth, cameras, settings
+from app.api import alerts, auth, cameras, settings, shift
 from app.core.config import get_settings
 from app.db.database import init_db
 from app.websocket.ws_manager import router as ws_router
@@ -121,6 +121,7 @@ app.include_router(auth.router_akun, prefix="/api/users", tags=["Users"])
 app.include_router(alerts.router, prefix="/api/alerts", tags=["Alerts"], dependencies=_login)
 app.include_router(cameras.router, prefix="/api/cameras", tags=["Cameras"], dependencies=_login)
 app.include_router(settings.router, prefix="/api/settings", tags=["Settings"], dependencies=_login)
+app.include_router(shift.router, prefix="/api/ringkasan-shift", tags=["Shift"], dependencies=_login)
 app.include_router(ws_router, tags=["WebSocket"])
 
 

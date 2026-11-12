@@ -32,6 +32,7 @@ KUNCI_TG_LATIHAN = "telegram_send_drills"
 KUNCI_TG_KAMERA = "telegram_camera_offline"
 # Menit tanpa "Saya ke sana" sebelum alarm dieskalasi (banner dan pengingat Telegram).
 KUNCI_ESKALASI = "eskalasi_menit"
+KUNCI_POLA_SHIFT = "pola_shift"
 ESKALASI_BAWAAN = 2
 
 

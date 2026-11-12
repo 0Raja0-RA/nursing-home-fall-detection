@@ -24,7 +24,6 @@ yang ditutup tanpa putusan tetap di antrean Perlu tindakan sampai dinilai.
 """
 
 import asyncio
-import statistics
 from datetime import datetime
 from typing import Annotated, Literal, Optional
 
@@ -169,25 +168,7 @@ async def metrik(
     query = select(AlertRecord).where(AlertRecord.simulated.is_(False))
     if sejak:
         query = query.where(AlertRecord.created_at >= sejak.replace(tzinfo=None))
-    alerts = (await db.execute(query)).scalars().all()
-
-    respons = []
-    for a in alerts:
-        pertama = min((t for t in (a.claimed_at, a.acknowledged_at) if t is not None), default=None)
-        if pertama is not None:
-            respons.append(max(0.0, (pertama - a.created_at).total_seconds()))
-    hitung = lambda syarat: sum(1 for a in alerts if syarat(a))      # noqa: E731
-    return MetrikInsiden(
-        total=len(alerts),
-        jatuh=hitung(lambda a: a.verdict == Putusan.JATUH.value),
-        palsu=hitung(lambda a: a.verdict == Putusan.PALSU.value),
-        belum_yakin=hitung(lambda a: a.verdict == Putusan.BELUM_YAKIN.value),
-        belum_dinilai=hitung(lambda a: a.acknowledged and not a.verdict),
-        belum_ditangani=hitung(lambda a: not a.acknowledged),
-        median_respons_detik=round(statistics.median(respons), 1) if respons else None,
-        jumlah_respons=len(respons),
-        telegram_gagal=hitung(lambda a: a.telegram_status == "gagal"),
-    )
+    return insiden.hitung_metrik((await db.execute(query)).scalars().all())
 
 
 @router.get("/ringkasan", response_model=AlertSummary)
