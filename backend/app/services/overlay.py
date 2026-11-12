@@ -124,6 +124,21 @@ def anotasi(frame: np.ndarray, hasil: Optional[list[DetectionResult]], ambang: f
     return gambar
 
 
+def dasar_privasi(frame: np.ndarray, privasi: str) -> np.ndarray:
+    """Gambar dasar sebelum deteksi digambar: asli, buram, atau latar gelap (kerangka saja).
+
+    Buram dibuat dengan memperkecil lalu memperbesar lagi: murah, dan cukup kuat untuk
+    menyembunyikan wajah, sementara postur tetap terbaca bersama kerangkanya.
+    """
+    if privasi == "buram":
+        h, w = frame.shape[:2]
+        kecil = cv2.resize(frame, (max(1, w // 24), max(1, h // 24)), interpolation=cv2.INTER_AREA)
+        return cv2.resize(kecil, (w, h), interpolation=cv2.INTER_LINEAR)
+    if privasi == "kerangka":
+        return np.full_like(frame, 24)
+    return frame
+
+
 def ke_jpeg(gambar: np.ndarray, lebar_maks: Optional[int] = None, mutu: int = 95) -> Optional[bytes]:
     """Byte JPEG, diperkecil dulu bila lebih lebar dari lebar_maks. Mutu 95 = bawaan OpenCV."""
     if lebar_maks and gambar.shape[1] > lebar_maks:

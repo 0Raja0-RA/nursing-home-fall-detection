@@ -157,6 +157,7 @@ class CameraRepository:
             source=data.source,
             rotate=data.rotate,
             enabled=data.enabled,
+            privasi=data.privasi,
         )
         self.session.add(db_obj)
         # Ditulis dalam transaksi yang sama dengan kameranya.

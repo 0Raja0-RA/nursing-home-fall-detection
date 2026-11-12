@@ -49,6 +49,11 @@ class AppRegistry:
         # Sumber kebenarannya tabel jeda_kamera; ini salinannya untuk pipeline.
         self.jeda: Dict[str, object] = {}
 
+        # Video asli kamera berprivasi yang sedang dibuka sementara saat alarm:
+        # batas waktunya (time.monotonic) dan JPEG beranotasi dari gambar asli.
+        self.asli_sampai: Dict[str, float] = {}
+        self.latest_jpeg_asli: Dict[str, Optional[bytes]] = {}
+
     def sedang_disimulasikan(self, camera_id: str) -> bool:
         """True kalau kamera ini sedang dalam masa simulasi jatuh."""
         import time

@@ -61,6 +61,9 @@ async def get_db() -> AsyncSession:
 # kolom baru adalah menghapus fall_detection.db -- berikut seluruh riwayat alert
 # yang sudah terkumpul.
 _KOLOM_SUSULAN: dict[str, list[tuple[str, str]]] = {
+    "cameras": [
+        ("privasi", "VARCHAR NOT NULL DEFAULT 'utuh'"),
+    ],
     "alerts": [
         ("notified", "BOOLEAN DEFAULT 0"),
         ("simulated", "BOOLEAN NOT NULL DEFAULT 0"),

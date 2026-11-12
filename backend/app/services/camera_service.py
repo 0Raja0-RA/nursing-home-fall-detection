@@ -200,6 +200,8 @@ class CameraService:
 
     def __init__(self, camera_id: str, source: Optional[str] = None, rotate: Optional[int] = None):
         self.camera_id = camera_id
+        # Tampilan video (utuh | buram | kerangka); diubah langsung tanpa menyalakan ulang.
+        self.privasi = "utuh"
         settings = get_settings()
         self.source = source or settings.CAMERA_SOURCE
         self.target_fps = settings.CAMERA_FPS

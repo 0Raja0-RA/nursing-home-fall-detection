@@ -42,6 +42,7 @@ async def mulai_kamera(record: CameraRecord) -> bool:
 
     settings = get_settings()
     camera = CameraService(camera_id=record.id, source=record.source, rotate=record.rotate)
+    camera.privasi = record.privasi or "utuh"
 
     # start() membuka koneksi dan bisa memakan waktu beberapa detik, jadi jangan
     # sampai memblokir event loop -- REST dan WebSocket harus tetap melayani.

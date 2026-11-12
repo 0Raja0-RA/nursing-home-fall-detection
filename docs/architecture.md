@@ -136,7 +136,9 @@ berasal dari riset referensi UI/UX proyek ini (audit 41 temuan, rencana Tahap 1 
 7. **Privasi lebih dulu.** Foto di Telegram bawaannya diburamkan dan semua pesan
    dilindungi dari penerusan. Foto lengkap dan klip kejadian hanya bisa dibuka setelah
    masuk, klip tidak pernah dikirim ke Telegram, dan klip dihapus otomatis setelah masa
-   simpannya (bawaan 7 hari). Tidak ada pengenalan wajah.
+   simpannya (bawaan 7 hari). Tampilan video diatur per kamera: utuh, buram, atau kerangka
+   saja; kamera baru bawaannya buram. Saat ada alarm, perawat yang masuk bisa membuka video
+   asli 15 detik, dan setiap pembukaan dicatat. Tidak ada pengenalan wajah.
 8. **Latihan tidak boleh tertukar dengan kejadian nyata.** Latihan berwarna biru, bernada
    lain, tidak dinilai, tidak ikut dihitung, dan secara bawaan tidak dikirim ke Telegram.
 

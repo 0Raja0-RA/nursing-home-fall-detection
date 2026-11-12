@@ -91,6 +91,13 @@ function GambarMini({ cam, t }) {
 }
 
 /** Panel pengaturan satu kamera: rotasi tepat di pratinjau, nama, alamat, nyala/mati, hapus. */
+const PRIVASI = [
+    { id: 'utuh', label: 'Utuh', arti: 'Video asli tampil di dashboard, foto kejadian, dan klip.' },
+    { id: 'buram', label: 'Buram', arti: 'Wajah dan detail tidak terbaca; postur dan kerangka tetap terlihat. Saat ada alarm, perawat bisa membuka video asli 15 detik, dan pembukaannya tercatat.' },
+    { id: 'kerangka', label: 'Kerangka saja', arti: 'Hanya kerangka dan kotak deteksi di latar gelap. Saat ada alarm, video asli bisa dibuka 15 detik dan tercatat.' },
+];
+const labelPrivasi = (id) => PRIVASI.find((p) => p.id === id)?.label || 'Utuh';
+
 function PanelKamera({ cam, t, onUbah, onHapus, onTutup }) {
     const [nama, setNama] = useState(cam.name);
     const [alamat, setAlamat] = useState('');
@@ -130,6 +137,31 @@ function PanelKamera({ cam, t, onUbah, onHapus, onTutup }) {
                             </button>
                         ))}
                     </div>
+                </fieldset>
+                <fieldset className="mt-3">
+                    <legend className="text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
+                        Tampilan video. Model tetap membaca gambar asli.
+                    </legend>
+                    <div className="flex gap-2">
+                        {PRIVASI.map((p) => (
+                            <button
+                                key={p.id}
+                                type="button"
+                                aria-pressed={(cam.privasi || 'utuh') === p.id}
+                                disabled={Boolean(sibuk)}
+                                onClick={() => ubah({ privasi: p.id }, 'privasi')}
+                                className={`min-h-10 flex-1 rounded-lg text-sm font-semibold border ${(cam.privasi || 'utuh') === p.id
+                                    ? 'bg-slate-900 text-white border-slate-900 dark:bg-slate-100 dark:text-slate-900'
+                                    : 'border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+                            >
+                                {p.label}
+                            </button>
+                        ))}
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1.5">
+                        {PRIVASI.find((p) => p.id === (cam.privasi || 'utuh'))?.arti} Foto kejadian, klip, dan Telegram
+                        mengikuti tampilan ini.
+                    </p>
                 </fieldset>
             </div>
 
@@ -468,7 +500,7 @@ export default function Cameras() {
                                     </div>
                                     <StatusKameraDaftar cam={cam} />
                                     <p className="text-xs text-slate-500 font-mono break-all">{cam.source}</p>
-                                    <p className="text-xs text-slate-500 tabular-nums">Rotasi {cam.rotate}&deg;</p>
+                                    <p className="text-xs text-slate-500 tabular-nums">Rotasi {cam.rotate}&deg; · Video {labelPrivasi(cam.privasi).toLowerCase()}</p>
                                 </div>
                             </div>
                             {atur === cam.camera_id ? (

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Clock, FlaskConical, Send, Video, VideoOff, Volume2, VolumeX, X } from 'lucide-react';
+import { Clock, Eye, EyeOff, FlaskConical, Send, Video, VideoOff, Volume2, VolumeX, X } from 'lucide-react';
 import { api, bacaGalat, PESAN_TERPUTUS } from '../api';
 import { API_BASE } from '../config';
 import { usePengunjung } from '../context/auth';
@@ -230,8 +230,28 @@ export default function SimulationDashboard() {
         return msDari(live ? live.dijeda_sampai : cam.dijeda_sampai);
     };
     const jedaOleh = (cam) => cameraData?.[cam.camera_id]?.dijeda_oleh || cam.dijeda_oleh;
-    // Hitung mundur per detik hanya selama ada kamera yang dijeda.
-    const sekarang = useJam(cameras.some((c) => Number.isFinite(jedaSampai(c))) ? 1000 : 30000);
+    // Hitung mundur per detik hanya selama ada kamera yang dijeda atau video aslinya dibuka.
+    const sekarang = useJam(cameras.some((c) => Number.isFinite(jedaSampai(c)) || c.asli_sampai) ? 1000 : 30000);
+    const sisaAsli = (cam) => {
+        const ms = msDari(cam.asli_sampai);
+        return Number.isFinite(ms) ? Math.max(0, (ms - sekarang) / 1000) : 0;
+    };
+
+    /** Video asli kamera berprivasi, 15 detik, hanya saat ada alarm di ruang itu. Tercatat di backend. */
+    const bukaAsli = async (cam) => {
+        setGalat('');
+        try {
+            const r = await api(`/api/cameras/${cam.camera_id}/buka-asli`, { method: 'POST' });
+            if (!r.ok) {
+                setGalat(await bacaGalat(r));
+                return;
+            }
+            const data = await r.json();
+            setCameras((prev) => prev.map((c) => (c.camera_id === data.camera_id ? { ...c, ...data } : c)));
+        } catch {
+            setGalat(PESAN_TERPUTUS);
+        }
+    };
     const sisaJeda = (cam) => {
         const ms = jedaSampai(cam);
         return Number.isFinite(ms) ? Math.max(0, (ms - sekarang) / 1000) : 0;
@@ -407,6 +427,10 @@ export default function SimulationDashboard() {
                         || alerts.some((a) => a.camera_id === cam.camera_id && a.simulated);
                     const sisa = sisaJeda(cam);
                     const dijeda = aktif && sisa > 0;
+                    const privasi = cam.privasi || 'utuh';
+                    const detikAsli = privasi !== 'utuh' ? sisaAsli(cam) : 0;
+                    const bolehBukaAsli = !pengunjung && privasi !== 'utuh' && !detikAsli
+                        && alerts.some((a) => a.camera_id === cam.camera_id);
                     const status = bacaStatus({
                         aktif, state, adaOrang: Boolean(posture), durasi,
                         ambang: pengaturan?.fall_duration_threshold, latihan, sisaJeda: sisa,
@@ -524,7 +548,7 @@ export default function SimulationDashboard() {
                                     </div>
                                 ) : aktif ? (
                                     <StreamImg
-                                        src={`${API_BASE}${cam.stream_url}`}
+                                        src={`${API_BASE}${cam.stream_url}${detikAsli ? '?asli=true' : ''}`}
                                         alt={`Video ${cam.name}`}
                                         kunci={cam.camera_id}
                                         onUkuran={catatRasio}
@@ -539,6 +563,27 @@ export default function SimulationDashboard() {
                                         >
                                             Buka Daftar Kamera
                                         </Link>
+                                    </div>
+                                )}
+
+                                {aktif && !dijeda && (privasi !== 'utuh' || bolehBukaAsli) && (
+                                    <div className="absolute right-3 top-3 flex flex-col items-end gap-2">
+                                        {privasi !== 'utuh' && (
+                                            <span className="text-xs text-white bg-black/60 px-2 py-1 rounded inline-flex items-center gap-1.5 tabular-nums">
+                                                {detikAsli
+                                                    ? <><Eye className="w-3.5 h-3.5" aria-hidden="true" /> Video asli · {Math.ceil(detikAsli)} dtk</>
+                                                    : <><EyeOff className="w-3.5 h-3.5" aria-hidden="true" /> {privasi === 'buram' ? 'Video buram' : 'Kerangka saja'}</>}
+                                            </span>
+                                        )}
+                                        {bolehBukaAsli && (
+                                            <button
+                                                type="button"
+                                                onClick={() => bukaAsli(cam)}
+                                                className="min-h-9 px-3 rounded-lg bg-white text-slate-900 text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-slate-200"
+                                            >
+                                                <Eye className="w-3.5 h-3.5" aria-hidden="true" /> Lihat video asli 15 dtk
+                                            </button>
+                                        )}
                                     </div>
                                 )}
 

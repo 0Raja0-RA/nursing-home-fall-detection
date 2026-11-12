@@ -64,7 +64,7 @@ def test_pipeline_membuat_jpeg_kecil_hanya_bila_diminta():
     frame = np.zeros((720, 1280, 3), dtype=np.uint8)
     settings = types.SimpleNamespace(CONFIDENCE_THRESHOLD=0.5, SHOW_UNCERTAIN_BOXES=True,
                                      TRIGGER_MIN_CONF=0.5, TRIGGER_CLASSES=["lying_on_ground"])
-    besar, kecil = _jpeg_dan_klip(frame, [], settings, True)
+    besar, kecil, _ = _jpeg_dan_klip(frame, [], settings, True)
     gambar = cv2.imdecode(np.frombuffer(kecil, np.uint8), cv2.IMREAD_COLOR)
     assert gambar.shape[:2] == (360, klip.LEBAR)
     assert cv2.imdecode(np.frombuffer(besar, np.uint8), cv2.IMREAD_COLOR).shape[:2] == (720, 1280)

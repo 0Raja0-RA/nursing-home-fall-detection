@@ -11,6 +11,7 @@ Endpoints:
     PATCH  /api/cameras/{id}          — Ubah nama/sumber/rotasi/enabled
     DELETE /api/cameras/{id}          — Hapus kamera
     POST   /api/cameras/{id}/simulate-fall — Paksa simulasi jatuh (untuk demo)
+    POST   /api/cameras/{id}/buka-asli — Video asli 15 detik saat alarm (kamera berprivasi)
     POST   /api/cameras/{id}/jeda     — Mulai atau perpanjang Mode perawatan
     DELETE /api/cameras/{id}/jeda     — Hentikan Mode perawatan lebih awal
     GET    /api/cameras/{id}/snapshot — Satu gambar terakhir (JPEG), untuk gambar mini
@@ -22,14 +23,16 @@ server — alamat kamera HP berubah setiap kali berpindah jaringan WiFi.
 """
 
 import asyncio
+import time
+from datetime import timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.auth import wajib_login
+from app.api.auth import wajib_login, wajib_tim
 from app.core.config import get_settings
-from app.core.logging import get_logger
+from app.core.logging import get_logger, utc_now_naive
 from app.db.database import get_db
 from app.db.models import CameraRecord
 from app.db.repository import CameraRepository
@@ -69,6 +72,8 @@ def _gabung(record: CameraRecord) -> CameraInfo:
     dasar["is_active"] = bool(camera and camera.sedang_mengalir)
     # Jeda dibaca langsung juga, supaya jawaban POST /jeda sudah memuatnya.
     jeda = mode_perawatan.aktif(record.id)
+    sisa_asli = registry.asli_sampai.get(record.id, 0.0) - time.monotonic()
+    dasar["asli_sampai"] = utc_now_naive() + timedelta(seconds=sisa_asli) if sisa_asli > 0 else None
     dasar["dijeda_sampai"] = jeda.sampai if jeda else None
     dasar["dijeda_oleh"] = jeda.oleh if jeda else None
 
@@ -79,6 +84,7 @@ def _gabung(record: CameraRecord) -> CameraInfo:
         source=samarkan_sumber(record.source),
         rotate=record.rotate,
         enabled=record.enabled,
+        privasi=record.privasi or "utuh",
         stream_url=f"/api/cameras/{record.id}/stream",
     )
 
@@ -201,6 +207,11 @@ async def ubah_kamera(camera_id: str, payload: CameraUpdate, db: AsyncSession = 
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=alasan)
 
     record = await repo.update_camera(camera_id, payload)
+    # Tampilan privasi berlaku seketika, tanpa menyalakan ulang kamera.
+    if payload.privasi is not None and camera_id in registry.cameras:
+        registry.cameras[camera_id].privasi = record.privasi
+        if record.privasi == "utuh":
+            registry.asli_sampai.pop(camera_id, None)
 
     # Nyalakan ulang hanya kalau ada yang memengaruhi capture.
     perlu_restart = sumber_baru or payload.rotate is not None or payload.enabled is not None
@@ -226,7 +237,7 @@ async def hapus_kamera(camera_id: str, db: AsyncSession = Depends(get_db)):
     return None
 
 
-async def generate_frames(camera_id: str):
+async def generate_frames(camera_id: str, asli: bool = False):
     """Generator MJPEG: frame terbaru dari kamera, dengan kotak deteksi tergambar.
 
     Frame-nya sudah digambari dan di-encode oleh detection_pipeline, jadi generator
@@ -243,6 +254,9 @@ async def generate_frames(camera_id: str):
     while camera_id in registry.cameras:
         seq = registry.frame_seq.get(camera_id, 0)
         jpeg = registry.latest_jpeg.get(camera_id)
+        # Video asli hanya selama masih dibuka; sesudahnya kembali ke tampilan privasi.
+        if asli and registry.asli_sampai.get(camera_id, 0.0) > time.monotonic():
+            jpeg = registry.latest_jpeg_asli.get(camera_id) or jpeg
         if jpeg is not None and seq != terakhir:
             terakhir = seq
             yield (b"--frame\r\n"
@@ -288,6 +302,38 @@ async def simulasi_jatuh(camera_id: str):
     )
 
 
+DETIK_ASLI = 15
+
+
+@router.post("/{camera_id}/buka-asli", response_model=CameraInfo)
+async def buka_video_asli(camera_id: str, user=Depends(wajib_tim), db: AsyncSession = Depends(get_db)):
+    """Buka video asli kamera berprivasi selama DETIK_ASLI detik, hanya saat ada alarm yang
+    belum ditangani di ruang itu. Setiap pembukaan dicatat di tabel akses_video."""
+    from sqlalchemy import or_, select
+
+    from app.db.models import AksesVideo, AlertRecord
+
+    record = await CameraRepository(db).get_camera(camera_id)
+    if record is None or camera_id not in registry.cameras:
+        raise HTTPException(status_code=404, detail="Camera not found")
+    if (record.privasi or "utuh") == "utuh":
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Kamera ini sudah menampilkan video utuh.")
+    alarm = (await db.execute(
+        select(AlertRecord).where(AlertRecord.camera_id == camera_id,
+                                  or_(AlertRecord.acknowledged.is_(False), AlertRecord.acknowledged.is_(None)))
+        .order_by(AlertRecord.created_at.desc()).limit(1)
+    )).scalar_one_or_none()
+    if alarm is None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                            detail="Video asli hanya bisa dibuka saat ada alarm yang belum ditangani di ruang ini.")
+    registry.asli_sampai[camera_id] = time.monotonic() + DETIK_ASLI
+    db.add(AksesVideo(camera_id=camera_id, alert_id=alarm.id, oleh=user.display_name,
+                      sampai=utc_now_naive() + timedelta(seconds=DETIK_ASLI)))
+    await db.commit()
+    log.info(f"[{camera_id}] 👁 Video asli dibuka {DETIK_ASLI} detik oleh {user.display_name} (alert #{alarm.id})")
+    return _gabung(record)
+
+
 @router.post("/{camera_id}/jeda", response_model=CameraInfo)
 async def mulai_jeda(camera_id: str, payload: JedaRequest,
                      user=Depends(wajib_login), db: AsyncSession = Depends(get_db)):
@@ -329,11 +375,14 @@ async def gambar_terakhir(camera_id: str):
 
 
 @router.get("/{camera_id}/stream")
-async def video_stream(camera_id: str):
-    """Endpoint video streaming langsung (MJPEG)."""
+async def video_stream(camera_id: str, asli: bool = False, user=Depends(wajib_login)):
+    """Endpoint video streaming langsung (MJPEG). `asli=1` memakai video asli selama sedang
+    dibuka sementara lewat POST /buka-asli; pengunjung tidak boleh."""
     if camera_id not in registry.cameras:
         raise HTTPException(status_code=404, detail="Camera not found")
+    if asli and user.role == "pengunjung":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Pengunjung hanya bisa melihat.")
     return StreamingResponse(
-        generate_frames(camera_id),
+        generate_frames(camera_id, asli),
         media_type="multipart/x-mixed-replace; boundary=frame",
     )

@@ -19,7 +19,7 @@ from app.runtime.registry import registry
 from app.services.inference_service import run_inference
 from app.services import klip, mode_perawatan
 from app.services.episode import pencatat as pencatat_episode
-from app.services.overlay import anotasi, ke_jpeg
+from app.services.overlay import anotasi, dasar_privasi, ke_jpeg
 from app.services.state_machine import FallStateMachine
 from app.websocket.ws_manager import manager
 
@@ -128,13 +128,20 @@ def pilih_observasi(
     return menang, wakil
 
 
-def _jpeg_dan_klip(frame, results, settings, untuk_klip: bool) -> tuple[Optional[bytes], Optional[bytes]]:
-    """JPEG beranotasi untuk stream, dan bila diminta versi kecilnya untuk klip.
-    Kotak deteksi digambar sekali untuk keduanya."""
-    gambar = anotasi(frame, results, settings.CONFIDENCE_THRESHOLD, settings.SHOW_UNCERTAIN_BOXES,
-                     settings.TRIGGER_MIN_CONF, tuple(settings.TRIGGER_CLASSES))
+def _jpeg_dan_klip(frame, results, settings, untuk_klip: bool, privasi: str = "utuh",
+                   minta_asli: bool = False) -> tuple[Optional[bytes], Optional[bytes], Optional[bytes]]:
+    """JPEG beranotasi untuk stream, versi kecilnya untuk klip bila diminta, dan versi dari
+    gambar asli bila video asli sedang dibuka sementara.
+
+    Stream, foto kejadian, klip, dan Telegram memakai tampilan privasi kamera. Kotak
+    deteksi digambar sekali untuk stream dan klip.
+    """
+    args = (results, settings.CONFIDENCE_THRESHOLD, settings.SHOW_UNCERTAIN_BOXES,
+            settings.TRIGGER_MIN_CONF, tuple(settings.TRIGGER_CLASSES))
+    gambar = anotasi(dasar_privasi(frame, privasi), *args)
     kecil = ke_jpeg(gambar, klip.LEBAR, klip.MUTU) if untuk_klip else None
-    return ke_jpeg(gambar), kecil
+    asli = ke_jpeg(anotasi(frame, *args)) if minta_asli and privasi != "utuh" else None
+    return ke_jpeg(gambar), kecil, asli
 
 
 async def camera_pipeline(camera: CameraService, fsm: FallStateMachine):
@@ -266,9 +273,12 @@ async def camera_pipeline(camera: CameraService, fsm: FallStateMachine):
         # di thread supaya event loop tetap bisa melayani REST dan WebSocket.
         # Beberapa kali per detik, versi kecilnya dititipkan ke penyangga klip.
         untuk_klip = klip.penyangga.perlu_frame(camera.camera_id, loop_start)
-        jpeg, kecil = await asyncio.to_thread(
-            _jpeg_dan_klip, frame, results, settings, untuk_klip
+        privasi = getattr(camera, "privasi", "utuh")
+        minta_asli = registry.asli_sampai.get(camera.camera_id, 0.0) > time.monotonic()
+        jpeg, kecil, asli = await asyncio.to_thread(
+            _jpeg_dan_klip, frame, results, settings, untuk_klip, privasi, minta_asli
         )
+        registry.latest_jpeg_asli[camera.camera_id] = asli
         if kecil:
             klip.penyangga.tambah(camera.camera_id, loop_start, kecil)
         registry.latest_jpeg[camera.camera_id] = jpeg

@@ -18,7 +18,16 @@ erDiagram
         string source "0 | http(s) | rtsp | path file"
         int rotate "0, 90, 180, 270"
         bool enabled
+        string privasi "utuh | buram | kerangka"
         datetime created_at
+    }
+    akses_video {
+        int id PK
+        string camera_id
+        int alert_id "alarm yang menjadi alasan"
+        string oleh
+        datetime mulai
+        datetime sampai
     }
     app_settings {
         string key PK
@@ -104,6 +113,7 @@ erDiagram
     alerts ||..o| alert_snapshots : "satu foto per alert"
     users ||..o{ sessions : "user_id"
     cameras ||..o{ jeda_kamera : "camera_id (tanpa FK)"
+    cameras ||..o{ akses_video : "camera_id (tanpa FK)"
     cameras ||..o{ episode_berbaring : "camera_id (tanpa FK)"
 ```
 
@@ -115,6 +125,7 @@ Daftar kamera. Disimpan di database supaya alamat kamera HP bisa diganti dari da
 
 - `id` dibentuk `cam-NN`. Nomornya tidak pernah dipakai ulang, walaupun kameranya sudah dihapus (lihat `camera_last_number`).
 - `source` hanya berlaku di laptop yang menjalankan backend. Contohnya, `0` adalah webcam laptop itu.
+- `privasi` menentukan yang ditayangkan, disimpan sebagai foto dan klip, dan dikirim ke Telegram: `utuh`, `buram`, atau `kerangka` (kerangka dan kotak deteksi di latar gelap). Model selalu membaca gambar asli. Kamera baru bawaannya `buram`; kamera yang sudah ada sebelum kolom ini tetap `utuh`.
 
 ### `app_settings`
 
@@ -170,6 +181,10 @@ Satu baris untuk setiap masa seseorang terbaca berbaring sampai hitungan dimulai
 ### `serah_terima`
 
 Tanda bahwa ringkasan satu shift sudah dibaca shift berikutnya, dengan awal shift (UTC) sebagai kunci. Hanya pembaca pertama yang dicatat. Isi ringkasannya sendiri tidak disimpan, tetapi dihitung dari `alerts` dan `jeda_kamera` setiap kali dibuka (`services/shift.py`).
+
+### `akses_video`
+
+Satu baris setiap kali video asli kamera berprivasi dibuka sementara (15 detik) saat ada alarm: siapa, kamera mana, alarm mana yang menjadi alasannya, dan sampai kapan.
 
 ### `jeda_kamera`
 

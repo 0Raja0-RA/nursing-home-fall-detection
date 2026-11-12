@@ -226,6 +226,10 @@ class CameraStatus(BaseModel):
 
 # ---- Camera Registry ---------------------------------------
 
+# Tampilan video per kamera. Model selalu membaca gambar asli.
+Privasi = Literal["utuh", "buram", "kerangka"]
+
+
 class CameraBase(BaseModel):
     """Field yang bisa diatur pengguna untuk sebuah kamera."""
     name: str = Field(..., min_length=1, max_length=100, description="Nama lokasi/kamar")
@@ -236,6 +240,7 @@ class CameraBase(BaseModel):
     )
     rotate: int = Field(0, description="Rotasi searah jarum jam: 0, 90, 180, atau 270")
     enabled: bool = Field(True, description="Kamera dinyalakan saat backend start")
+    privasi: Privasi = Field("buram", description="Tampilan video: utuh, buram, atau kerangka saja")
 
     @field_validator("name", "source")
     @classmethod
@@ -264,6 +269,7 @@ class CameraUpdate(BaseModel):
     source: Optional[str] = Field(None, min_length=1)
     rotate: Optional[int] = None
     enabled: Optional[bool] = None
+    privasi: Optional[Privasi] = None
 
     @field_validator("name", "source")
     @classmethod
@@ -294,6 +300,9 @@ class CameraInfo(CameraStatus):
     rotate: int = 0
     enabled: bool = True
     stream_url: str = Field(..., description="Path endpoint MJPEG untuk kamera ini")
+    privasi: str = "utuh"
+    # Video asli sedang dibuka sementara sampai waktu ini (UTC). Kosong = tidak.
+    asli_sampai: Optional[datetime] = None
 
 
 class JedaRequest(BaseModel):

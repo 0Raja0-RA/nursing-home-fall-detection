@@ -36,6 +36,10 @@ class CameraRecord(Base):
     source = Column(String, nullable=False)                    # "0" | http://... | rtsp://... | path file
     rotate = Column(Integer, nullable=False, default=0)        # 0, 90, 180, 270 (searah jarum jam)
     enabled = Column(Boolean, nullable=False, default=True)
+    # Tampilan video: utuh | buram | kerangka. Model selalu membaca gambar asli; ini hanya
+    # yang ditayangkan, disimpan sebagai foto dan klip, dan dikirim ke Telegram. Kamera
+    # baru bawaannya buram; kamera yang sudah ada sebelum kolom ini tetap utuh.
+    privasi = Column(String, nullable=False, default="buram", server_default="utuh")
     created_at = Column(DateTime, default=utc_now_naive)
 
 
@@ -228,3 +232,16 @@ class SerahTerima(Base):
     shift_mulai = Column(DateTime, primary_key=True)   # UTC, awal shift yang diringkas
     dibaca_oleh = Column(String, nullable=False)
     dibaca_pada = Column(DateTime, nullable=False, default=utc_now_naive)
+
+
+class AksesVideo(Base):
+    """Catatan setiap kali video asli kamera berprivasi dibuka sementara saat alarm."""
+
+    __tablename__ = "akses_video"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    camera_id = Column(String, nullable=False, index=True)
+    alert_id = Column(Integer, nullable=True)          # alarm yang menjadi alasannya
+    oleh = Column(String, nullable=False)
+    mulai = Column(DateTime, nullable=False, default=utc_now_naive)
+    sampai = Column(DateTime, nullable=False)
