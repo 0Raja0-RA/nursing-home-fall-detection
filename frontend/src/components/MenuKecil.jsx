@@ -13,6 +13,8 @@ const LEBAR = 320;
  *
  * pemicu: fungsi yang menerima props tombol pemicu (ref, popoverTarget, aria-expanded,
  * aria-controls) lalu mengembalikan tombolnya.
+ * children: isi panel, atau fungsi yang menerima `tutup()` untuk menutup panel dari dalam,
+ * misalnya setelah sebuah pilihan diklik.
  */
 export default function MenuKecil({ pemicu, judul, children }) {
     const idPanel = useId();
@@ -74,6 +76,12 @@ export default function MenuKecil({ pemicu, judul, children }) {
         };
     }, [buka]);
 
+    // Dicari lewat id, bukan ref, karena fungsi ini diteruskan ke isi panel saat render.
+    const tutup = () => {
+        const p = document.getElementById(idPanel);
+        if (p?.matches(':popover-open')) p.hidePopover();
+    };
+
     return (
         <>
             {pemicu({ ref: tombol, popoverTarget: idPanel, 'aria-expanded': buka, 'aria-controls': idPanel })}
@@ -90,7 +98,7 @@ export default function MenuKecil({ pemicu, judul, children }) {
                         <X className="w-4 h-4" aria-hidden="true" />
                     </button>
                 </div>
-                <div className="px-4 pb-4 pt-1">{children}</div>
+                <div className="px-4 pb-4 pt-1">{typeof children === 'function' ? children(tutup) : children}</div>
             </div>
         </>
     );

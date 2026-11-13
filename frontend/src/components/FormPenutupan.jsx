@@ -44,10 +44,12 @@ export function PilihanRadio({ nama, pilihan, nilai, onUbah }) {
  * memperbaiki model atau ambang. Latihan ditutup tanpa putusan, karena tidak
  * ikut dihitung.
  *
- * Dipakai di banner alarm dan di laci detail Riwayat Insiden. Latarnya selalu
- * putih supaya terbaca di atas banner merah, amber, maupun biru.
+ * Dipakai di dialog Tandai Ditangani dari banner alarm dan di laci detail Riwayat
+ * Insiden. Kontrolnya berwarna terang, jadi formulir ini selalu berlatar putih: di laci
+ * sebagai kartu putih, di dialog (`polos`) menyatu dengan dialog pada tema terang dan
+ * menjadi kartu putih pada tema gelap.
  */
-export default function FormPenutupan({ alert, onSelesai, onBatal }) {
+export default function FormPenutupan({ alert, onSelesai, onBatal, polos = false }) {
     const id = useId();
     const latihan = Boolean(alert.simulated);
     const [putusan, setPutusan] = useState('');
@@ -83,7 +85,9 @@ export default function FormPenutupan({ alert, onSelesai, onBatal }) {
     };
 
     return (
-        <form onSubmit={kirim} className="w-full rounded-xl bg-white text-slate-800 p-3 sm:p-4 shadow-sm space-y-3">
+        <form onSubmit={kirim} className={polos
+            ? 'w-full space-y-3 dark:rounded-xl dark:bg-white dark:text-slate-800 dark:p-4'
+            : 'w-full rounded-xl bg-white text-slate-800 p-3 sm:p-4 shadow-sm space-y-3'}>
             {latihan ? (
                 <p className="text-sm text-slate-600">Latihan ditutup tanpa putusan, dan tidak ikut dihitung di riwayat.</p>
             ) : (

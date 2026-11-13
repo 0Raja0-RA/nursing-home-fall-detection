@@ -4,11 +4,14 @@ import { BellOff, CheckCircle2, FlaskConical, Footprints, TriangleAlert, Video, 
 import { api, bacaGalat, PESAN_TERPUTUS } from '../api';
 import { usePengunjung } from '../context/auth';
 import { useLive } from '../context/LiveContext';
+import { useToast } from '../context/toast';
 import { aktifkanSuara, bunyikan, useStatusSuara } from '../hooks/useAlarmSound';
 import { kabariAlarm } from '../hooks/useNotifikasi';
 import { usePengaturan } from '../hooks/usePengaturan';
+import { labelPutusan } from '../putusan';
 import { jamDari } from '../statusKamera';
 import { durasiTeks, msDari, useJam } from '../waktu';
+import Dialog from './Dialog';
 import FormPenutupan from './FormPenutupan';
 
 const JUDUL_HALAMAN = 'FallDetect';
@@ -96,8 +99,9 @@ export default function AlertBanner() {
     const pengunjung = usePengunjung();
     const pengaturan = usePengaturan(60_000);
     const navigate = useNavigate();
-    const [galat, setGalat] = useState('');
-    const [menutup, setMenutup] = useState(null);   // id alert yang formulir penutupannya terbuka
+    // Galat tampil sebagai toast, supaya tinggi banner tidak berubah.
+    const kabari = useToast();
+    const [menutup, setMenutup] = useState(null);   // id alert yang dialog penutupannya terbuka
     const [mengklaim, setMengklaim] = useState(null);
     // Bisu hanya berlaku untuk alarm yang sedang tampil: alarm baru tetap berbunyi.
     const [bisu, setBisu] = useState(null);   // { sampai: ms epoch, ids: number[] }
@@ -195,7 +199,6 @@ export default function AlertBanner() {
     }, [urut]);
 
     const klaim = async (id) => {
-        setGalat('');
         setMengklaim(id);
         // Yang baru diklaim tetap tampil di layar ini, supaya Tandai Ditangani ada di tempat yang sama.
         setFokusId(id);
@@ -206,10 +209,10 @@ export default function AlertBanner() {
             } else {
                 // 409: sudah diklaim orang lain. Namanya ada di pesan backend, dan
                 // banner ikut berubah lewat siaran WebSocket.
-                setGalat(await bacaGalat(r));
+                kabari(await bacaGalat(r), 'galat');
             }
         } catch {
-            setGalat(`${PESAN_TERPUTUS} Alarm tetap ditampilkan; coba lagi.`);
+            kabari(`${PESAN_TERPUTUS} Alarm tetap ditampilkan; coba lagi.`, 'galat');
         } finally {
             setMengklaim(null);
         }
@@ -225,6 +228,10 @@ export default function AlertBanner() {
 
     const a = urut.find((x) => x.id === fokusId) || urut[0];
     const lain = urut.filter((x) => x !== a);
+    // Alarm yang dialog Tandai Ditangani-nya terbuka. Bila alarm itu selesai di tempat lain
+    // (mis. lewat Telegram), dialognya ikut tertutup.
+    const aTutup = urut.find((x) => x.id === menutup);
+    const namaTutup = aTutup ? (aTutup.camera_name || aTutup.camera_id) : '';
 
     let isi = null;
     if (a) {
@@ -267,62 +274,50 @@ export default function AlertBanner() {
                         </div>
                     </div>
 
-                    {menutup !== a.id && (
-                        <div className="flex items-center gap-2 w-full xl:w-auto">
-                            {pengunjung ? null : diklaim ? (
-                                <button type="button" onClick={() => setMenutup(a.id)} className={`${tombol} ${lebarRata} ${gaya.utama}`}>
-                                    <CheckCircle2 className={ikonKecil} aria-hidden="true" /> Tandai Ditangani
-                                </button>
-                            ) : (
-                                <button
-                                    type="button"
-                                    onClick={() => klaim(a.id)}
-                                    disabled={mengklaim === a.id}
-                                    className={`${tombol} ${lebarRata} ${gaya.utama}`}
-                                >
-                                    <Footprints className={ikonKecil} aria-hidden="true" />
-                                    {mengklaim === a.id ? 'Mencatat…' : 'Saya ke sana'}
-                                </button>
-                            )}
+                    {/* Tombolnya tetap di tempat: Tandai Ditangani membuka dialog, jadi tinggi
+                        banner tidak berubah dan isi halaman di bawahnya tidak terdorong. */}
+                    <div className="flex items-center gap-2 w-full xl:w-auto">
+                        {pengunjung ? null : diklaim ? (
+                            <button type="button" onClick={() => setMenutup(a.id)} aria-haspopup="dialog" className={`${tombol} ${lebarRata} ${gaya.utama}`}>
+                                <CheckCircle2 className={ikonKecil} aria-hidden="true" /> Tandai Ditangani
+                            </button>
+                        ) : (
                             <button
                                 type="button"
-                                onClick={() => navigate('/dashboard', { state: { fokus: a.camera_id } })}
-                                className={`${tombol} ${lebarRata} border ${gaya.garis}`}
+                                onClick={() => klaim(a.id)}
+                                disabled={mengklaim === a.id}
+                                className={`${tombol} ${lebarRata} ${gaya.utama}`}
                             >
-                                <Video className={ikonKecil} aria-hidden="true" /> Lihat kamera
+                                <Footprints className={ikonKecil} aria-hidden="true" />
+                                {mengklaim === a.id ? 'Mencatat…' : 'Saya ke sana'}
                             </button>
-                            {!diklaim && !pengunjung && (dibisukan ? (
-                                <span className={`shrink-0 text-xs px-1 whitespace-nowrap tabular-nums ${gaya.redup}`}>
-                                    Dibisukan<span className="hidden sm:inline"> sampai</span> {jamDari(bisu.sampai)}
-                                </span>
-                            ) : (
-                                // Di HP hanya ikon; namanya tetap terbaca lewat aria-label dan tooltip.
-                                <button
-                                    type="button"
-                                    onClick={bisukan}
-                                    aria-label={`Bisukan ${BISU_MENIT} menit`}
-                                    title={`Bisukan ${BISU_MENIT} menit`}
-                                    className={`${tombol} shrink-0 min-w-11 px-2.5 sm:px-3 font-medium ${gaya.hantu}`}
-                                >
-                                    <BellOff className="w-4 h-4" aria-hidden="true" />
-                                    <span className="hidden sm:inline">Bisukan {BISU_MENIT} menit</span>
-                                </button>
-                            ))}
-                        </div>
-                    )}
+                        )}
+                        <button
+                            type="button"
+                            onClick={() => navigate('/dashboard', { state: { fokus: a.camera_id } })}
+                            className={`${tombol} ${lebarRata} border ${gaya.garis}`}
+                        >
+                            <Video className={ikonKecil} aria-hidden="true" /> Lihat kamera
+                        </button>
+                        {!diklaim && !pengunjung && (dibisukan ? (
+                            <span className={`shrink-0 text-xs px-1 whitespace-nowrap tabular-nums ${gaya.redup}`}>
+                                Dibisukan<span className="hidden sm:inline"> sampai</span> {jamDari(bisu.sampai)}
+                            </span>
+                        ) : (
+                            // Di HP hanya ikon; namanya tetap terbaca lewat aria-label dan tooltip.
+                            <button
+                                type="button"
+                                onClick={bisukan}
+                                aria-label={`Bisukan ${BISU_MENIT} menit`}
+                                title={`Bisukan ${BISU_MENIT} menit`}
+                                className={`${tombol} shrink-0 min-w-11 px-2.5 sm:px-3 font-medium ${gaya.hantu}`}
+                            >
+                                <BellOff className="w-4 h-4" aria-hidden="true" />
+                                <span className="hidden sm:inline">Bisukan {BISU_MENIT} menit</span>
+                            </button>
+                        ))}
+                    </div>
                 </div>
-
-                {menutup === a.id && (
-                    <FormPenutupan
-                        alert={a}
-                        onBatal={() => setMenutup(null)}
-                        onSelesai={() => {
-                            setMenutup(null);
-                            setFokusId(null);
-                            dismissAlert(a.id);
-                        }}
-                    />
-                )}
 
                 {lain.length > 0 && (
                     <div className="flex flex-wrap items-center gap-2" aria-label="Alarm lain">
@@ -360,11 +355,29 @@ export default function AlertBanner() {
 
             {isi}
 
-            {galat && (
-                <div role="alert" className="bg-red-950 text-red-100 text-sm px-4 py-2 flex items-center gap-3">
-                    <span className="flex-1">{galat}</span>
-                    <button type="button" onClick={() => setGalat('')} className="text-xs underline underline-offset-2">Tutup</button>
-                </div>
+            {aTutup && (
+                <Dialog
+                    judul={aTutup.simulated ? `Tutup latihan, ${namaTutup}` : `Tandai ditangani, ${namaTutup}`}
+                    keterangan={aTutup.claimed_by
+                        ? `${aTutup.claimed_by} menuju lokasi sejak ${jam(aTutup.claimed_at)}. Alarm ${jam(aTutup.created_at)}.`
+                        : `Alarm ${jam(aTutup.created_at)}.`}
+                    lebar="max-w-xl"
+                    onTutup={() => setMenutup(null)}
+                >
+                    <FormPenutupan
+                        alert={aTutup}
+                        polos
+                        onBatal={() => setMenutup(null)}
+                        onSelesai={(hasil) => {
+                            setMenutup(null);
+                            setFokusId(null);
+                            dismissAlert(aTutup.id);
+                            kabari(aTutup.simulated
+                                ? `Latihan di ${namaTutup} ditutup.`
+                                : `Alarm ${namaTutup} ditutup: ${labelPutusan(hasil?.verdict).toLowerCase()}.`);
+                        }}
+                    />
+                </Dialog>
             )}
         </div>
     );

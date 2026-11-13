@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Clock, Eye, EyeOff, FlaskConical, Monitor, Send, Video, VideoOff, Volume2, VolumeX, X } from 'lucide-react';
+import { Clock, Eye, EyeOff, FlaskConical, Monitor, Send, Video, VideoOff, Volume2, VolumeX } from 'lucide-react';
 import { api, bacaGalat, PESAN_TERPUTUS } from '../api';
 import { API_BASE } from '../config';
 import { usePengunjung } from '../context/auth';
 import { useLive } from '../context/LiveContext';
+import { useToast } from '../context/toast';
+import MenuKecil from '../components/MenuKecil';
 import { aktifkanSuara, bunyikan, useStatusSuara } from '../hooks/useAlarmSound';
 import { usePengaturan } from '../hooks/usePengaturan';
 import StatusKamera from '../components/StatusKamera';
@@ -27,10 +29,10 @@ function bacaDetailAI() {
 
 export default function SimulationDashboard() {
     const [cameras, setCameras] = useState([]);
-    const [panelLatihan, setPanelLatihan] = useState(false);
     const [kameraLatihanId, setKameraLatihanId] = useState('');
     const [memulai, setMemulai] = useState(false);
-    const [galat, setGalat] = useState('');
+    // Galat tampil sebagai toast, bukan kotak yang menyisip di atas grid kamera.
+    const kabari = useToast();
     // Nama kelas dan keyakinan model berguna untuk tim, bukan untuk perawat,
     // jadi disembunyikan kecuali dinyalakan.
     const [detailAI, setDetailAI] = useState(bacaDetailAI);
@@ -40,8 +42,7 @@ export default function SimulationDashboard() {
     // Pilihan "kirim latihan ke Telegram" yang baru diubah di halaman ini; selama
     // belum diubah, nilai dari pengaturan backend yang dipakai.
     const [kirimLatihan, setKirimLatihan] = useState(null);
-    // Kamera yang pilihan Mode perawatannya sedang terbuka, dan yang permintaannya sedang dikirim.
-    const [menuJeda, setMenuJeda] = useState('');
+    // Kamera yang permintaan Mode perawatannya sedang dikirim.
     const [mengubahJeda, setMengubahJeda] = useState('');
 
     const { cameraData, alerts } = useLive();
@@ -132,7 +133,7 @@ export default function SimulationDashboard() {
             if (!r.ok) throw new Error(await bacaGalat(r));
         } catch (err) {
             setKirimLatihan(!nyala);
-            setGalat(err instanceof TypeError ? PESAN_TERPUTUS : `Pilihan Telegram gagal disimpan: ${err.message}`);
+            kabari(err instanceof TypeError ? PESAN_TERPUTUS : `Pilihan Telegram gagal disimpan: ${err.message}`, 'galat');
         }
     };
 
@@ -144,19 +145,18 @@ export default function SimulationDashboard() {
      * alertnya melewati jalur yang sama dengan deteksi sungguhan -- termasuk foto
      * frame kamera saat itu juga dan penanda SIMULASI di riwayat dan Telegram.
      */
-    const mulaiLatihan = async () => {
+    const mulaiLatihan = async (tutup) => {
         if (!kameraLatihanId || memulai) return;
         setMemulai(true);
-        setGalat('');
         try {
             const r = await api(`/api/cameras/${kameraLatihanId}/simulate-fall`, { method: 'POST' });
             if (r.ok) {
-                setPanelLatihan(false);
+                tutup();
             } else {
-                setGalat(await bacaGalat(r));
+                kabari(`Latihan gagal dimulai: ${await bacaGalat(r)}`, 'galat');
             }
         } catch {
-            setGalat(PESAN_TERPUTUS);
+            kabari(PESAN_TERPUTUS, 'galat');
         } finally {
             setMemulai(false);
         }
@@ -168,19 +168,17 @@ export default function SimulationDashboard() {
      */
     const ubahJeda = async (cam, menit) => {
         setMengubahJeda(cam.camera_id);
-        setGalat('');
         try {
             const r = await api(`/api/cameras/${cam.camera_id}/jeda`,
                 menit ? { method: 'POST', json: { menit } } : { method: 'DELETE' });
             if (!r.ok) {
-                setGalat(await bacaGalat(r));
+                kabari(`Mode perawatan ${cam.name} gagal diubah: ${await bacaGalat(r)}`, 'galat');
                 return;
             }
             const data = await r.json();
             setCameras((prev) => prev.map((c) => (c.camera_id === data.camera_id ? { ...c, ...data } : c)));
-            setMenuJeda('');
         } catch {
-            setGalat(PESAN_TERPUTUS);
+            kabari(PESAN_TERPUTUS, 'galat');
         } finally {
             setMengubahJeda('');
         }
@@ -201,17 +199,16 @@ export default function SimulationDashboard() {
 
     /** Video asli kamera berprivasi, 15 detik, hanya saat ada alarm di ruang itu. Tercatat di backend. */
     const bukaAsli = async (cam) => {
-        setGalat('');
         try {
             const r = await api(`/api/cameras/${cam.camera_id}/buka-asli`, { method: 'POST' });
             if (!r.ok) {
-                setGalat(await bacaGalat(r));
+                kabari(`Video asli ${cam.name} gagal dibuka: ${await bacaGalat(r)}`, 'galat');
                 return;
             }
             const data = await r.json();
             setCameras((prev) => prev.map((c) => (c.camera_id === data.camera_id ? { ...c, ...data } : c)));
         } catch {
-            setGalat(PESAN_TERPUTUS);
+            kabari(PESAN_TERPUTUS, 'galat');
         }
     };
     const sisaJeda = (cam) => {
@@ -240,14 +237,65 @@ export default function SimulationDashboard() {
                 >
                     <Monitor className="w-4 h-4" aria-hidden="true" /> Layar dinding
                 </Link>
-                <button
-                    type="button"
-                    onClick={() => setPanelLatihan((b) => !b)}
-                    aria-expanded={panelLatihan}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition-colors"
+                {/* Menu kecil yang menempel di tombolnya, bukan panel yang mendorong grid kamera ke bawah. */}
+                <MenuKecil
+                    judul="Mode latihan"
+                    pemicu={(p) => (
+                        <button
+                            type="button"
+                            {...p}
+                            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition-colors"
+                        >
+                            <FlaskConical className="w-4 h-4" aria-hidden="true" /> Mode latihan
+                        </button>
+                    )}
                 >
-                    <FlaskConical className="w-4 h-4" aria-hidden="true" /> Mode latihan
-                </button>
+                    {(tutup) => (
+                        <div className="space-y-3">
+                            <p className="text-xs text-slate-600 dark:text-slate-400">
+                                Menjalankan alur alarm sungguhan di satu kamera: hitungan, banner, Saya ke sana, dan
+                                riwayat. Semuanya bertanda latihan dan tidak ikut dihitung.
+                            </p>
+                            <label className="text-xs font-medium flex flex-col gap-1">
+                                Kamera untuk latihan
+                                <select
+                                    value={kameraLatihanId}
+                                    onChange={(e) => setKameraLatihanId(e.target.value)}
+                                    className="bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 px-3 min-h-10 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                >
+                                    {cameras.length === 0 && <option value="">Belum ada kamera</option>}
+                                    {cameras.map((c) => (
+                                        <option key={c.camera_id} value={c.camera_id}>
+                                            {c.name}{c.is_active ? '' : ' (terputus)'}
+                                        </option>
+                                    ))}
+                                </select>
+                            </label>
+                            {pengaturan?.telegram_configured && (
+                                <label className="flex items-start gap-2 text-xs cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={latihanKeTelegram}
+                                        onChange={(e) => ubahKirimLatihan(e.target.checked)}
+                                        className="mt-0.5 accent-blue-600"
+                                    />
+                                    <span>Kirim juga ke grup Telegram, bertanda LATIHAN. Bawaannya mati.</span>
+                                </label>
+                            )}
+                            <button
+                                type="button"
+                                onClick={() => mulaiLatihan(tutup)}
+                                disabled={memulai || !kameraLatihan?.is_active}
+                                className="w-full min-h-11 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-4 rounded-lg text-sm font-semibold"
+                            >
+                                {memulai ? 'Memulai…' : 'Mulai latihan'}
+                            </button>
+                            {kameraLatihan && !kameraLatihan.is_active && (
+                                <p className="text-xs text-slate-500">Kamera ini terputus. Pilih kamera yang sedang mengalir.</p>
+                            )}
+                        </div>
+                    )}
+                </MenuKecil>
                 </div>}
             </div>
 
@@ -267,6 +315,13 @@ export default function SimulationDashboard() {
                     <span className={`${CHIP} border border-blue-500 bg-blue-50 text-blue-800 dark:bg-blue-950 dark:text-blue-200`}>
                         <Clock className="w-3.5 h-3.5" aria-hidden="true" />
                         <b className="font-semibold tabular-nums">{jumlahJeda}</b> dalam Mode perawatan
+                    </span>
+                )}
+                {/* Chip di baris ringkasan, bukan strip yang menyisip di atas grid. */}
+                {sedangLatihan.length > 0 && (
+                    <span role="status" className={`${CHIP} bg-blue-600 text-white font-semibold`}>
+                        <FlaskConical className="w-3.5 h-3.5" aria-hidden="true" />
+                        Latihan berjalan di {sedangLatihan.map((c) => c.name).join(', ')}
                     </span>
                 )}
                 <span className={alerts.length ? `${CHIP} bg-red-600 text-white font-semibold` : CHIP_TENANG}>
@@ -300,81 +355,6 @@ export default function SimulationDashboard() {
                     Tampilkan detail AI
                 </label>
             </div>
-
-            {sedangLatihan.length > 0 && (
-                <div role="status" className="mb-6 px-4 py-2.5 rounded-xl bg-blue-600 text-white text-sm flex items-center gap-2">
-                    <FlaskConical className="w-4 h-4 shrink-0" aria-hidden="true" />
-                    Latihan berjalan di {sedangLatihan.map((c) => c.name).join(', ')}. Bukan kejadian sungguhan.
-                </div>
-            )}
-
-            {panelLatihan && !pengunjung && (
-                <div className="mb-6 rounded-2xl border border-blue-500/30 bg-blue-50 dark:bg-blue-950/40 p-4">
-                    <div className="flex items-start justify-between gap-3">
-                        <div>
-                            <h2 className="font-semibold text-sm">Mode latihan</h2>
-                            <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 max-w-2xl">
-                                Latihan menjalankan alur alarm sungguhan di satu kamera: hitungan, banner,
-                                Saya ke sana, dan riwayat. Semuanya bertanda latihan, jadi tidak tertukar
-                                dengan kejadian nyata, dan tidak ikut dihitung sebagai alarm benar atau palsu.
-                            </p>
-                        </div>
-                        <button
-                            type="button"
-                            onClick={() => setPanelLatihan(false)}
-                            aria-label="Tutup Mode latihan"
-                            className="p-1.5 rounded-lg text-slate-500 hover:bg-blue-100 dark:hover:bg-blue-900/40"
-                        >
-                            <X className="w-4 h-4" />
-                        </button>
-                    </div>
-                    <div className="mt-3 flex flex-col sm:flex-row sm:items-end gap-3">
-                        <label className="text-xs font-medium flex flex-col gap-1">
-                            Kamera untuk latihan
-                            <select
-                                value={kameraLatihanId}
-                                onChange={(e) => setKameraLatihanId(e.target.value)}
-                                className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 px-3 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            >
-                                {cameras.length === 0 && <option value="">Belum ada kamera</option>}
-                                {cameras.map((c) => (
-                                    <option key={c.camera_id} value={c.camera_id}>
-                                        {c.name}{c.is_active ? '' : ' (terputus)'}
-                                    </option>
-                                ))}
-                            </select>
-                        </label>
-                        <button
-                            type="button"
-                            onClick={mulaiLatihan}
-                            disabled={memulai || !kameraLatihan?.is_active}
-                            className="min-h-11 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-4 rounded-xl text-sm font-medium"
-                        >
-                            {memulai ? 'Memulai…' : 'Mulai latihan'}
-                        </button>
-                    </div>
-                    {pengaturan?.telegram_configured && (
-                        <label className="mt-3 flex items-start gap-2 text-xs cursor-pointer">
-                            <input
-                                type="checkbox"
-                                checked={latihanKeTelegram}
-                                onChange={(e) => ubahKirimLatihan(e.target.checked)}
-                                className="mt-0.5 accent-blue-600"
-                            />
-                            <span>
-                                Kirim juga ke grup Telegram, bertanda LATIHAN. Bawaannya mati, supaya grup tidak
-                                terbiasa mengabaikan pesan alarm.
-                            </span>
-                        </label>
-                    )}
-                </div>
-            )}
-
-            {galat && (
-                <div className="mb-6 p-4 rounded-xl border border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400 text-sm">
-                    {galat}
-                </div>
-            )}
 
             {/* Grid kamera. Kamera yang alarm naik ke depan lewat CSS order, bukan
                 menyusun ulang DOM, supaya aliran MJPEG-nya tidak terputus. */}
@@ -434,53 +414,54 @@ export default function SimulationDashboard() {
                                     <Video className="w-4 h-4 shrink-0 text-slate-400" aria-hidden="true" />
                                     <span className="truncate">{cam.name}</span>
                                 </span>
-                                <span className="flex items-center gap-2 shrink-0">
+                                {/* min-h-6 setinggi tombol Jeda, supaya kepala kartu tidak memendek
+                                    saat tombol itu hilang selama Mode perawatan. */}
+                                <div className="flex items-center gap-2 shrink-0 min-h-6">
                                     <StatusKamera status={status} />
+                                    {/* Pilihan Mode perawatan di menu kecil yang menempel di tombol Jeda,
+                                        jadi kartu kamera tidak memanjang dan kartu di bawahnya tidak bergeser. */}
                                     {!pengunjung && aktif && !dijeda && (
-                                        <button
-                                            type="button"
-                                            onClick={() => setMenuJeda((m) => (m === cam.camera_id ? '' : cam.camera_id))}
-                                            aria-expanded={menuJeda === cam.camera_id}
-                                            aria-label={`Mode perawatan untuk ${cam.name}`}
-                                            title="Mode perawatan"
-                                            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-200/70 dark:hover:bg-slate-800"
+                                        <MenuKecil
+                                            judul={`Mode perawatan untuk ${cam.name}`}
+                                            pemicu={(p) => (
+                                                <button
+                                                    type="button"
+                                                    {...p}
+                                                    aria-label={`Mode perawatan untuk ${cam.name}`}
+                                                    title="Mode perawatan"
+                                                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-200/70 dark:hover:bg-slate-800"
+                                                >
+                                                    <Clock className="w-4 h-4" aria-hidden="true" />
+                                                    <span className="hidden sm:inline">Jeda</span>
+                                                </button>
+                                            )}
                                         >
-                                            <Clock className="w-4 h-4" aria-hidden="true" />
-                                            <span className="hidden sm:inline">Jeda</span>
-                                        </button>
+                                            {(tutup) => (
+                                                <div className="space-y-3">
+                                                    <p className="text-xs text-slate-600 dark:text-slate-400">
+                                                        Deteksi jatuh dan video dijeda, misalnya saat penghuni dimandikan. Selama
+                                                        jeda, jatuh di ruang ini tidak terdeteksi. Alarm yang sudah muncul tetap
+                                                        harus ditangani.
+                                                    </p>
+                                                    <div className="grid grid-cols-3 gap-2">
+                                                        {PILIHAN_JEDA.map((menit) => (
+                                                            <button
+                                                                key={menit}
+                                                                type="button"
+                                                                disabled={mengubahJeda === cam.camera_id}
+                                                                onClick={() => { tutup(); ubahJeda(cam, menit); }}
+                                                                className="min-h-10 px-2 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white text-sm font-semibold"
+                                                            >
+                                                                {menit} menit
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </MenuKecil>
                                     )}
-                                </span>
-                            </header>
-
-                            {menuJeda === cam.camera_id && !dijeda && (
-                                <div className="p-3 border-b border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/40 space-y-2">
-                                    <p className="text-sm font-semibold">Mode perawatan untuk {cam.name}</p>
-                                    <p className="text-xs text-slate-600 dark:text-slate-400">
-                                        Deteksi jatuh dan video dijeda, misalnya saat penghuni dimandikan. Selama jeda,
-                                        jatuh di ruang ini tidak terdeteksi. Alarm yang sudah muncul tetap harus ditangani.
-                                    </p>
-                                    <div className="flex flex-wrap gap-2">
-                                        {PILIHAN_JEDA.map((menit) => (
-                                            <button
-                                                key={menit}
-                                                type="button"
-                                                disabled={mengubahJeda === cam.camera_id}
-                                                onClick={() => ubahJeda(cam, menit)}
-                                                className="min-h-10 px-3 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white text-sm font-semibold"
-                                            >
-                                                {menit} menit
-                                            </button>
-                                        ))}
-                                        <button
-                                            type="button"
-                                            onClick={() => setMenuJeda('')}
-                                            className="min-h-10 px-3 rounded-lg border border-slate-300 dark:border-slate-700 text-sm font-semibold hover:bg-white dark:hover:bg-slate-800"
-                                        >
-                                            Batal
-                                        </button>
-                                    </div>
                                 </div>
-                            )}
+                            </header>
 
                             <div
                                 className="bg-slate-950 relative flex items-center justify-center text-slate-300 max-h-[75vh] mx-auto"
