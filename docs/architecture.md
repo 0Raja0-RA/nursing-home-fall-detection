@@ -152,9 +152,11 @@ berasal dari riset referensi UI/UX proyek ini (audit 41 temuan, rencana Tahap 1 
    dari kanan (di HP, layar penuh), atau dialog di tengah. Formulir yang sudah berada di
    dalam laci tetap terbuka di lacinya. Pesan sementara tampil sebagai toast di kanan bawah;
    galat yang perlu ditindaklanjuti menunggu ditutup. Yang boleh menggeser hanya alarm:
-   kamera yang alarm naik dan melebar, dan banner alarm mendorong isi ke bawah. Mulai lebar
-   1024 px, Riwayat Insiden dan Pengaturan setinggi layar tanpa gulir halaman, diuji di area
-   1536 × 730 dan 1536 × 834 px.
+   kamera yang alarm naik dan melebar, dan banner alarm mendorong isi ke bawah. Riwayat
+   Insiden mulai lebar 1024 px dan Pengaturan mulai 1280 px setinggi layar tanpa gulir
+   halaman. Di bawah 1280 px ketiga kolom Pengaturan terlalu sempit, jadi kartunya disusun
+   menurun. Acuan ujinya area 1536 × 730 dan 1536 × 834 px. Penjelasan panjang di Pengaturan
+   ada di ikon ⓘ, berupa menu kecil.
 
 ### Status kamera (tile di Pemantauan)
 

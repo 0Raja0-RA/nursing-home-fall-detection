@@ -2,33 +2,36 @@ import { useCallback, useEffect, useState } from 'react';
 import { Bell, BellOff, Volume2, VolumeX } from 'lucide-react';
 import { api, bacaGalat, PESAN_TERPUTUS } from '../api';
 import { API_BASE } from '../config';
+import { useToast } from '../context/toast';
 import { msDari, tanggalJam } from '../waktu';
 import { aktifkanSuara, bunyikan, useStatusSuara } from '../hooks/useAlarmSound';
 import { kabariAlarm, mintaIzinNotifikasi, useStatusNotifikasi } from '../hooks/useNotifikasi';
+import { Penjelasan } from '../components/MenuKecil';
 
-const KARTU = 'bg-white dark:bg-slate-900 p-4 md:p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4';
-const TOMBOL_NETRAL = 'min-h-10 px-3 rounded-lg text-sm font-semibold border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50';
+const KARTU = 'bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm';
+const TOMBOL_NETRAL = 'shrink-0 min-h-10 px-3 rounded-lg text-sm font-semibold border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50';
+const PILIH = 'w-full min-h-10 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50';
+const LABEL = 'text-sm font-medium text-slate-700 dark:text-slate-300';
 
-function Bagian({ id, judul, keterangan, children }) {
+/**
+ * Satu kartu pengaturan: judul, satu baris keterangan, dan penjelasan lengkap di ikon ⓘ,
+ * supaya kartunya pendek dan halaman muat satu layar.
+ */
+function Bagian({ id, judul, keterangan, penjelasan, aksi, className = '', children }) {
     return (
-        <section aria-labelledby={id} className={KARTU}>
-            <div>
-                <h2 id={id} className="font-semibold">{judul}</h2>
-                {keterangan && <p className="text-xs text-slate-500 mt-0.5">{keterangan}</p>}
+        <section aria-labelledby={id} className={`${KARTU} flex flex-col gap-3 ${className}`}>
+            <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                    <div className="flex items-center gap-1">
+                        <h2 id={id} className="font-semibold">{judul}</h2>
+                        {penjelasan && <Penjelasan judul={judul}>{penjelasan}</Penjelasan>}
+                    </div>
+                    {keterangan && <p className="text-xs text-slate-500">{keterangan}</p>}
+                </div>
+                {aksi}
             </div>
             {children}
         </section>
-    );
-}
-
-function Kabar({ kabar }) {
-    if (!kabar) return null;
-    return (
-        <div role="status" className={`text-sm rounded-lg px-3 py-2 border ${kabar.tipe === 'ok'
-            ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-700 dark:text-emerald-400'
-            : 'bg-red-500/10 border-red-500/20 text-red-700 dark:text-red-400'}`}>
-            {kabar.teks}
-        </div>
     );
 }
 
@@ -76,6 +79,9 @@ function RiwayatPerubahan({ riwayat, daftarMode, opsiFoto }) {
  * Pratinjau ambang dari episode berbaring 30 hari terakhir: alarm yang hilang bila ambang
  * dinaikkan (beserta putusannya, termasuk jatuh sungguhan), dan alarm tambahan yang belum
  * pernah dinilai bila diturunkan. Latihan tidak dihitung.
+ *
+ * Kotaknya selalu ada. Selama angka baru dihitung, hasil sebelumnya tetap tampil dengan
+ * warna pudar, supaya isi kartu tidak melompat setiap kali slider digeser.
  */
 function PratinjauAmbang({ ambang, ambangKini }) {
     const [hasil, setHasil] = useState(null);
@@ -94,33 +100,38 @@ function PratinjauAmbang({ ambang, ambangKini }) {
         };
     }, [ambang]);
 
-    if (!hasil || Number(hasil.ambang) !== Number(ambang)) return null;
+    const kotak = 'rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 px-3 py-2 text-xs space-y-0.5 min-h-[3.75rem] transition-opacity';
+    if (!hasil) {
+        return <div role="status" className={`${kotak} text-slate-500`}>Menghitung pratinjau dari episode berbaring…</div>;
+    }
+    const pudar = Number(hasil.ambang) !== Number(ambang) ? 'opacity-50' : '';
     if (!hasil.episode) {
         return (
-            <p className="text-xs text-slate-500 mt-2">
-                Pratinjau: belum ada episode berbaring yang tercatat dalam 30 hari terakhir. Angkanya mulai
-                terisi setelah sistem berjalan beberapa hari.
-            </p>
+            <div role="status" className={`${kotak} ${pudar} text-slate-500`}>
+                Pratinjau: belum ada episode berbaring dalam 30 hari terakhir. Angkanya terisi setelah sistem
+                berjalan beberapa hari.
+            </div>
         );
     }
-    const naik = Number(ambang) > Number(ambangKini);
-    const turun = Number(ambang) < Number(ambangKini);
+    const a = Number(hasil.ambang);
+    const naik = a > Number(ambangKini);
+    const turun = a < Number(ambangKini);
     const jatuh = hasil.hilang.jatuh || 0;
     const palsu = hasil.hilang.palsu || 0;
     const hilang = Object.values(hasil.hilang).reduce((x, y) => x + y, 0);
-    let teks = `Pada ${ambang} detik, ${hasil.berbunyi} dari ${hasil.episode} episode berbaring memicu alarm.`;
+    let teks = `Pada ${a} detik, ${hasil.berbunyi} dari ${hasil.episode} episode berbaring memicu alarm.`;
     if (naik) {
         const rincian = [[palsu, 'alarm palsu'], [jatuh, 'jatuh sungguhan'], [hilang - palsu - jatuh, 'belum dinilai atau belum yakin']]
             .filter(([n]) => n > 0).map(([n, label]) => `${n} ${label}`);
         teks = hilang ? `${hilang} alarm tidak akan berbunyi: ${rincian.join(', ')}.` : 'Tidak ada alarm yang hilang.';
-        if (hasil.belum_tentu) teks += ` ${hasil.belum_tentu} alarm lain belum tentu, karena ditutup sebelum ${ambang} detik.`;
+        if (hasil.belum_tentu) teks += ` ${hasil.belum_tentu} alarm lain belum tentu, karena ditutup sebelum ${a} detik.`;
     } else if (turun) {
         teks = hasil.tambahan
             ? `Ada ${hasil.tambahan} alarm tambahan dari orang yang dulu bangun sebelum ${ambangKini} detik. Belum ada yang menilai apakah itu jatuh.`
             : 'Tidak ada alarm tambahan.';
     }
     return (
-        <div role="status" className="mt-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 p-3 text-xs space-y-1">
+        <div role="status" className={`${kotak} ${pudar}`}>
             <p className="font-semibold text-slate-700 dark:text-slate-300">
                 Pratinjau dari {hasil.episode} episode berbaring, 30 hari terakhir
             </p>
@@ -135,6 +146,7 @@ function PratinjauAmbang({ ambang, ambangKini }) {
 }
 
 export default function Settings() {
+    const kabari = useToast();
     const [threshold, setThreshold] = useState(10);
     const [mode, setMode] = useState('');
     const [daftarMode, setDaftarMode] = useState([]);
@@ -149,16 +161,12 @@ export default function Settings() {
 
     const [memuat, setMemuat] = useState(true);
     const [sibuk, setSibuk] = useState(false);
-    const [kabar, setKabar] = useState(null);           // deteksi: { tipe: 'ok' | 'galat', teks }
-    const [kabarTg, setKabarTg] = useState(null);       // { tipe, teks, bagian: 'telegram' | 'privasi' }
     const [eskalasi, setEskalasi] = useState(2);
     const [polaShift, setPolaShift] = useState('3');
-    const [kabarEskalasi, setKabarEskalasi] = useState(null);
     const [simpan, setSimpan] = useState(null);          // { foto, klip } dalam hari
     const [riwayat, setRiwayat] = useState(null);        // null = memuat, 'galat', atau daftar
     const suara = useStatusSuara();
     const notifikasi = useStatusNotifikasi();
-    const [kabarNotif, setKabarNotif] = useState(null);
 
     const terapkan = (d) => {
         setThreshold(d.fall_duration_threshold);
@@ -178,13 +186,12 @@ export default function Settings() {
             const r = await api('/api/settings/');
             if (!r.ok) throw new Error(String(r.status));
             terapkan(await r.json());
-            setKabar(null);
         } catch {
-            setKabar({ tipe: 'galat', teks: PESAN_TERPUTUS });
+            kabari(PESAN_TERPUTUS, 'galat');
         } finally {
             setMemuat(false);
         }
-    }, []);
+    }, [kabari]);
 
     const ambilRiwayat = useCallback(async () => {
         try {
@@ -203,10 +210,11 @@ export default function Settings() {
         ambilRiwayat();
     }, [ambil, ambilRiwayat]);
 
+    const berubah = Number(threshold) !== Number(tersimpan.threshold) || mode !== tersimpan.mode;
+
     const simpanDeteksi = async (e) => {
         e.preventDefault();
         setSibuk(true);
-        setKabar(null);
         try {
             const dilakukan = [];
 
@@ -227,43 +235,38 @@ export default function Settings() {
 
             await ambil();
             ambilRiwayat();
-            setKabar({
-                tipe: 'ok',
-                teks: dilakukan.length ? `Tersimpan: ${dilakukan.join('; ')}.` : 'Tidak ada yang berubah.',
-            });
+            if (dilakukan.length) kabari(`Tersimpan: ${dilakukan.join('; ')}.`);
         } catch (err) {
-            setKabar({ tipe: 'galat', teks: `Gagal menyimpan: ${err.message}` });
+            kabari(`Gagal menyimpan: ${err.message}`, 'galat');
         } finally {
             setSibuk(false);
         }
     };
 
-    /** Pengaturan Telegram tersimpan seketika setiap diubah; kabarnya tampil di kartu asalnya. */
-    const ubahTelegram = async (isi, bagian = 'telegram') => {
-        setKabarTg(null);
+    /** Pengaturan Telegram tersimpan seketika setiap diubah. */
+    const ubahTelegram = async (isi, pesan) => {
         setTg((t) => ({ ...t, ...isi }));
         try {
             const r = await api('/api/settings/telegram', { method: 'PUT', json: isi });
             if (!r.ok) throw new Error(await bacaGalat(r));
             terapkan(await r.json());
             ambilRiwayat();
-            setKabarTg({ tipe: 'ok', teks: 'Tersimpan.', bagian });
+            kabari(pesan);
         } catch (err) {
-            setKabarTg({ tipe: 'galat', teks: `Gagal menyimpan: ${err.message}`, bagian });
+            kabari(`Gagal menyimpan: ${err.message}`, 'galat');
             ambil();
         }
     };
 
     const ujiTelegram = async () => {
         setSibuk(true);
-        setKabarTg(null);
         try {
             const r = await api('/api/settings/test-telegram', { method: 'POST' });
             const d = await r.json();
-            setKabarTg({ tipe: d.terkirim ? 'ok' : 'galat', teks: d.pesan, bagian: 'telegram' });
+            kabari(d.pesan, d.terkirim ? 'ok' : 'galat');
             setTelegramSiap(d.dikonfigurasi);
         } catch {
-            setKabarTg({ tipe: 'galat', teks: PESAN_TERPUTUS, bagian: 'telegram' });
+            kabari(PESAN_TERPUTUS, 'galat');
         } finally {
             setSibuk(false);
         }
@@ -271,31 +274,29 @@ export default function Settings() {
 
     /** Tersimpan seketika setiap diubah, seperti pengaturan Telegram. */
     const ubahEskalasi = async (menit) => {
-        setKabarEskalasi(null);
         setEskalasi(menit);
         try {
             const r = await api('/api/settings/eskalasi', { method: 'PUT', json: { eskalasi_menit: menit } });
             if (!r.ok) throw new Error(await bacaGalat(r));
             terapkan(await r.json());
             ambilRiwayat();
-            setKabarEskalasi({ tipe: 'ok', teks: 'Tersimpan.' });
+            kabari(`Tersimpan: pengingat setelah ${menit} menit.`);
         } catch (err) {
-            setKabarEskalasi({ tipe: 'galat', teks: `Gagal menyimpan: ${err.message}` });
+            kabari(`Gagal menyimpan: ${err.message}`, 'galat');
             ambil();
         }
     };
 
     const ubahPolaShift = async (pola) => {
-        setKabarEskalasi(null);
         setPolaShift(pola);
         try {
             const r = await api('/api/settings/shift', { method: 'PUT', json: { pola_shift: pola } });
             if (!r.ok) throw new Error(await bacaGalat(r));
             terapkan(await r.json());
             ambilRiwayat();
-            setKabarEskalasi({ tipe: 'ok', teks: 'Tersimpan.' });
+            kabari(`Tersimpan: ${pola} shift.`);
         } catch (err) {
-            setKabarEskalasi({ tipe: 'galat', teks: `Gagal menyimpan: ${err.message}` });
+            kabari(`Gagal menyimpan: ${err.message}`, 'galat');
             ambil();
         }
     };
@@ -305,67 +306,76 @@ export default function Settings() {
     };
 
     // Chrome Android dan Safari iOS menolak notifikasi dari halaman web biasa walau izinnya ada.
-    const tesNotifikasi = () => setKabarNotif(kabariAlarm({ id: 'uji', camera_name: 'Uji notifikasi', simulated: true })
-        ? { tipe: 'ok', teks: 'Notifikasi uji dikirim. Bila tidak muncul, periksa pengaturan notifikasi sistem operasi.' }
-        : { tipe: 'galat', teks: 'Browser ini tidak menampilkan notifikasi dari halaman web, biasanya di HP. Di HP, andalkan pesan Telegram.' });
+    const tesNotifikasi = () => (kabariAlarm({ id: 'uji', camera_name: 'Uji notifikasi', simulated: true })
+        ? kabari('Notifikasi uji dikirim. Bila tidak muncul, periksa pengaturan notifikasi sistem operasi.')
+        : kabari('Browser ini tidak menampilkan notifikasi dari halaman web, biasanya di HP. Di HP, andalkan pesan Telegram.', 'galat'));
 
-    const modeTerpilih = daftarMode.find((m) => m.id === mode);
+    const modeBerlaku = daftarMode.find((m) => m.id === tersimpan.mode);
 
     return (
-        <div className="p-4 md:p-8 w-full max-w-full min-w-0">
-            <h1 className="text-xl md:text-2xl font-bold mb-6">Pengaturan</h1>
+        /* Mulai 1280 px halaman ini setinggi layar dikurangi banner alarm dan tidak menggulir:
+           tiga kolom, dan Riwayat perubahan menggulir di dalam kartunya. Di bawah 1280 px
+           ketiga kolom terlalu sempit, jadi kartu disusun menurun dengan gulir halaman biasa;
+           kolomnya memakai display: contents supaya urutan kartu bisa diatur. */
+        <div className="p-4 md:p-6 xl:px-8 xl:pt-6 xl:pb-5 w-full max-w-full min-w-0 xl:h-[calc(100dvh-var(--tinggi-banner,0px))] xl:flex xl:flex-col xl:overflow-hidden">
+            <div className="mb-4 xl:mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+                <h1 className="text-xl md:text-2xl font-bold">Pengaturan</h1>
+                <p className="text-xs md:text-sm text-slate-500">
+                    Berlaku untuk seluruh panti, kecuali suara dan notifikasi yang diatur per perangkat.
+                </p>
+            </div>
 
-            <div className="max-w-2xl space-y-6">
-                <Bagian id="atur-deteksi" judul="Deteksi" keterangan="Berlaku untuk semua kamera.">
-                    <form onSubmit={simpanDeteksi} className="space-y-6">
-                        {/* Dua kartu berisi akibatnya, bukan dropdown nama teknis: yang dipilih
-                            perawat adalah perilaku alarmnya, bukan arsitektur modelnya. */}
-                        <fieldset>
-                            <legend className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                                Model deteksi
-                            </legend>
-                            {daftarMode.length === 0 && <p className="text-sm text-slate-500">Memuat…</p>}
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                {daftarMode.map((m) => (
-                                    <label
-                                        key={m.id}
-                                        className={`flex flex-col gap-1.5 rounded-xl border p-3 cursor-pointer transition-colors ${mode === m.id
-                                            ? 'border-slate-900 ring-1 ring-slate-900 dark:border-slate-100 dark:ring-slate-100'
-                                            : 'border-slate-300 dark:border-slate-700 hover:border-slate-500'} ${memuat ? 'opacity-50' : ''}`}
-                                    >
-                                        <span className="flex items-center gap-2">
-                                            <input type="radio" name="model-deteksi" value={m.id} checked={mode === m.id}
-                                                onChange={() => setMode(m.id)} disabled={memuat}
-                                                className="accent-slate-700 dark:accent-slate-300" />
-                                            <span className="font-semibold text-sm text-slate-900 dark:text-slate-100">{m.label}</span>
-                                            {m.recommended && <span className="text-xs text-slate-500">· disarankan</span>}
-                                        </span>
-                                        <span className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">{m.description}</span>
-                                    </label>
-                                ))}
-                            </div>
+            <div className="grid gap-4 max-w-2xl xl:max-w-none xl:grid-cols-3 xl:grid-rows-[minmax(0,1fr)] xl:flex-1 xl:min-h-0">
+                {/* Kolom 1: deteksi. */}
+                <div className="contents xl:flex xl:flex-col xl:gap-4 xl:min-h-0 xl:overflow-y-auto">
+                    <Bagian id="atur-deteksi" judul="Deteksi" keterangan="Berlaku untuk semua kamera." className="xl:flex-1"
+                        penjelasan={<>
+                            <p>Model menentukan cara sistem membaca postur. Mengganti model mereset hitungan durasi berbaring di semua kamera.</p>
+                            <p>Waktu tunggu yang lebih pendek berarti lebih banyak alarm palsu. Yang lebih panjang berarti pertolongan bisa terlambat.</p>
                             {daftarMode.some((m) => m.teknis) && (
-                                <details className="mt-2 text-xs text-slate-500">
-                                    <summary className="cursor-pointer w-fit">Detail teknis</summary>
-                                    <dl className="mt-1 space-y-1">
-                                        {daftarMode.map((m) => (
-                                            <div key={m.id}><dt className="inline font-medium">{m.label}: </dt><dd className="inline">{m.teknis}</dd></div>
-                                        ))}
-                                    </dl>
-                                </details>
+                                <dl className="space-y-1 text-xs text-slate-500">
+                                    {daftarMode.map((m) => (
+                                        <div key={m.id}><dt className="inline font-medium">{m.label}: </dt><dd className="inline">{m.teknis}</dd></div>
+                                    ))}
+                                </dl>
                             )}
-                            {mode !== tersimpan.mode && (
-                                <p className="text-xs text-amber-700 dark:text-amber-400 mt-2">
-                                    Mengganti model akan mereset hitungan durasi di semua kamera.
+                        </>}>
+                        <form onSubmit={simpanDeteksi} className="flex flex-col gap-4 xl:flex-1">
+                            {/* Dua kartu berisi akibatnya, bukan dropdown nama teknis: yang dipilih
+                                perawat adalah perilaku alarmnya, bukan arsitektur modelnya. */}
+                            <fieldset>
+                                <legend className={`${LABEL} mb-2`}>Model deteksi</legend>
+                                {daftarMode.length === 0 && <p className="text-sm text-slate-500">Memuat…</p>}
+                                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-2">
+                                    {daftarMode.map((m) => (
+                                        <label
+                                            key={m.id}
+                                            className={`flex flex-col gap-1 rounded-xl border px-3 py-2.5 cursor-pointer transition-colors ${mode === m.id
+                                                ? 'border-slate-900 ring-1 ring-slate-900 dark:border-slate-100 dark:ring-slate-100'
+                                                : 'border-slate-300 dark:border-slate-700 hover:border-slate-500'} ${memuat ? 'opacity-50' : ''}`}
+                                        >
+                                            <span className="flex items-center gap-2">
+                                                <input type="radio" name="model-deteksi" value={m.id} checked={mode === m.id}
+                                                    onChange={() => setMode(m.id)} disabled={memuat}
+                                                    className="accent-slate-700 dark:accent-slate-300" />
+                                                <span className="font-semibold text-sm text-slate-900 dark:text-slate-100">{m.label}</span>
+                                                {m.recommended && <span className="text-xs text-slate-500">· disarankan</span>}
+                                            </span>
+                                            <span className="text-xs text-slate-600 dark:text-slate-400 leading-snug">{m.description}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                                {/* Selalu tampil, supaya memilih model lain tidak menyisipkan baris baru. */}
+                                <p className={`text-xs mt-1.5 ${mode !== tersimpan.mode ? 'font-semibold text-amber-700 dark:text-amber-400' : 'text-slate-500'}`}>
+                                    Mengganti model mereset hitungan di semua kamera.
                                 </p>
-                            )}
-                        </fieldset>
+                            </fieldset>
 
-                        <div>
-                            <label htmlFor="ambang" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                                Tunggu sebelum memberi alarm
-                            </label>
-                            <div className="flex items-center gap-4">
+                            <div className="space-y-1.5">
+                                <div className="flex items-baseline justify-between gap-3">
+                                    <label htmlFor="ambang" className={LABEL}>Tunggu sebelum memberi alarm</label>
+                                    <span className="text-lg font-bold text-slate-800 dark:text-slate-200 tabular-nums whitespace-nowrap">{threshold} detik</span>
+                                </div>
                                 <input
                                     id="ambang"
                                     type="range"
@@ -373,201 +383,175 @@ export default function Settings() {
                                     value={threshold}
                                     onChange={(e) => setThreshold(e.target.value)}
                                     disabled={memuat}
+                                    aria-describedby="ambang-ket"
                                     className="w-full accent-slate-700 dark:accent-slate-300"
                                 />
-                                <span className="text-lg font-bold text-slate-800 dark:text-slate-200 w-24 text-right tabular-nums">{threshold} detik</span>
+                                <p id="ambang-ket" className="text-xs text-slate-500">
+                                    Alarm berbunyi setelah {threshold} detik terbaca berbaring.
+                                </p>
+                                <PratinjauAmbang ambang={threshold} ambangKini={tersimpan.threshold} />
                             </div>
-                            <p className="text-xs text-slate-500 mt-1">
-                                Alarm berbunyi setelah seseorang terbaca berbaring selama {threshold} detik. Lebih pendek,
-                                lebih banyak alarm palsu. Lebih panjang, pertolongan bisa terlambat.
-                            </p>
-                            <PratinjauAmbang ambang={threshold} ambangKini={tersimpan.threshold} />
+
+                            {/* Di dasar kartu. Bila kolomnya harus menggulir (layar pendek), tombol
+                                menempel di dasar kolom dengan latar kartu di belakangnya. */}
+                            <div className="mt-auto xl:sticky xl:bottom-0 xl:pt-2 bg-white dark:bg-slate-900">
+                                <button
+                                    type="submit"
+                                    disabled={sibuk || memuat || !berubah}
+                                    className="w-full min-h-11 bg-emerald-700 hover:bg-emerald-800 disabled:bg-slate-200 disabled:text-slate-500 dark:disabled:bg-slate-800 dark:disabled:text-slate-400 text-white font-semibold rounded-lg transition-colors"
+                                >
+                                    {sibuk ? 'Menyimpan…' : berubah ? 'Simpan pengaturan deteksi' : 'Pengaturan deteksi tersimpan'}
+                                </button>
+                            </div>
+                        </form>
+                    </Bagian>
+                </div>
+
+                {/* Kolom 2: perangkat ini, pengingat, dan riwayat perubahan yang mengisi sisa tinggi. */}
+                <div className="contents xl:flex xl:flex-col xl:gap-4 xl:min-h-0">
+                    <Bagian id="atur-suara" judul="Suara dan notifikasi" keterangan="Diatur per perangkat ini."
+                        penjelasan={<>
+                            <p>Browser yang memutuskan boleh tidaknya halaman berbunyi dan memberi notifikasi, jadi pengaturan ini berlaku per perangkat.</p>
+                            <p>Alarm berbunyi berulang sampai ada yang menekan Saya ke sana. Browser menahan suara sampai ada klik pertama di halaman, jadi klik sekali setiap kali dashboard dibuka.</p>
+                            <p>Notifikasi muncul saat ada alarm dan tab FallDetect sedang tidak dilihat, berisi nama ruang tanpa foto. Alarm sungguhan tetap tampil sampai ada yang menuju lokasi. Untuk komputer jaga; di HP, perawat dikabari lewat Telegram.</p>
+                        </>}>
+                        <div className="flex items-center gap-3">
+                            <span className="flex-1 min-w-0 inline-flex items-center gap-2 text-sm">
+                                {suara === 'aktif'
+                                    ? <><Volume2 className="w-4 h-4 shrink-0" aria-hidden="true" /> Suara aktif di perangkat ini</>
+                                    : suara === 'tidak-didukung'
+                                        ? <><VolumeX className="w-4 h-4 shrink-0" aria-hidden="true" /> Browser ini tidak bisa membunyikan alarm</>
+                                        : <><VolumeX className="w-4 h-4 shrink-0" aria-hidden="true" /> Suara belum aktif</>}
+                            </span>
+                            <button type="button" onClick={tesSuara} className={TOMBOL_NETRAL}>Tes suara</button>
                         </div>
+                        <div className="flex items-center gap-3">
+                            <span className="flex-1 min-w-0 inline-flex items-center gap-2 text-sm">
+                                {notifikasi === 'granted'
+                                    ? <Bell className="w-4 h-4 shrink-0" aria-hidden="true" />
+                                    : <BellOff className="w-4 h-4 shrink-0" aria-hidden="true" />}
+                                {TEKS_NOTIFIKASI[notifikasi]}
+                            </span>
+                            {notifikasi === 'default' && (
+                                <button type="button" onClick={mintaIzinNotifikasi} className={TOMBOL_NETRAL}>Izinkan notifikasi</button>
+                            )}
+                            {notifikasi === 'granted' && (
+                                <button type="button" onClick={tesNotifikasi} className={TOMBOL_NETRAL}>Tes notifikasi</button>
+                            )}
+                        </div>
+                    </Bagian>
 
-                        <Kabar kabar={kabar} />
+                    <Bagian id="atur-eskalasi" judul="Bila tidak ada yang merespons" keterangan="Pengingat bila belum ada yang menekan Saya ke sana."
+                        penjelasan={<>
+                            <p>Alarm yang dibiarkan tidak boleh mati diam-diam. Setelah {eskalasi} menit, banner menulis Belum ada yang merespons beserta lamanya, dan grup Telegram menerima pengingat sebagai balasan ke pesan alarm, setiap {eskalasi} menit, paling banyak 3 kali.</p>
+                            <p>Belum ada angka yang teruji untuk panti, jadi sesuaikan dengan pengalaman perawat.</p>
+                            <p>Jam shift membagi Ringkasan shift di Riwayat Insiden untuk serah terima: 3 shift mulai pukul 07.00, 14.00, dan 21.00; 2 shift mulai pukul 07.00 dan 19.00.</p>
+                        </>}>
+                        <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-2">
+                            <label htmlFor="eskalasi" className={LABEL}>Ingatkan setelah</label>
+                            <select id="eskalasi" value={eskalasi} onChange={(e) => ubahEskalasi(Number(e.target.value))}
+                                disabled={memuat} className={PILIH}>
+                                {[1, 2, 3, 5, 10].map((m) => <option key={m} value={m}>{m} menit</option>)}
+                            </select>
+                            <label htmlFor="pola-shift" className={LABEL}>Jam shift</label>
+                            <select id="pola-shift" value={polaShift} onChange={(e) => ubahPolaShift(e.target.value)}
+                                disabled={memuat} className={PILIH}>
+                                <option value="3">3 shift: 7, 14, 21</option>
+                                <option value="2">2 shift: 7, 19</option>
+                            </select>
+                        </div>
+                    </Bagian>
 
-                        <button
-                            type="submit"
-                            disabled={sibuk || memuat}
-                            className="w-full min-h-11 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white font-semibold rounded-lg transition-colors"
-                        >
-                            {sibuk ? 'Menyimpan…' : 'Simpan pengaturan deteksi'}
-                        </button>
-                    </form>
-                </Bagian>
+                    <Bagian id="atur-riwayat" judul="Riwayat perubahan" keterangan="Terbaru di atas, beserta siapa yang mengubah."
+                        className="max-xl:order-1 xl:flex-1 xl:min-h-0">
+                        <div className="xl:flex-1 xl:min-h-0 xl:overflow-y-auto xl:overscroll-contain">
+                            <RiwayatPerubahan riwayat={riwayat} daftarMode={daftarMode} opsiFoto={opsiFoto} />
+                        </div>
+                    </Bagian>
+                </div>
 
-                <Bagian id="atur-suara" judul="Suara dan notifikasi" keterangan="Diatur per perangkat, karena browser yang memutuskan boleh tidaknya berbunyi.">
-                    <div className="flex flex-wrap items-center gap-3">
-                        <span className="inline-flex items-center gap-2 text-sm">
-                            {suara === 'aktif'
-                                ? <><Volume2 className="w-4 h-4" aria-hidden="true" /> Suara aktif di perangkat ini</>
-                                : suara === 'tidak-didukung'
-                                    ? <><VolumeX className="w-4 h-4" aria-hidden="true" /> Browser ini tidak bisa membunyikan alarm</>
-                                    : <><VolumeX className="w-4 h-4" aria-hidden="true" /> Suara belum aktif</>}
-                        </span>
-                        <button type="button" onClick={tesSuara} className={`${TOMBOL_NETRAL} ml-auto`}>Tes suara</button>
-                    </div>
-                    <p className="text-xs text-slate-500">
-                        Alarm berbunyi berulang sampai ada yang menekan Saya ke sana. Browser menahan suara sampai ada
-                        klik pertama di halaman, jadi klik sekali setiap kali dashboard dibuka.
-                    </p>
-                    <div className="flex flex-wrap items-center gap-3">
-                        <span className="inline-flex items-center gap-2 text-sm">
-                            {notifikasi === 'granted'
-                                ? <Bell className="w-4 h-4" aria-hidden="true" />
-                                : <BellOff className="w-4 h-4" aria-hidden="true" />}
-                            {TEKS_NOTIFIKASI[notifikasi]}
-                        </span>
-                        {notifikasi === 'default' && (
-                            <button type="button" onClick={mintaIzinNotifikasi} className={`${TOMBOL_NETRAL} ml-auto`}>Izinkan notifikasi</button>
+                {/* Kolom 3: Telegram, privasi, dan keterangan sistem. */}
+                <div className="contents xl:flex xl:flex-col xl:gap-4 xl:min-h-0 xl:overflow-y-auto">
+                    <Bagian id="atur-telegram" judul="Telegram"
+                        keterangan={(
+                            <span className="inline-flex items-center gap-1.5">
+                                <span className={`w-2 h-2 shrink-0 rounded-full ${telegramSiap ? 'bg-emerald-500' : 'bg-slate-400 dark:bg-slate-600'}`} aria-hidden="true" />
+                                {telegramSiap ? 'Terhubung ke grup perawat' : 'Belum diatur'}
+                            </span>
                         )}
-                        {notifikasi === 'granted' && (
-                            <button type="button" onClick={tesNotifikasi} className={`${TOMBOL_NETRAL} ml-auto`}>Tes notifikasi</button>
+                        aksi={(
+                            <button type="button" onClick={ujiTelegram} disabled={sibuk} className={TOMBOL_NETRAL}>
+                                Kirim pesan uji
+                            </button>
                         )}
-                    </div>
-                    <p className="text-xs text-slate-500">
-                        Notifikasi muncul saat ada alarm dan tab FallDetect sedang tidak dilihat, berisi nama ruang tanpa
-                        foto. Alarm sungguhan tetap tampil sampai ada yang menuju lokasi. Untuk komputer jaga; di HP,
-                        perawat dikabari lewat Telegram.
-                    </p>
-                    <Kabar kabar={kabarNotif} />
-                </Bagian>
-
-                <Bagian id="atur-eskalasi" judul="Bila tidak ada yang merespons" keterangan="Alarm yang dibiarkan tidak boleh mati diam-diam.">
-                    <div className="flex flex-wrap items-center gap-3">
-                        <label htmlFor="eskalasi" className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                            Ingatkan setelah
-                        </label>
-                        <select
-                            id="eskalasi"
-                            value={eskalasi}
-                            onChange={(e) => ubahEskalasi(Number(e.target.value))}
-                            disabled={memuat}
-                            className="bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-                        >
-                            {[1, 2, 3, 5, 10].map((m) => <option key={m} value={m}>{m} menit</option>)}
-                        </select>
-                        <span className="text-sm text-slate-600 dark:text-slate-400">tanpa Saya ke sana</span>
-                    </div>
-                    <p className="text-xs text-slate-500">
-                        Setelah {eskalasi} menit, banner menulis Belum ada yang merespons beserta lamanya, dan grup Telegram
-                        menerima pengingat sebagai balasan ke pesan alarm, setiap {eskalasi} menit, paling banyak 3 kali.
-                        Belum ada angka yang teruji untuk panti, jadi sesuaikan dengan hasil uji mini.
-                    </p>
-                    <div className="flex flex-wrap items-center gap-3 pt-2">
-                        <label htmlFor="pola-shift" className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                            Shift untuk ringkasan serah terima
-                        </label>
-                        <select
-                            id="pola-shift"
-                            value={polaShift}
-                            onChange={(e) => ubahPolaShift(e.target.value)}
-                            disabled={memuat}
-                            className="bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-                        >
-                            <option value="3">3 shift: 07.00, 14.00, 21.00</option>
-                            <option value="2">2 shift: 07.00, 19.00</option>
-                        </select>
-                    </div>
-                    <Kabar kabar={kabarEskalasi} />
-                </Bagian>
-
-                <Bagian id="atur-telegram" judul="Telegram" keterangan="Pesan alarm ke grup perawat, dengan tombol Saya ke sana dan Alarm palsu. Membalas pesan alarm di grup menambah catatan insiden.">
-                    <div className="flex flex-wrap items-center gap-3">
-                        <span className="inline-flex items-center gap-2 text-sm">
-                            <span className={`w-2 h-2 rounded-full ${telegramSiap ? 'bg-emerald-500' : 'bg-slate-400 dark:bg-slate-600'}`} aria-hidden="true" />
-                            {telegramSiap ? 'Terhubung ke grup' : 'Belum diatur'}
-                        </span>
-                        <button type="button" onClick={ujiTelegram} disabled={sibuk} className={`${TOMBOL_NETRAL} ml-auto`}>
-                            Kirim pesan uji
-                        </button>
-                    </div>
-                    <p className="text-xs text-slate-500">
-                        Token bot dan ID grup diatur di server oleh pengelola sistem, bukan dari halaman ini, karena keduanya rahasia.
-                    </p>
-                    {tg && (
-                        <div className="space-y-3">
-                            <label className="flex items-start gap-3 text-sm cursor-pointer">
-                                <input type="checkbox" checked={tg.send_drills} className="mt-1 accent-blue-600"
-                                    onChange={(e) => ubahTelegram({ send_drills: e.target.checked })} />
-                                <span>
+                        penjelasan={<>
+                            <p>Pesan alarm dikirim ke grup perawat, dengan tombol Saya ke sana dan Alarm palsu. Membalas pesan alarm di grup menambah catatan insiden.</p>
+                            <p>Token bot dan ID grup diatur di server oleh pengelola sistem, bukan dari halaman ini, karena keduanya rahasia.</p>
+                            <p>Latihan tidak dikirim secara bawaan, supaya grup tidak terbiasa mengabaikan pesan alarm.</p>
+                            <p>Kabar kamera dikirim setelah 30 detik tanpa gambar dan saat kamera pulih, juga saat Mode perawatan dimulai, diperpanjang, atau selesai.</p>
+                        </>}>
+                        {tg && (
+                            <div className="space-y-0.5">
+                                <label className="flex items-center gap-3 text-sm cursor-pointer min-h-7">
+                                    <input type="checkbox" checked={tg.send_drills} className="accent-blue-600"
+                                        onChange={(e) => ubahTelegram({ send_drills: e.target.checked },
+                                            e.target.checked ? 'Tersimpan: latihan ikut dikirim ke Telegram.' : 'Tersimpan: latihan tidak dikirim ke Telegram.')} />
                                     Kirim juga latihan ke Telegram
-                                    <span className="block text-xs text-slate-500">
-                                        Bawaannya mati, supaya grup tidak terbiasa mengabaikan pesan alarm.
-                                    </span>
-                                </span>
-                            </label>
-                            <label className="flex items-start gap-3 text-sm cursor-pointer">
-                                <input type="checkbox" checked={tg.camera_offline} className="mt-1 accent-slate-700"
-                                    onChange={(e) => ubahTelegram({ camera_offline: e.target.checked })} />
-                                <span>
-                                    Kabari grup saat kamera terputus atau dijeda
-                                    <span className="block text-xs text-slate-500">
-                                        Setelah 30 detik tanpa gambar dan saat kamera pulih, juga saat Mode
-                                        perawatan dimulai, diperpanjang, atau selesai.
-                                    </span>
-                                </span>
-                            </label>
-                        </div>
-                    )}
-                    {kabarTg?.bagian === 'telegram' && <Kabar kabar={kabarTg} />}
-                </Bagian>
-
-                <Bagian id="atur-privasi" judul="Privasi" keterangan="Foto penghuni yang tergeletak adalah data kesehatan.">
-                    {tg && (
-                        <fieldset className="space-y-2">
-                            <legend className="text-sm font-medium mb-1">Foto di pesan Telegram</legend>
-                            {opsiFoto.map((o) => (
-                                <label key={o.id} className="flex items-center gap-3 text-sm cursor-pointer min-h-8">
-                                    <input type="radio" name="foto-telegram" value={o.id} checked={tg.photo_mode === o.id}
-                                        onChange={() => ubahTelegram({ photo_mode: o.id }, 'privasi')} className="accent-slate-700" />
-                                    {o.label}
                                 </label>
-                            ))}
-                        </fieldset>
-                    )}
-                    <p className="text-xs text-slate-500">
-                        Semua pesan dilindungi supaya tidak bisa diteruskan atau disimpan dari Telegram. Foto dan klip
-                        di server hanya bisa dilihat setelah masuk, di Riwayat Insiden.
-                    </p>
-                    {kabarTg?.bagian === 'privasi' && <Kabar kabar={kabarTg} />}
-                    {simpan && (
-                        <div>
-                            <h3 className="text-sm font-medium mb-1">Masa simpan di server</h3>
-                            <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-                                <dt className="text-slate-500">Foto kejadian</dt>
-                                <dd>{masaSimpan(simpan.foto, 'tidak disimpan')}</dd>
-                                <dt className="text-slate-500">Klip kejadian</dt>
-                                <dd>{masaSimpan(simpan.klip, 'tidak direkam')}</dd>
-                                <dt className="text-slate-500">Catatan insiden</dt>
-                                <dd>disimpan tanpa batas waktu, untuk laporan</dd>
-                            </dl>
-                            <p className="text-xs text-slate-500 mt-1">
-                                Diubah lewat <code>FOTO_MASA_SIMPAN_HARI</code> dan <code>KLIP_MASA_SIMPAN_HARI</code> di
-                                berkas <code>backend/.env</code>. Angka 0 berarti tidak disimpan sama sekali.
-                            </p>
-                        </div>
-                    )}
-                </Bagian>
+                                <label className="flex items-center gap-3 text-sm cursor-pointer min-h-7">
+                                    <input type="checkbox" checked={tg.camera_offline} className="accent-slate-700"
+                                        onChange={(e) => ubahTelegram({ camera_offline: e.target.checked },
+                                            e.target.checked ? 'Tersimpan: grup dikabari saat kamera terputus.' : 'Tersimpan: grup tidak dikabari soal kamera.')} />
+                                    Kabari grup saat kamera terputus atau dijeda
+                                </label>
+                            </div>
+                        )}
+                    </Bagian>
 
-                <Bagian id="atur-riwayat" judul="Riwayat perubahan" keterangan="Perubahan pengaturan terbaru lebih dulu, beserta siapa yang mengubahnya.">
-                    <RiwayatPerubahan riwayat={riwayat} daftarMode={daftarMode} opsiFoto={opsiFoto} />
-                </Bagian>
+                    <Bagian id="atur-privasi" judul="Privasi" keterangan="Foto penghuni yang tergeletak adalah data kesehatan."
+                        penjelasan={<>
+                            <p>Semua pesan dilindungi supaya tidak bisa diteruskan atau disimpan dari Telegram. Foto dan klip di server hanya bisa dilihat setelah masuk, di Riwayat Insiden.</p>
+                            <p>Masa simpan diubah lewat <code>FOTO_MASA_SIMPAN_HARI</code> dan <code>KLIP_MASA_SIMPAN_HARI</code> di berkas <code>backend/.env</code>. Angka 0 berarti tidak disimpan sama sekali.</p>
+                        </>}>
+                        {tg && (
+                            <fieldset>
+                                <legend className={`${LABEL} mb-1`}>Foto di pesan Telegram</legend>
+                                {opsiFoto.map((o) => (
+                                    <label key={o.id} className="flex items-center gap-3 text-sm cursor-pointer min-h-7">
+                                        <input type="radio" name="foto-telegram" value={o.id} checked={tg.photo_mode === o.id}
+                                            onChange={() => ubahTelegram({ photo_mode: o.id }, `Tersimpan: ${o.label.toLowerCase()}.`)}
+                                            className="accent-slate-700" />
+                                        {o.label}
+                                    </label>
+                                ))}
+                            </fieldset>
+                        )}
+                        {simpan && (
+                            <div>
+                                <h3 className={`${LABEL} mb-1`}>Masa simpan di server</h3>
+                                <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-0.5 text-sm">
+                                    <dt className="text-slate-500">Foto kejadian</dt>
+                                    <dd>{masaSimpan(simpan.foto, 'tidak disimpan')}</dd>
+                                    <dt className="text-slate-500">Klip kejadian</dt>
+                                    <dd>{masaSimpan(simpan.klip, 'tidak direkam')}</dd>
+                                    <dt className="text-slate-500">Catatan insiden</dt>
+                                    <dd>tanpa batas waktu, untuk laporan</dd>
+                                </dl>
+                            </div>
+                        )}
+                    </Bagian>
 
-                <Bagian id="atur-tentang" judul="Tentang sistem">
-                    <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-                        <dt className="text-slate-500">Aplikasi</dt>
-                        <dd>FallDetect, prototipe proyek mahasiswa</dd>
-                        <dt className="text-slate-500">Model aktif</dt>
-                        <dd>{modeTerpilih?.label || '…'}</dd>
-                        <dt className="text-slate-500">Backend</dt>
-                        <dd className="font-mono text-xs break-all self-center">{API_BASE}</dd>
-                    </dl>
-                    <p className="text-xs text-slate-500">
-                        Bukan alat kesehatan bersertifikat. Alarm adalah pemberitahuan kemungkinan jatuh dan tetap
-                        perlu diperiksa langsung oleh perawat.
-                    </p>
-                </Bagian>
+                    <Bagian id="atur-tentang" judul="Tentang sistem" keterangan="Bukan alat kesehatan bersertifikat."
+                        className="max-xl:order-2 xl:flex-1"
+                        penjelasan={<p>FallDetect adalah prototipe proyek mahasiswa. Alarm adalah pemberitahuan kemungkinan jatuh dan tetap perlu diperiksa langsung oleh perawat.</p>}>
+                        <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-0.5 text-sm">
+                            <dt className="text-slate-500">Model aktif</dt>
+                            <dd>{modeBerlaku?.label || '…'}</dd>
+                            <dt className="text-slate-500">Backend</dt>
+                            <dd className="font-mono text-xs break-all self-center">{API_BASE}</dd>
+                        </dl>
+                    </Bagian>
+                </div>
             </div>
         </div>
     );
