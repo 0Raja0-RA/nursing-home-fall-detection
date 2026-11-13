@@ -196,7 +196,7 @@ terputus menunjukkan sejak kapan ia buta.
 
 | Method | Endpoint | Keterangan |
 |---|---|---|
-| GET | `/api/settings/` | Konfigurasi aktif, pilihan model, pengaturan Telegram, daftar putusan dan alasan, serta masa simpan `foto_masa_simpan_hari` dan `klip_masa_simpan_hari` (hanya dibaca; diatur di `backend/.env`) |
+| GET | `/api/settings/` | Konfigurasi aktif, pilihan model (`available_modes`: `id`, `label`, `description` berisi akibatnya, `teknis`), pengaturan Telegram, daftar putusan dan alasan, serta masa simpan `foto_masa_simpan_hari` dan `klip_masa_simpan_hari` (hanya dibaca; diatur di `backend/.env`) |
 | PUT | `/api/settings/threshold` | `{"fall_duration_threshold": 3}` (lebih dari 0, paling besar 60) |
 | PUT | `/api/settings/mode` | `{"detection_mode": "pose"}` atau `bbox`; mereset hitungan semua kamera |
 | PUT | `/api/settings/telegram` | `{"photo_mode", "send_drills", "camera_offline"}`, semuanya opsional |

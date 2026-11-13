@@ -482,10 +482,11 @@ class ModeUpdate(BaseModel):
 
 
 class ModeInfo(BaseModel):
-    """Satu pilihan mode detektor, untuk mengisi dropdown di dashboard."""
+    """Satu pilihan mode detektor, untuk kartu pilihan di Pengaturan."""
     id: str
     label: str
-    description: str
+    description: str          # akibatnya bagi perawat
+    teknis: str = ""          # nama model dan berkasnya
     recommended: bool
 
 

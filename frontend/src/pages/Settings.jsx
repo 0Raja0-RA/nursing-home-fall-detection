@@ -318,35 +318,48 @@ export default function Settings() {
             <div className="max-w-2xl space-y-6">
                 <Bagian id="atur-deteksi" judul="Deteksi" keterangan="Berlaku untuk semua kamera.">
                     <form onSubmit={simpanDeteksi} className="space-y-6">
-                        <div>
-                            <label htmlFor="pilih-model" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                        {/* Dua kartu berisi akibatnya, bukan dropdown nama teknis: yang dipilih
+                            perawat adalah perilaku alarmnya, bukan arsitektur modelnya. */}
+                        <fieldset>
+                            <legend className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                                 Model deteksi
-                            </label>
-                            <select
-                                id="pilih-model"
-                                value={mode}
-                                onChange={(e) => setMode(e.target.value)}
-                                disabled={memuat || daftarMode.length === 0}
-                                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg p-2.5 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-                            >
-                                {daftarMode.length === 0 && <option value="">Memuat…</option>}
+                            </legend>
+                            {daftarMode.length === 0 && <p className="text-sm text-slate-500">Memuat…</p>}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 {daftarMode.map((m) => (
-                                    <option key={m.id} value={m.id}>
-                                        {m.label}{m.recommended ? ' (disarankan)' : ''}
-                                    </option>
+                                    <label
+                                        key={m.id}
+                                        className={`flex flex-col gap-1.5 rounded-xl border p-3 cursor-pointer transition-colors ${mode === m.id
+                                            ? 'border-slate-900 ring-1 ring-slate-900 dark:border-slate-100 dark:ring-slate-100'
+                                            : 'border-slate-300 dark:border-slate-700 hover:border-slate-500'} ${memuat ? 'opacity-50' : ''}`}
+                                    >
+                                        <span className="flex items-center gap-2">
+                                            <input type="radio" name="model-deteksi" value={m.id} checked={mode === m.id}
+                                                onChange={() => setMode(m.id)} disabled={memuat}
+                                                className="accent-slate-700 dark:accent-slate-300" />
+                                            <span className="font-semibold text-sm text-slate-900 dark:text-slate-100">{m.label}</span>
+                                            {m.recommended && <span className="text-xs text-slate-500">· disarankan</span>}
+                                        </span>
+                                        <span className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">{m.description}</span>
+                                    </label>
                                 ))}
-                            </select>
-                            <p className="text-xs text-slate-500 mt-1">
-                                {modeTerpilih
-                                    ? modeTerpilih.description
-                                    : 'Model yang dipakai untuk membaca postur dari setiap frame.'}
-                            </p>
+                            </div>
+                            {daftarMode.some((m) => m.teknis) && (
+                                <details className="mt-2 text-xs text-slate-500">
+                                    <summary className="cursor-pointer w-fit">Detail teknis</summary>
+                                    <dl className="mt-1 space-y-1">
+                                        {daftarMode.map((m) => (
+                                            <div key={m.id}><dt className="inline font-medium">{m.label}: </dt><dd className="inline">{m.teknis}</dd></div>
+                                        ))}
+                                    </dl>
+                                </details>
+                            )}
                             {mode !== tersimpan.mode && (
-                                <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">
+                                <p className="text-xs text-amber-700 dark:text-amber-400 mt-2">
                                     Mengganti model akan mereset hitungan durasi di semua kamera.
                                 </p>
                             )}
-                        </div>
+                        </fieldset>
 
                         <div>
                             <label htmlFor="ambang" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">

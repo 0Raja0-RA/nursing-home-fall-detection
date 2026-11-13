@@ -117,7 +117,8 @@ mudah tertukar, dan kalau tertukar kelasnya kacau tanpa pesan error:
 
 #### Model kedua (opsional): Pose Estimation
 
-Halaman **Pengaturan** punya pilihan model. Selain `best.pt` di atas, ada mode
+Halaman **Pengaturan** punya pilihan model, ditampilkan sebagai dua kartu: **Kerangka tubuh**
+(mode `pose`) dan **Kotak tubuh** (mode `bbox`), masing-masing dengan akibatnya. Selain `best.pt` di atas, ada mode
 **Pose Estimation** yang memakai `yolo11n-pose.pt` — model rilis standar
 Ultralytics, bukan hasil training kita. Taruh di folder yang sama:
 

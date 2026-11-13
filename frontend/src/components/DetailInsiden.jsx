@@ -9,7 +9,7 @@ import FormPenutupan, { PilihanRadio } from './FormPenutupan';
 import { StatusTelegram } from './StatusInsiden';
 import { usePengunjung } from '../context/auth';
 
-const MODEL = { pose: 'YOLO11-Pose', bbox: 'Model custom (bbox)' };
+const MODEL = { pose: 'Kerangka tubuh (YOLO11-Pose)', bbox: 'Kotak tubuh (model custom)' };
 const TOMBOL = 'min-h-11 px-4 rounded-lg text-sm font-semibold inline-flex items-center justify-center gap-2';
 
 /** Ubah putusan alarm yang sudah ditangani. Alasan wajib bila alarm palsu. */
