@@ -14,13 +14,13 @@ const DATA_DISIMPAN = [
     },
     {
         apa: 'Foto saat alarm',
-        isi: 'Satu foto per alarm, dihapus otomatis setelah 30 hari. Foto yang dikirim ke grup Telegram bawaannya diburamkan, dan pesannya tidak bisa diteruskan atau disimpan.',
-        siapa: 'akun tim perawat, dan anggota grup Telegram perawat dalam versi buram',
+        isi: 'Satu foto per alarm, dalam tampilan privasi kamera yang sama dengan videonya, dihapus otomatis setelah 30 hari. Foto yang dikirim ke grup Telegram bawaannya diburamkan, dan pesannya tidak bisa diteruskan atau disimpan.',
+        siapa: 'siapa pun yang bisa melihat videonya di dasbor, dan anggota grup Telegram perawat dalam versi buram',
     },
     {
         apa: 'Klip kejadian',
-        isi: 'Dari sekitar 5 detik sebelum orangnya terbaca berbaring sampai 5 detik sesudah alarm, dihapus otomatis setelah 7 hari. Tidak pernah dikirim ke Telegram.',
-        siapa: 'akun tim perawat',
+        isi: 'Dari sekitar 5 detik sebelum orangnya terbaca berbaring sampai 5 detik sesudah alarm, dalam tampilan privasi kamera, dihapus otomatis setelah 7 hari. Tidak pernah dikirim ke Telegram.',
+        siapa: 'siapa pun yang bisa melihat videonya di dasbor',
     },
     {
         apa: 'Video asli kamera berprivasi',
@@ -30,7 +30,7 @@ const DATA_DISIMPAN = [
     {
         apa: 'Riwayat insiden',
         isi: 'Jam alarm, siapa yang menuju lokasi dan menangani, putusan jatuh atau alarm palsu, dan catatan perawat. Disimpan untuk laporan dan untuk menilai seberapa sering sistem keliru.',
-        siapa: 'akun tim perawat; pengunjung pameran hanya bisa melihat, tanpa foto dan klip',
+        siapa: 'akun tim perawat; pengunjung pameran hanya bisa melihat, tanpa bisa mengubah apa pun',
     },
 ];
 

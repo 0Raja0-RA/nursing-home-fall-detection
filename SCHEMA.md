@@ -212,7 +212,7 @@ Riwayat Mode perawatan: jeda deteksi jatuh dan video di satu kamera, misalnya sa
 
 - Semua API, video, dan WebSocket wajib login (`wajib_login`, dipasang di `backend/app/main.py`). Kecualinya `/api/auth` (status, masuk, pengunjung, keluar) dan health check. Hanya `/api/users` yang khusus `pengelola` (`wajib_pengelola` di `api/auth.py`). Pembatasan ini dijaga di backend, bukan di database: SQLite tidak punya row-level security.
 - `users.username` unik dan disimpan dalam huruf kecil.
-- Pengunjung pameran (dari QR di stand) tidak punya baris di tabel mana pun. Cookie lihat-sajanya ditandatangani HMAC dengan `VISITOR_TOKEN` dan berlaku 12 jam; token baru dari launcher membatalkan cookie lama. Pengunjung boleh GET kecuali `/api/users` dan alat kerja tim yang dijaga `wajib_tim` (foto dan klip kejadian, ekspor CSV, riwayat perubahan pengaturan, diagnostik kamera), dan metode lain ditolak 403 (`tolak_perubahan_pengunjung` di `api/auth.py`).
+- Pengunjung pameran (dari QR di stand) tidak punya baris di tabel mana pun. Cookie lihat-sajanya ditandatangani HMAC dengan `VISITOR_TOKEN` dan berlaku 12 jam; token baru dari launcher membatalkan cookie lama. Pengunjung boleh GET kecuali `/api/users` dan alat kerja tim yang dijaga `wajib_tim` (ekspor CSV, riwayat perubahan pengaturan, diagnostik kamera), dan metode lain ditolak 403 (`tolak_perubahan_pengunjung` di `api/auth.py`).
 - Nilai seperti `role`, `verdict`, dan `telegram_status` disimpan sebagai teks bebas di database. Validasinya ada di skema Pydantic (`backend/app/models/schemas.py`).
 
 ## Cara skema diperbarui

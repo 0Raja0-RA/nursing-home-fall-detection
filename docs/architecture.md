@@ -137,9 +137,10 @@ berasal dari riset referensi UI/UX proyek ini (audit 41 temuan, rencana Tahap 1 
    perawatan dimulai manusia per kamera, paling lama 2 jam, berhitung mundur, tercatat,
    dan dikabarkan ke grup. Alarm yang sudah terbuka tidak ikut tertutup.
 7. **Privasi lebih dulu.** Foto di Telegram bawaannya diburamkan dan semua pesan
-   dilindungi dari penerusan. Foto lengkap dan klip kejadian hanya bisa dibuka akun tim
-   (pengunjung pameran tidak), klip tidak pernah dikirim ke Telegram, dan foto serta klip
-   dihapus otomatis setelah masa simpannya (bawaan 30 dan 7 hari, terlihat di Pengaturan).
+   dilindungi dari penerusan. Foto dan klip kejadian memakai tampilan privasi kamera yang
+   sama dengan videonya dan hanya bisa dibuka setelah masuk, klip tidak pernah dikirim ke
+   Telegram, dan foto serta klip dihapus otomatis setelah masa simpannya (bawaan 30 dan 7
+   hari, terlihat di Pengaturan).
    Tampilan video diatur per kamera: utuh, buram, atau kerangka saja; kamera baru bawaannya
    buram. Saat ada alarm, perawat yang masuk bisa membuka video asli 15 detik, dan setiap
    pembukaan dicatat. Tidak ada pengenalan wajah. Landing page menjelaskan semua ini kepada

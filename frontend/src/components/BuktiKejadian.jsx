@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { CircleSlash, ImageOff, Loader2, Lock, Pause, Play, RotateCcw, X } from 'lucide-react';
+import { CircleSlash, ImageOff, Loader2, Pause, Play, RotateCcw, X } from 'lucide-react';
 import { api, bacaGalat, PESAN_TERPUTUS } from '../api';
 import { API_BASE } from '../config';
-import { usePengunjung } from '../context/auth';
 import { durasiTeks, msDari, tanggalJam } from '../waktu';
 
 // Keadaan klip selain "tersimpan". Kejadian dari sebelum ada fitur klip tidak berstatus.
@@ -199,17 +198,7 @@ function PemutarKlip({ alert, onTutup }) {
 /** Bukti kejadian di laci detail: foto saat alarm, dan klip sebelum sampai sesudahnya bila ada. */
 export default function BuktiKejadian({ alert }) {
     const [putar, setPutar] = useState(false);
-    const pengunjung = usePengunjung();
     const status = alert.klip_status;
-
-    if (pengunjung) {
-        return (
-            <div className="aspect-video rounded-xl bg-slate-100 dark:bg-slate-800 flex flex-col items-center justify-center gap-2 px-4 text-center text-sm text-slate-500">
-                <Lock className="w-6 h-6" aria-hidden="true" />
-                Foto dan klip kejadian hanya bisa dibuka akun tim perawat.
-            </div>
-        );
-    }
 
     if (putar && status === 'tersimpan') return <PemutarKlip alert={alert} onTutup={() => setPutar(false)} />;
     return (

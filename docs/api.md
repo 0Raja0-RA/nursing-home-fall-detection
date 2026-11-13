@@ -83,8 +83,8 @@ tetap di antrean Perlu tindakan sampai dinilai.
 | GET | `/api/alerts/ekspor` | Unduh CSV, filter sama dengan daftar tanpa `skip`/`limit`, urut dari yang terlama. Akun tim saja, pengunjung `403`. Kolomnya di bawah |
 | GET | `/api/alerts/count` | Hitung total alert, filter `acknowledged` opsional |
 | GET | `/api/alerts/{id}` | Detail satu alert |
-| GET | `/api/alerts/{id}/snapshot` | Foto kejadian (JPEG, tanpa diburamkan, `Cache-Control: no-store`). `404` beserta sebabnya: tidak tersimpan, sudah lewat `FOTO_MASA_SIMPAN_HARI`, masa simpannya 0, atau jatuh yang dicatat manual. Akun tim saja, pengunjung `403` |
-| GET | `/api/alerts/{id}/klip` | Klip sebelum dan sesudah kejadian: `{detik_tergeletak, dihapus_pada, frame: [{t, jpeg}]}`, dengan `t` detik relatif terhadap alarm dan `jpeg` base64 (`Cache-Control: no-store`). `404` beserta sebabnya bila tidak ada; keadaannya ada di `klip_status` alert. Akun tim saja, pengunjung `403` |
+| GET | `/api/alerts/{id}/snapshot` | Foto kejadian (JPEG, tanpa diburamkan, `Cache-Control: no-store`). `404` beserta sebabnya: tidak tersimpan, sudah lewat `FOTO_MASA_SIMPAN_HARI`, masa simpannya 0, atau jatuh yang dicatat manual. Fotonya dalam tampilan privasi kamera, sama dengan videonya |
+| GET | `/api/alerts/{id}/klip` | Klip sebelum dan sesudah kejadian: `{detik_tergeletak, dihapus_pada, frame: [{t, jpeg}]}`, dengan `t` detik relatif terhadap alarm dan `jpeg` base64 (`Cache-Control: no-store`). `404` beserta sebabnya bila tidak ada; keadaannya ada di `klip_status` alert. Klipnya dalam tampilan privasi kamera |
 | PUT | `/api/alerts/{id}/claim` | "Saya ke sana". Klaim oleh orang lain ditolak `409` beserta nama dan jamnya |
 | PUT | `/api/alerts/{id}/ack` | "Tandai Ditangani". Body opsional `{"verdict", "reason", "note"}` |
 | PUT | `/api/alerts/{id}/verdict` | Isi atau ubah putusan belakangan. `409` bila belum ditangani |
