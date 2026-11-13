@@ -121,7 +121,9 @@ berasal dari riset referensi UI/UX proyek ini (audit 41 temuan, rencana Tahap 1 
    hitungan berbaring dan untuk alarm yang sudah ada yang menuju lokasi. Biru untuk
    latihan dan info. Abu-abu untuk hal teknis dan keterangan. Hijau hanya untuk logo,
    tombol utama, dan tanda selesai. Setiap status juga punya ikon dan kata, tidak
-   mengandalkan warna saja.
+   mengandalkan warna saja. Di video, kotak dan kerangka bertepi hitam supaya terlihat di
+   latar terang, dan labelnya kata ("berbaring"), tanpa nama kelas model atau angka
+   keyakinan; keduanya hanya di Uji Kamera dan "Tampilkan detail AI".
 4. **Penanganan dua langkah, terlihat semua orang.** "Saya ke sana" mencatat nama,
    menghentikan bunyi di semua dashboard, dan menyunting pesan Telegram. "Tandai
    Ditangani" dilakukan setelah penghuni ditolong. Catatan bisa menyusul dari HP: membalas

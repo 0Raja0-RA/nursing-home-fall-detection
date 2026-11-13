@@ -334,6 +334,35 @@ def test_mode_pose_membuang_kotak_tanpa_sendi_terbaca():
         inference_service.unload_model()
 
 
+def test_label_video_berupa_kata_tanpa_angka(monkeypatch):
+    """Nama kelas model dan angka keyakinan hanya untuk diagnostik, bukan di video perawat."""
+    from app.models.schemas import DetectionResult
+    from app.services import overlay
+
+    teks = []
+    monkeypatch.setattr(overlay.cv2, "putText", lambda gambar, t, *a, **k: teks.append(t))
+    for postur, conf in ((PostureClass.LYING_ON_GROUND, 0.9), (PostureClass.NORMAL, 0.2)):
+        overlay.gambar_deteksi(np.zeros((320, 320, 3), np.uint8),
+                               DetectionResult(posture=postur, confidence=conf, bbox=[60, 60, 160, 300]), 0.5)
+    assert teks == ["berbaring", "tegak (ragu)"]
+
+
+def test_kotak_dan_kerangka_bertepi_gelap_di_latar_terang():
+    """Garis berwarna diberi tepi gelap supaya tetap terlihat di dinding atau lantai terang."""
+    from app.models.schemas import DetectionResult
+    from app.services.overlay import gambar_deteksi
+
+    k = kpts((100, 100), (100, 200), conf=0.9).tolist()
+    hasil = DetectionResult(posture=PostureClass.LYING_ON_GROUND, confidence=0.9,
+                            bbox=[60, 60, 160, 300], keypoints=k)
+    frame = gambar_deteksi(np.full((320, 320, 3), 255, np.uint8), hasil, ambang=0.5)
+
+    assert tuple(frame[200, 160]) == (60, 60, 230), "garis kotak tetap merah"
+    assert frame[200, 157].max() < 60 and frame[200, 163].max() < 60, "tepi gelap di kedua sisi garis kotak"
+    assert tuple(frame[150, 100]) == (60, 60, 230), "garis bahu-pinggul tetap berwarna"
+    assert frame[150, 97].max() < 60 and frame[150, 103].max() < 60, "tepi gelap di kedua sisi garis kerangka"
+
+
 def test_kotak_ragu_bisa_disembunyikan_dari_stream():
     from app.models.schemas import DetectionResult
     from app.services.overlay import gambar_deteksi

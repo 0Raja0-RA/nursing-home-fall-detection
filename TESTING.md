@@ -237,14 +237,17 @@ Sehat kalau jumlah **unik** jauh lebih dari 1. Kalau unik = 1, koneksi kamera pu
 
 ### b. Bounding box muncul
 
-Kotak digambar oleh backend di dalam stream, jadi bentuknya langsung terlihat di video.
+Kotak digambar oleh backend di dalam stream, jadi bentuknya langsung terlihat di video. Kotak
+dan kerangkanya bertepi hitam supaya tetap terlihat di latar terang. Labelnya berupa kata, tanpa
+angka keyakinan; nama kelas model dan keyakinannya ada di halaman Uji Kamera dan sakelar
+**Tampilkan detail AI** di Pemantauan.
 
-| Warna kotak | Arti |
-|---|---|
-| Hijau | `normal`, keyakinan di atas ambang |
-| Oranye | `transitional` |
-| Merah | `lying_on_ground` |
-| **Abu-abu + `(ragu)`** | model mendeteksi, tapi keyakinan **di bawah** `CONFIDENCE_THRESHOLD` |
+| Warna kotak | Label | Arti |
+|---|---|---|
+| Hijau | `tegak` | kelas `normal`, keyakinan di atas ambang |
+| Oranye | `transisi` | kelas `transitional` |
+| Merah | `berbaring` | kelas `lying_on_ground` |
+| **Abu-abu** | kata yang sama + `(ragu)` | model mendeteksi, tapi keyakinan **di bawah** `CONFIDENCE_THRESHOLD` |
 
 Kotak abu-abu itu disengaja. Tanpa itu, layar terlihat kosong dan kita tidak bisa membedakan
 "model tidak melihat apa pun" dari "model melihat tapi kurang yakin".
