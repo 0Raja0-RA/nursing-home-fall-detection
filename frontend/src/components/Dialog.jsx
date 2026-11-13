@@ -14,7 +14,7 @@ import { X } from 'lucide-react';
  * Karena halaman di belakangnya tidak bisa disentuh, toast juga tertutup selama dialog
  * terbuka. Kabar dari tindakan di dalam dialog ditulis di dalam dialog itu sendiri.
  */
-export default function Dialog({ judul, keterangan, onTutup, children, lebar = 'max-w-lg', laci = false, fokusKolom = true }) {
+export default function Dialog({ judul, keterangan, onTutup, onEsc, children, lebar = 'max-w-lg', laci = false, fokusKolom = true }) {
     const ref = useRef(null);
     const idJudul = useId();
 
@@ -64,7 +64,13 @@ export default function Dialog({ judul, keterangan, onTutup, children, lebar = '
         <dialog
             ref={ref}
             aria-labelledby={idJudul}
-            onCancel={(e) => { e.preventDefault(); onTutup(); }}
+            // Esc menutup dialog, kecuali onEsc memutuskan lain (mis. selama formulir di
+            // dalam laci masih terbuka, supaya ketikannya tidak hilang).
+            onCancel={(e) => { e.preventDefault(); (onEsc || onTutup)(); }}
+            // Browser bisa menutup dialog tanpa bisa dicegah, mis. Esc kedua tanpa interaksi
+            // lain di antaranya. Keadaan React disamakan di sini. Dialog yang sudah terbuka
+            // lagi (StrictMode memasang ulang efeknya) diabaikan.
+            onClose={() => { if (!ref.current?.open) onTutup(); }}
             // Klik di latar (bukan di isi) mengenai elemen dialog itu sendiri.
             onClick={(e) => { if (e.target === ref.current) onTutup(); }}
             className={`p-0 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 shadow-xl backdrop:bg-slate-950/60 ${bentuk}`}
