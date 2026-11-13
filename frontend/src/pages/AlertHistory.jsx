@@ -3,7 +3,9 @@ import { ChevronRight, Download, FlaskConical, Inbox, Loader2, Plus } from 'luci
 import { api, bacaGalat, PESAN_TERPUTUS } from '../api';
 import { usePengunjung } from '../context/auth';
 import { useLive } from '../context/LiveContext';
+import { useToast } from '../context/toast';
 import DetailInsiden from '../components/DetailInsiden';
+import Dialog from '../components/Dialog';
 import RingkasanShift from '../components/RingkasanShift';
 import { StatusPenanganan, StatusPutusan, StatusTelegram } from '../components/StatusInsiden';
 import { PUTUSAN } from '../putusan';
@@ -33,14 +35,14 @@ function Waktu({ iso, sekarang, bertumpuk = false }) {
 }
 
 // flex-col: isi tombol tidak ditengahkan vertikal, jadi sejajar dengan kartu biasa.
-const KARTU = 'flex flex-col text-left rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-sm';
+const KARTU = 'flex flex-col text-left min-w-0 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-2.5 shadow-sm';
 
 /** Satu kartu angka. Bila `onPilih` ada, kartunya sekaligus tombol filter. */
 function Kartu({ judul, nilai, keterangan, onPilih, tegas = false }) {
     const isi = (
         <>
             <span className="block text-xs text-slate-500">{judul}</span>
-            <span className={`block text-2xl font-bold tabular-nums mt-1 ${tegas ? 'text-red-700 dark:text-red-400' : ''}`}>{nilai}</span>
+            <span className={`block text-xl font-bold tabular-nums leading-tight mt-0.5 ${tegas ? 'text-red-700 dark:text-red-400' : ''}`}>{nilai}</span>
             <span className="block text-xs text-slate-500 mt-0.5">{keterangan}</span>
         </>
     );
@@ -58,19 +60,17 @@ function KartuMetrik({ metrik, perluTindakan, labelRentang, keAntrean, kePalsu }
     const dinilai = metrik.jatuh + metrik.palsu + metrik.belum_yakin;
     const persen = dinilai ? Math.round((metrik.palsu / dinilai) * 100) : null;
     return (
-        <section aria-label={`Angka ${labelRentang}, tanpa latihan`} className="mb-5">
-            <p className="text-xs text-slate-500 mb-2">Angka {labelRentang.toLowerCase()}, tanpa latihan.</p>
-            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+        <section aria-label={`Angka ${labelRentang}, tanpa latihan`} className="mb-3">
+            <p className="text-xs text-slate-500 mb-1.5">Angka {labelRentang.toLowerCase()}, tanpa latihan.</p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 lg:gap-3">
                 <Kartu judul="Perlu tindakan" nilai={perluTindakan ?? '–'} tegas={perluTindakan > 0}
-                    keterangan="belum ditangani atau belum dinilai" onPilih={keAntrean} />
+                    keterangan="belum ditangani atau dinilai" onPilih={keAntrean} />
                 <Kartu judul="Median waktu respons"
                     nilai={metrik.median_respons_detik != null ? durasiTeks(metrik.median_respons_detik) : '–'}
-                    keterangan={metrik.jumlah_respons ? `dari ${metrik.jumlah_respons} alarm, sampai ada yang ke sana` : 'belum ada alarm yang direspons'} />
+                    keterangan={metrik.jumlah_respons ? `dari ${metrik.jumlah_respons} alarm, sampai klaim` : 'belum ada respons'} />
                 <Kartu judul="Alarm palsu"
                     nilai={dinilai ? `${metrik.palsu} dari ${dinilai}` : '–'}
-                    keterangan={dinilai
-                        ? `${persen}% dari yang dinilai${metrik.belum_dinilai ? `; ${metrik.belum_dinilai} belum dinilai` : ''}`
-                        : 'belum ada alarm yang dinilai'}
+                    keterangan={dinilai ? `${persen}% dari yang dinilai` : 'belum ada yang dinilai'}
                     onPilih={kePalsu} />
                 <Kartu judul="Telegram gagal" nilai={metrik.telegram_gagal} tegas={metrik.telegram_gagal > 0}
                     keterangan={`dari ${metrik.total} alarm`} />
@@ -80,7 +80,7 @@ function KartuMetrik({ metrik, perluTindakan, labelRentang, keAntrean, kePalsu }
                     nilai={metrik.jatuh + metrik.terlewat ? `${metrik.jatuh} dari ${metrik.jatuh + metrik.terlewat}` : '–'}
                     keterangan={metrik.jatuh + metrik.terlewat
                         ? `${metrik.terlewat} terlewat, dicatat manual`
-                        : 'belum ada jatuh yang dinilai atau dicatat'} />
+                        : 'belum ada jatuh tercatat'} />
             </div>
         </section>
     );
@@ -138,15 +138,8 @@ function FormTerlewat({ kamera, onSelesai, onBatal }) {
     };
 
     return (
-        <form onSubmit={kirim} className="mb-5 p-4 rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 space-y-3">
-            <div>
-                <h2 className="font-semibold">Catat jatuh yang tidak memicu alarm</h2>
-                <p className="text-xs text-slate-500">
-                    Misalnya penghuni ditemukan di lantai tanpa ada alarm. Catatan ini langsung berputusan jatuh
-                    sungguhan dan tidak dihitung sebagai alarm.
-                </p>
-            </div>
-            <div className="grid sm:grid-cols-2 gap-3">
+        <form onSubmit={kirim} className="space-y-3">
+            <div className="grid gap-3">
                 {kamera.length ? (
                     <label className="text-sm font-medium">
                         Ruang
@@ -178,13 +171,13 @@ function FormTerlewat({ kamera, onSelesai, onBatal }) {
                     placeholder="Mis. ditemukan di lantai kamar mandi, sadar, dibantu duduk" className={`${INPUT} mt-1`} />
             </label>
             {galat && <p role="alert" className="text-sm text-red-700 dark:text-red-400">{galat}</p>}
-            <div className="flex gap-2">
+            <div className="flex justify-end gap-2 pt-1">
+                <button type="button" onClick={onBatal} className="min-h-10 px-4 rounded-lg border border-slate-300 dark:border-slate-700 text-sm font-semibold hover:bg-slate-100 dark:hover:bg-slate-800">
+                    Batal
+                </button>
                 <button type="submit" disabled={sibuk || !terpilih}
                     className="min-h-10 px-4 rounded-lg bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 text-sm font-semibold disabled:opacity-60">
                     {sibuk ? 'Menyimpan…' : 'Simpan'}
-                </button>
-                <button type="button" onClick={onBatal} className="min-h-10 px-4 rounded-lg border border-slate-300 dark:border-slate-700 text-sm font-semibold">
-                    Batal
                 </button>
             </div>
         </form>
@@ -217,14 +210,13 @@ export default function AlertHistory() {
     const [kamera, setKamera] = useState([]);
     const [metrik, setMetrik] = useState(null);
     const [formTerlewat, setFormTerlewat] = useState(false);
-    const [kabarTerlewat, setKabarTerlewat] = useState('');
+    const kabari = useToast();
     // Disimpan sebagai objek, bukan id saja: insiden yang baru ditutup keluar dari
     // tab Perlu tindakan, tetapi lacinya tidak boleh ikut tertutup tiba-tiba.
     const [detail, setDetail] = useState(null);
 
     const pengunjung = usePengunjung();
     const [mengunduh, setMengunduh] = useState(false);
-    const [galatUnduh, setGalatUnduh] = useState('');
 
     // Filter yang sama dipakai daftar dan ekspor CSV.
     const saringan = useCallback(() => {
@@ -260,11 +252,10 @@ export default function AlertHistory() {
     // Semua baris yang cocok dengan filter, bukan hanya yang sedang tampil.
     const unduh = async () => {
         setMengunduh(true);
-        setGalatUnduh('');
         try {
             const r = await api(`/api/alerts/ekspor?${saringan()}`);
             if (!r.ok) {
-                setGalatUnduh(await bacaGalat(r));
+                kabari(`CSV gagal diunduh: ${await bacaGalat(r)}`, 'galat');
                 return;
             }
             const url = URL.createObjectURL(await r.blob());
@@ -278,7 +269,7 @@ export default function AlertHistory() {
             a.remove();
             setTimeout(() => URL.revokeObjectURL(url), 1000);
         } catch {
-            setGalatUnduh(PESAN_TERPUTUS);
+            kabari(`CSV gagal diunduh: ${PESAN_TERPUTUS}`, 'galat');
         } finally {
             setMengunduh(false);
         }
@@ -337,59 +328,41 @@ export default function AlertHistory() {
     };
 
     const detailSegar = detail ? (daftar.find((a) => a.id === detail.id) || detail) : null;
-    const tabKelas = (aktif) => `min-h-10 px-4 rounded-lg text-sm font-semibold inline-flex items-center gap-2 whitespace-nowrap ${aktif
+    const tabKelas = (aktif) => `min-h-9 px-3.5 rounded-lg text-sm font-semibold inline-flex items-center gap-2 whitespace-nowrap ${aktif
         ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900'
         : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`;
+    const tombolKepala = 'min-h-10 px-3 rounded-lg border border-slate-300 dark:border-slate-700 text-sm font-semibold inline-flex items-center gap-2 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-60';
+    const muatLagi = () => setBatas((b) => b + PER_HALAMAN);
 
     return (
-        <div className="p-4 md:p-8 w-full max-w-full min-w-0">
-            <div className="mb-5 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-                <div>
+        /* Mulai 1024 px halaman ini setinggi layar dikurangi banner alarm (--tinggi-banner,
+           diisi AlertBanner) dan tidak menggulir: bagian atas diam, tabel mengisi sisa
+           tinggi, dan hanya barisnya yang menggulir di bawah kepala tabel yang menempel.
+           Di bawah 1024 px halaman mengalir dan menggulir seperti biasa. */
+        <div className="p-4 md:p-6 lg:px-8 lg:pt-6 lg:pb-5 w-full max-w-full min-w-0 lg:h-[calc(100dvh-var(--tinggi-banner,0px))] lg:flex lg:flex-col lg:overflow-hidden">
+            <div className="mb-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div className="min-w-0">
                     <h1 className="text-xl md:text-2xl font-bold">Riwayat Insiden</h1>
                     <p className="text-xs md:text-sm text-slate-500">
                         Setiap alarm, siapa yang menangani, dan apakah benar jatuh.
                     </p>
                 </div>
                 {!pengunjung && tab !== 'shift' && (
-                    <div className="flex flex-wrap gap-2 self-start shrink-0">
-                    <button type="button" onClick={() => { setFormTerlewat((f) => !f); setKabarTerlewat(''); }}
-                        aria-expanded={formTerlewat}
-                        className="min-h-10 px-3 rounded-lg border border-slate-300 dark:border-slate-700 text-sm font-semibold inline-flex items-center gap-2 hover:bg-slate-100 dark:hover:bg-slate-800">
-                        <Plus className="w-4 h-4" aria-hidden="true" /> Catat jatuh terlewat
-                    </button>
-                    <button type="button" onClick={unduh} disabled={mengunduh}
-                        title="Semua insiden sesuai tab dan filter di bawah, untuk uji mini atau laporan"
-                        className="min-h-10 px-3 rounded-lg border border-slate-300 dark:border-slate-700 text-sm font-semibold inline-flex items-center gap-2 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-60">
-                        {mengunduh
-                            ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
-                            : <Download className="w-4 h-4" aria-hidden="true" />}
-                        Unduh CSV
-                    </button>
+                    <div className="flex flex-wrap gap-2 shrink-0">
+                        <button type="button" onClick={() => setFormTerlewat(true)} aria-haspopup="dialog" className={tombolKepala}>
+                            <Plus className="w-4 h-4" aria-hidden="true" /> Catat jatuh terlewat
+                        </button>
+                        <button type="button" onClick={unduh} disabled={mengunduh}
+                            title="Semua insiden sesuai tab dan filter di bawah, untuk laporan"
+                            className={tombolKepala}>
+                            {mengunduh
+                                ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+                                : <Download className="w-4 h-4" aria-hidden="true" />}
+                            Unduh CSV
+                        </button>
                     </div>
                 )}
             </div>
-
-            {formTerlewat && !pengunjung && (
-                <FormTerlewat
-                    // Hanya kamera terdaftar: ruang yang kameranya sudah dihapus tidak bisa dicatat.
-                    kamera={kamera.map((k) => [k.id, k.nama])}
-                    onBatal={() => setFormTerlewat(false)}
-                    onSelesai={(a) => {
-                        setFormTerlewat(false);
-                        setKabarTerlewat(`Tercatat: jatuh terlewat di ${a.camera_name || a.camera_id}.`);
-                        segarkanRingkasan();
-                        ambil();
-                        ambilMetrik();
-                    }}
-                />
-            )}
-            {kabarTerlewat && <p role="status" className="mb-4 text-sm text-emerald-700 dark:text-emerald-400">{kabarTerlewat}</p>}
-
-            {galatUnduh && (
-                <p role="alert" className="mb-4 text-sm text-red-700 dark:text-red-400">
-                    CSV gagal diunduh: {galatUnduh}
-                </p>
-            )}
 
             {tab !== 'shift' && <KartuMetrik
                 metrik={metrik}
@@ -399,7 +372,7 @@ export default function AlertHistory() {
                 kePalsu={() => { setTab('semua'); setPutusan('palsu'); setBatas(PER_HALAMAN); }}
             />}
 
-            <div className="flex flex-col lg:flex-row lg:items-center gap-3 mb-4">
+            <div className="flex flex-wrap items-center gap-2 mb-3">
                 <div role="tablist" aria-label="Kelompok insiden" className="inline-flex self-start shrink-0 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-1 gap-1">
                     <button type="button" role="tab" aria-selected={tab === 'perlu_tindakan'}
                         onClick={() => { setTab('perlu_tindakan'); setBatas(PER_HALAMAN); }}
@@ -446,97 +419,133 @@ export default function AlertHistory() {
                 </div>}
             </div>
 
-
-            {galat && (
-                <div role="alert" className="mb-4 p-4 rounded-xl border border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-400 text-sm">
-                    {galat}
-                </div>
+            {formTerlewat && !pengunjung && (
+                <Dialog
+                    judul="Catat jatuh yang tidak memicu alarm"
+                    keterangan="Misalnya penghuni ditemukan di lantai tanpa ada alarm. Catatan ini langsung berputusan jatuh sungguhan dan tidak dihitung sebagai alarm."
+                    onTutup={() => setFormTerlewat(false)}
+                >
+                    <FormTerlewat
+                        // Hanya kamera terdaftar: ruang yang kameranya sudah dihapus tidak bisa dicatat.
+                        kamera={kamera.map((k) => [k.id, k.nama])}
+                        onBatal={() => setFormTerlewat(false)}
+                        onSelesai={(a) => {
+                            setFormTerlewat(false);
+                            kabari(`Tercatat: jatuh terlewat di ${a.camera_name || a.camera_id}.`);
+                            segarkanRingkasan();
+                            ambil();
+                            ambilMetrik();
+                        }}
+                    />
+                </Dialog>
             )}
 
-            {tab === 'shift' ? (
-                <RingkasanShift onBuka={setDetail} />
-            ) : memuat && !daftar.length ? (
-                <div className="p-10 text-center text-sm text-slate-500 flex items-center justify-center gap-2">
-                    <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> Memuat riwayat…
-                </div>
-            ) : !daftar.length && !galat ? (
-                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-10 text-center">
-                    <Inbox className="w-8 h-8 mx-auto text-slate-400" aria-hidden="true" />
-                    <p className="mt-3 font-semibold">
-                        {tab === 'perlu_tindakan' ? 'Tidak ada yang perlu ditindaklanjuti' : 'Tidak ada insiden pada pilihan ini'}
-                    </p>
-                    <p className="text-sm text-slate-500 mt-1">
-                        {tab === 'perlu_tindakan'
-                            ? 'Semua alarm sudah ditangani dan dinilai.'
-                            : 'Ubah filter ruang, putusan, atau rentang waktu.'}
-                    </p>
-                </div>
-            ) : (
-                <>
-                    {/* Layar lebar: tabel. */}
-                    <div className="hidden md:block bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
-                        <table className="w-full text-left border-collapse">
-                            <thead>
-                                <tr className="bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 text-xs">
-                                    <th scope="col" className="p-3 font-semibold">Waktu</th>
-                                    <th scope="col" className="p-3 font-semibold">Ruang</th>
-                                    <th scope="col" className="p-3 font-semibold">Penanganan</th>
-                                    <th scope="col" className="p-3 font-semibold">Putusan</th>
-                                    <th scope="col" className="p-3 font-semibold">Telegram</th>
-                                    <th scope="col" className="p-3"><span className="sr-only">Detail</span></th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-                                {daftar.map((a) => (
-                                    <tr key={a.id} onClick={() => setDetail(a)} className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors align-top">
-                                        <td className="p-3"><Waktu iso={a.created_at} sekarang={sekarang} bertumpuk /></td>
-                                        <td className="p-3 text-sm"><Ruang alert={a} /></td>
-                                        <td className="p-3"><StatusPenanganan alert={a} /></td>
-                                        <td className="p-3"><StatusPutusan alert={a} /></td>
-                                        <td className="p-3"><StatusTelegram alert={a} /></td>
-                                        <td className="p-3 text-right">
-                                            <button type="button" onClick={(e) => { e.stopPropagation(); setDetail(a); }}
-                                                className="inline-flex items-center gap-1 text-sm font-semibold px-2 py-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">
-                                                Detail <ChevronRight className="w-4 h-4" aria-hidden="true" />
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+            {/* Area isi: di layar lebar mengisi sisa tinggi halaman. */}
+            <div className="lg:flex-1 lg:min-h-0 lg:flex lg:flex-col">
+                {galat && (
+                    <div role="alert" className="mb-3 p-4 rounded-xl border border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-400 text-sm">
+                        {galat}
                     </div>
+                )}
 
-                    {/* HP: kartu, supaya status dan tombol tetap terlihat tanpa menggeser tabel. */}
-                    <ul className="md:hidden space-y-3">
-                        {daftar.map((a) => (
-                            <li key={a.id}>
-                                <button type="button" onClick={() => setDetail(a)}
-                                    className="w-full text-left bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 shadow-sm space-y-2">
-                                    <span className="flex items-center justify-between gap-3">
-                                        <Ruang alert={a} />
-                                        <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" aria-hidden="true" />
-                                    </span>
-                                    <Waktu iso={a.created_at} sekarang={sekarang} />
-                                    <span className="flex flex-wrap items-start gap-2">
-                                        <StatusPenanganan alert={a} />
-                                        <StatusPutusan alert={a} />
-                                    </span>
-                                    <StatusTelegram alert={a} />
-                                </button>
-                            </li>
-                        ))}
-                    </ul>
-
-                    {adaLagi && (
-                        <div className="mt-4 text-center">
-                            <button type="button" onClick={() => setBatas((b) => b + PER_HALAMAN)}
-                                className="min-h-11 px-4 rounded-xl border border-slate-300 dark:border-slate-700 text-sm font-semibold hover:bg-slate-100 dark:hover:bg-slate-800">
-                                Muat lebih banyak
-                            </button>
+                {tab === 'shift' ? (
+                    <div className="lg:flex-1 lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain">
+                        <RingkasanShift onBuka={setDetail} />
+                    </div>
+                ) : memuat && !daftar.length ? (
+                    <div className="p-10 text-center text-sm text-slate-500 flex items-center justify-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> Memuat riwayat…
+                    </div>
+                ) : !daftar.length && !galat ? (
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-10 text-center">
+                        <Inbox className="w-8 h-8 mx-auto text-slate-400" aria-hidden="true" />
+                        <p className="mt-3 font-semibold">
+                            {tab === 'perlu_tindakan' ? 'Tidak ada yang perlu ditindaklanjuti' : 'Tidak ada insiden pada pilihan ini'}
+                        </p>
+                        <p className="text-sm text-slate-500 mt-1">
+                            {tab === 'perlu_tindakan'
+                                ? 'Semua alarm sudah ditangani dan dinilai.'
+                                : 'Ubah filter ruang, putusan, atau rentang waktu.'}
+                        </p>
+                    </div>
+                ) : (
+                    <>
+                        {/* Layar lebar: tabel di wadah gulirnya sendiri. Kepala tabel menempel, dan
+                            scroll-padding menjaga baris yang difokus keyboard tidak tertutup olehnya. */}
+                        <div className="hidden lg:flex lg:flex-col lg:flex-1 lg:min-h-0 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
+                            <div data-gulir-insiden className="lg:flex-1 lg:min-h-0 overflow-y-auto overscroll-contain scroll-pt-10">
+                                <table className="w-full text-left border-collapse">
+                                    <thead className="sticky top-0 z-10">
+                                        <tr className="bg-slate-50 dark:bg-slate-950 text-slate-600 dark:text-slate-400 text-xs shadow-[inset_0_-1px_0_var(--color-slate-200)] dark:shadow-[inset_0_-1px_0_var(--color-slate-800)]">
+                                            <th scope="col" className="px-3 py-2.5 font-semibold">Waktu</th>
+                                            <th scope="col" className="px-3 py-2.5 font-semibold">Ruang</th>
+                                            <th scope="col" className="px-3 py-2.5 font-semibold">Penanganan</th>
+                                            <th scope="col" className="px-3 py-2.5 font-semibold">Putusan</th>
+                                            <th scope="col" className="px-3 py-2.5 font-semibold">Telegram</th>
+                                            <th scope="col" className="px-3 py-2.5 w-12"><span className="sr-only">Detail</span></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                                        {daftar.map((a) => (
+                                            <tr key={a.id} onClick={() => setDetail(a)} className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors align-top">
+                                                <td className="px-3 py-2"><Waktu iso={a.created_at} sekarang={sekarang} bertumpuk /></td>
+                                                <td className="px-3 py-2 text-sm"><Ruang alert={a} /></td>
+                                                <td className="px-3 py-2"><StatusPenanganan alert={a} /></td>
+                                                <td className="px-3 py-2"><StatusPutusan alert={a} /></td>
+                                                <td className="px-3 py-2"><StatusTelegram alert={a} /></td>
+                                                <td className="px-2 py-1.5 text-right">
+                                                    <button type="button" onClick={(e) => { e.stopPropagation(); setDetail(a); }}
+                                                        aria-label={`Detail insiden ${a.camera_name || a.camera_id}, ${tanggalJam(msDari(a.created_at))}`}
+                                                        className="inline-flex p-2 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 dark:hover:text-slate-100 dark:hover:bg-slate-800">
+                                                        <ChevronRight className="w-5 h-5" aria-hidden="true" />
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                                {adaLagi && (
+                                    <div className="p-3 text-center border-t border-slate-200 dark:border-slate-800">
+                                        <button type="button" onClick={muatLagi}
+                                            className="min-h-10 px-4 rounded-lg border border-slate-300 dark:border-slate-700 text-sm font-semibold hover:bg-slate-100 dark:hover:bg-slate-800">
+                                            Muat lebih banyak
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
                         </div>
-                    )}
-                </>
-            )}
+
+                        {/* HP dan tablet: kartu per insiden, halaman menggulir biasa. */}
+                        <ul className="lg:hidden space-y-3">
+                            {daftar.map((a) => (
+                                <li key={a.id}>
+                                    <button type="button" onClick={() => setDetail(a)}
+                                        className="w-full text-left bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 shadow-sm space-y-2">
+                                        <span className="flex items-center justify-between gap-3">
+                                            <Ruang alert={a} />
+                                            <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" aria-hidden="true" />
+                                        </span>
+                                        <Waktu iso={a.created_at} sekarang={sekarang} />
+                                        <span className="flex flex-wrap items-start gap-2">
+                                            <StatusPenanganan alert={a} />
+                                            <StatusPutusan alert={a} />
+                                        </span>
+                                        <StatusTelegram alert={a} />
+                                    </button>
+                                </li>
+                            ))}
+                        </ul>
+                        {adaLagi && (
+                            <div className="lg:hidden mt-4 text-center">
+                                <button type="button" onClick={muatLagi}
+                                    className="min-h-11 px-4 rounded-xl border border-slate-300 dark:border-slate-700 text-sm font-semibold hover:bg-slate-100 dark:hover:bg-slate-800">
+                                    Muat lebih banyak
+                                </button>
+                            </div>
+                        )}
+                    </>
+                )}
+            </div>
 
             {detailSegar && (
                 <DetailInsiden alert={detailSegar} onTutup={() => setDetail(null)} onBerubah={berubah} />

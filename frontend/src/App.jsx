@@ -8,6 +8,7 @@ import { AuthProvider } from './context/AuthContext';
 import { useAuth, usePengunjung } from './context/auth';
 import { API_BASE } from './config';
 import AlertBanner from './components/AlertBanner';
+import ToastProvider from './components/Toast';
 
 import LandingPage from './pages/LandingPage';
 import SimulationDashboard from './pages/SimulationDashboard';
@@ -188,7 +189,9 @@ function TataLetakDashboard() {
 function DashboardLayout() {
   return (
     <LiveProvider>
-      <TataLetakDashboard />
+      <ToastProvider>
+        <TataLetakDashboard />
+      </ToastProvider>
     </LiveProvider>
   );
 }

@@ -147,6 +147,14 @@ berasal dari riset referensi UI/UX proyek ini (audit 41 temuan, rencana Tahap 1 
    orang di luar tim, di bagian "Apa yang disimpan, dan siapa yang melihat".
 8. **Latihan tidak boleh tertukar dengan kejadian nyata.** Latihan berwarna biru, bernada
    lain, tidak dinilai, tidak ikut dihitung, dan secara bawaan tidak dikirim ke Telegram.
+9. **Tombol tidak menggeser tata letak.** Aksi tambahan muncul sebagai lapisan di atas
+   halaman: menu kecil yang menempel di tombolnya (di HP, lembar dari bawah), laci samping
+   dari kanan (di HP, layar penuh), atau dialog di tengah. Formulir yang sudah berada di
+   dalam laci tetap terbuka di lacinya. Pesan sementara tampil sebagai toast di kanan bawah;
+   galat yang perlu ditindaklanjuti menunggu ditutup. Yang boleh menggeser hanya alarm:
+   kamera yang alarm naik dan melebar, dan banner alarm mendorong isi ke bawah. Mulai lebar
+   1024 px, Riwayat Insiden dan Pengaturan setinggi layar tanpa gulir halaman, diuji di area
+   1536 × 730 dan 1536 × 834 px.
 
 ### Status kamera (tile di Pemantauan)
 

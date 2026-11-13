@@ -104,6 +104,23 @@ export default function AlertBanner() {
     // Alarm yang dipilih pengguna. Tanpa pilihan, yang paling mendesak yang tampil.
     const [fokusId, setFokusId] = useState(null);
 
+    // Tinggi banner (strip suara, alarm, galat) dilaporkan sebagai --tinggi-banner, supaya
+    // halaman setinggi layar (Riwayat Insiden, Pengaturan) menyisakan tempat untuknya dan
+    // tidak ikut menggulir saat banner muncul.
+    const akar = useRef(null);
+    useEffect(() => {
+        const el = akar.current;
+        if (!el || typeof ResizeObserver === 'undefined') return undefined;
+        const atur = () => document.documentElement.style.setProperty('--tinggi-banner', `${el.offsetHeight}px`);
+        atur();
+        const ro = new ResizeObserver(atur);
+        ro.observe(el);
+        return () => {
+            ro.disconnect();
+            document.documentElement.style.removeProperty('--tinggi-banner');
+        };
+    }, []);
+
     const urut = useMemo(() => [...alerts].sort(bandingkan), [alerts]);
     const adaBelum = alerts.some((a) => !a.claimed_by);
     const sekarang = useJam(adaBelum ? 5000 : 60_000);
@@ -321,7 +338,7 @@ export default function AlertBanner() {
 
     return (
         // Di HP menempel tepat di bawah bilah atas (tinggi 3.5rem); di layar lebar di paling atas.
-        <div id="banner-alarm" className="sticky top-14 md:top-0 z-20">
+        <div id="banner-alarm" ref={akar} className="sticky top-14 md:top-0 z-20">
             {!connected && (
                 <div role="status" className="bg-amber-50 dark:bg-amber-950 border-b border-amber-500/30 text-amber-700 dark:text-amber-400 text-xs px-4 py-2 flex items-center gap-2">
                     <WifiOff className="w-4 h-4 shrink-0" aria-hidden="true" />
