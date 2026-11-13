@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { CheckCircle2, Clock, Info, Loader2, Plug, Plus, Power, Radar, ScanEye, Settings2, Trash2, Usb, VideoOff, X } from 'lucide-react';
 import { api, bacaGalat, PESAN_TERPUTUS } from '../api';
 import { API_BASE } from '../config';
 import { jamDari } from '../statusKamera';
 import { msDari, useJam } from '../waktu';
+import { useToast } from '../context/toast';
+import Dialog from '../components/Dialog';
 
 const ROTASI = [0, 90, 180, 270];
 const INPUT = 'w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500';
@@ -118,7 +120,6 @@ function GambarMini({ cam, t }) {
     );
 }
 
-/** Panel pengaturan satu kamera: rotasi tepat di pratinjau, nama, alamat, nyala/mati, hapus. */
 const PRIVASI = [
     { id: 'utuh', label: 'Utuh', arti: 'Video asli tampil di dashboard, foto kejadian, dan klip.' },
     { id: 'buram', label: 'Buram', arti: 'Wajah dan detail tidak terbaca; postur dan kerangka tetap terlihat. Saat ada alarm, perawat bisa membuka video asli 15 detik, dan pembukaannya tercatat.' },
@@ -126,7 +127,12 @@ const PRIVASI = [
 ];
 const labelPrivasi = (id) => PRIVASI.find((p) => p.id === id)?.label || 'Utuh';
 
-function PanelKamera({ cam, t, onUbah, onHapus, onTutup }) {
+/**
+ * Isi laci Atur untuk satu kamera: pratinjau dengan rotasi, tampilan video, letak di denah,
+ * nama, alamat, nyala/mati, dan hapus. Kabarnya ditulis di dalam laci, karena toast
+ * tertutup selama laci terbuka.
+ */
+function PanelKamera({ cam, t, onUbah, onHapus }) {
     const [nama, setNama] = useState(cam.name);
     const [alamat, setAlamat] = useState('');
     const [sibuk, setSibuk] = useState('');
@@ -142,9 +148,10 @@ function PanelKamera({ cam, t, onUbah, onHapus, onTutup }) {
     };
 
     return (
-        <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-800 space-y-4">
+        <div className="space-y-5">
             <div>
-                <GambarMini cam={cam} t={t} />
+                <StatusKameraDaftar cam={cam} />
+                <div className="mt-2"><GambarMini cam={cam} t={t} /></div>
                 <fieldset className="mt-2">
                     <legend className="text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
                         Putar gambar (searah jarum jam). Model membaca gambar yang sudah diputar.
@@ -243,54 +250,32 @@ function PanelKamera({ cam, t, onUbah, onHapus, onTutup }) {
                 </p>
             )}
 
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 pt-4 border-t border-slate-200 dark:border-slate-800">
                 <button type="button" disabled={Boolean(sibuk)} onClick={() => ubah({ enabled: !cam.enabled }, 'nyala')} className={TOMBOL_NETRAL}>
                     <Power className="w-4 h-4" aria-hidden="true" /> {cam.enabled ? 'Matikan kamera' : 'Nyalakan kamera'}
                 </button>
                 <button type="button" onClick={() => onHapus(cam.camera_id, cam.name)} className={`${TOMBOL_NETRAL} hover:text-red-700 dark:hover:text-red-400`}>
                     <Trash2 className="w-4 h-4" aria-hidden="true" /> Hapus kamera
                 </button>
-                <button type="button" onClick={onTutup} className={`${TOMBOL} text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 sm:ml-auto`}>
-                    Tutup
-                </button>
             </div>
         </div>
     );
 }
 
-export default function Cameras() {
-    const [cameras, setCameras] = useState([]);
+/**
+ * Isi laci Tambah kamera: nama, alamat, Tes koneksi, dan Cari kamera. Hasil tes, hasil
+ * pencarian, dan galat tampil di dalam laci, dan tombol Tambah kamera menempel di dasarnya.
+ */
+function FormTambah({ onSelesai }) {
     const [nama, setNama] = useState('');
     const [alamat, setAlamat] = useState('');
     const [pengguna, setPengguna] = useState('');
     const [sandi, setSandi] = useState('');
-    const [pesan, setPesan] = useState(null);          // { tipe: 'error' | 'info' | 'koneksi', teks }
+    const [pesan, setPesan] = useState(null);          // { tipe: 'error' | 'info', teks, langkah? }
     const [menambah, setMenambah] = useState(false);
     const [memindai, setMemindai] = useState(false);
     const [kandidat, setKandidat] = useState(null);     // hasil pemindaian jaringan
     const [tes, setTes] = useState(null);               // { memuat } atau { hasil, alamat }
-    const [atur, setAtur] = useState(null);             // id kamera yang panelnya terbuka
-    const t = useJam(5000);
-
-    const ambilDaftar = useCallback(async () => {
-        try {
-            const r = await api('/api/cameras/');
-            if (!r.ok) throw new Error(`Backend menjawab ${r.status}`);
-            setCameras(await r.json());
-            setPesan((p) => (p?.tipe === 'koneksi' ? null : p));
-        } catch {
-            setPesan({ tipe: 'koneksi', teks: PESAN_TERPUTUS });
-        }
-    }, []);
-
-    // Muat daftar di awal, lalu segarkan berkala supaya status Terhubung/Terputus ikut hidup.
-    useEffect(() => {
-        // setState-nya terjadi di callback async setelah fetch selesai, bukan sinkron.
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        ambilDaftar();
-        const timer = setInterval(ambilDaftar, 3000);
-        return () => clearInterval(timer);
-    }, [ambilDaftar]);
 
     const tambahKamera = async (e) => {
         e.preventDefault();
@@ -310,45 +295,12 @@ export default function Cameras() {
                 setPesan({ tipe: 'error', teks: await bacaGalat(r) });
                 return;
             }
-            setNama('');
-            setAlamat('');
-            setPengguna('');
-            setSandi('');
-            setKandidat(null);
-            await ambilDaftar();
+            // Laci ditutup oleh pemanggil, jadi isian tidak perlu dikosongkan di sini.
+            onSelesai(nama.trim());
         } catch {
             setPesan({ tipe: 'error', teks: PESAN_TERPUTUS });
         } finally {
             setMenambah(false);
-        }
-    };
-
-    /** Returns: true kalau berhasil, atau pesan galat. */
-    const ubahKamera = async (id, isi) => {
-        try {
-            const r = await api(`/api/cameras/${id}`, { method: 'PATCH', json: isi });
-            if (!r.ok) return bacaGalat(r);
-            await ambilDaftar();
-            return true;
-        } catch {
-            return PESAN_TERPUTUS;
-        }
-    };
-
-    const hapusKamera = async (id, namaKamera) => {
-        // Satu klik tidak boleh langsung menghentikan pemantauan sebuah ruangan.
-        const setuju = window.confirm(
-            `Hapus ${namaKamera}? Kamera berhenti memantau dan dihapus dari daftar. Riwayat insidennya tetap tersimpan.`,
-        );
-        if (!setuju) return;
-        setPesan(null);
-        try {
-            const r = await api(`/api/cameras/${id}`, { method: 'DELETE' });
-            if (!r.ok && r.status !== 204) setPesan({ tipe: 'error', teks: await bacaGalat(r) });
-            setAtur(null);
-            await ambilDaftar();
-        } catch {
-            setPesan({ tipe: 'error', teks: PESAN_TERPUTUS });
         }
     };
 
@@ -414,116 +366,95 @@ export default function Cameras() {
     const pilihKandidat = (source) => {
         setAlamat(source);
         setKandidat(null);
+        setTes(null);
     };
 
     return (
-        <div className="p-4 md:p-8 w-full max-w-full min-w-0">
-            <div className="mb-6">
-                <h1 className="text-xl md:text-2xl font-bold">Daftar Kamera</h1>
-                <p className="text-xs md:text-sm text-slate-500">
-                    Setiap kamera mewakili satu ruang. Kata sandi kamera disimpan di server dan tidak ditampilkan lagi.
-                </p>
+        <form onSubmit={tambahKamera} className="space-y-4">
+            <label className="block">
+                <span className={LABEL}>Nama ruang</span>
+                <input value={nama} onChange={(e) => setNama(e.target.value)} required maxLength={100}
+                    placeholder="Contoh: Kamar 101" className={INPUT} />
+            </label>
+            <label className="block">
+                <span className={LABEL}>Alamat kamera</span>
+                <input value={alamat} onChange={(e) => setAlamat(e.target.value)} required
+                    placeholder="http://192.168.43.1:8080/video" spellCheck={false} autoCapitalize="none"
+                    className={`${INPUT} font-mono`} />
+                <span className="block text-xs text-slate-500 mt-1">
+                    Webcam laptop: <code>0</code>. Kamera HP (IP Webcam): <code>http://IP-HP:8080/video</code>.
+                    CCTV: <code>rtsp://IP:554/stream1</code>. Tidak tahu alamatnya? Tekan Cari kamera.
+                </span>
+            </label>
+
+            {pakaiJaringan(alamat) && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <label>
+                        <span className={LABEL}>Nama pengguna kamera <span className="font-normal text-slate-500">(opsional)</span></span>
+                        <input value={pengguna} onChange={(e) => setPengguna(e.target.value)} autoComplete="off"
+                            spellCheck={false} autoCapitalize="none" className={INPUT} />
+                    </label>
+                    <label>
+                        <span className={LABEL}>Kata sandi kamera <span className="font-normal text-slate-500">(opsional)</span></span>
+                        <input type="password" value={sandi} onChange={(e) => setSandi(e.target.value)} autoComplete="new-password" className={INPUT} />
+                    </label>
+                </div>
+            )}
+
+            <div className="flex flex-wrap gap-2">
+                <button type="button" onClick={tesKoneksi} disabled={tes?.memuat} className={TOMBOL_NETRAL}>
+                    {tes?.memuat ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : <Plug className="w-4 h-4" aria-hidden="true" />}
+                    Tes koneksi
+                </button>
+                <button type="button" onClick={pindaiJaringan} disabled={memindai} className={TOMBOL_NETRAL}>
+                    {memindai ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : <Radar className="w-4 h-4" aria-hidden="true" />}
+                    {memindai ? 'Mencari…' : 'Cari kamera'}
+                </button>
             </div>
-
-            {/* Formulir tambah kamera */}
-            <form onSubmit={tambahKamera} className="bg-white dark:bg-slate-900 p-4 md:p-6 rounded-2xl border border-slate-200 dark:border-slate-800 mb-6 shadow-sm space-y-4">
-                <h2 className="font-semibold">Tambah kamera</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <label>
-                        <span className={LABEL}>Nama ruang</span>
-                        <input value={nama} onChange={(e) => setNama(e.target.value)} required maxLength={100}
-                            placeholder="Contoh: Kamar 101" className={INPUT} />
-                    </label>
-                    <label>
-                        <span className={LABEL}>Alamat kamera</span>
-                        <input value={alamat} onChange={(e) => setAlamat(e.target.value)} required
-                            placeholder="http://192.168.43.1:8080/video" spellCheck={false} autoCapitalize="none"
-                            className={`${INPUT} font-mono`} />
-                        <span className="block text-xs text-slate-500 mt-1">
-                            Webcam laptop: <code>0</code>. Kamera HP (IP Webcam): <code>http://IP-HP:8080/video</code>.
-                            CCTV: <code>rtsp://IP:554/stream1</code>. Atau tekan Cari kamera.
-                        </span>
-                    </label>
-                </div>
-
-                {pakaiJaringan(alamat) && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <label>
-                            <span className={LABEL}>Nama pengguna kamera <span className="font-normal text-slate-500">(opsional)</span></span>
-                            <input value={pengguna} onChange={(e) => setPengguna(e.target.value)} autoComplete="off"
-                                spellCheck={false} autoCapitalize="none" className={INPUT} />
-                        </label>
-                        <label>
-                            <span className={LABEL}>Kata sandi kamera <span className="font-normal text-slate-500">(opsional)</span></span>
-                            <input type="password" value={sandi} onChange={(e) => setSandi(e.target.value)} autoComplete="new-password" className={INPUT} />
-                        </label>
-                    </div>
-                )}
-
-                <p className="flex items-start gap-2 text-xs text-slate-600 dark:text-slate-400">
-                    <Info className="w-4 h-4 shrink-0 mt-0.5" aria-hidden="true" />
-                    Sebelum memasang kamera, beri tahu penghuni dan keluarganya, dan pasang pemberitahuan bahwa ruang itu dipantau kamera.
-                </p>
-
-                <div className="flex flex-col sm:flex-row gap-2">
-                    <button type="submit" disabled={menambah} className={`${TOMBOL} bg-emerald-700 hover:bg-emerald-800 text-white`}>
-                        {menambah
-                            ? <><Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> Memeriksa alamat…</>
-                            : <><Plus className="w-4 h-4" aria-hidden="true" /> Tambah kamera</>}
-                    </button>
-                    <button type="button" onClick={tesKoneksi} disabled={tes?.memuat} className={TOMBOL_NETRAL}>
-                        {tes?.memuat ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : <Plug className="w-4 h-4" aria-hidden="true" />}
-                        Tes koneksi
-                    </button>
-                    <button type="button" onClick={pindaiJaringan} disabled={memindai} className={TOMBOL_NETRAL}>
-                        {memindai ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : <Radar className="w-4 h-4" aria-hidden="true" />}
-                        Cari kamera
-                    </button>
-                </div>
-            </form>
 
             {/* Hasil Tes koneksi: gambar pratinjau, atau sebab dan daftar periksa. */}
             {tes?.hasil && (
-                <div role="status" className="mb-6 p-4 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm flex flex-col sm:flex-row gap-4">
+                <div role="status" className="p-3 rounded-xl border border-slate-300 dark:border-slate-700 text-sm space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                        {tes.hasil.ok ? (
+                            <p className="font-semibold inline-flex items-center gap-2">
+                                <CheckCircle2 className="w-4 h-4 text-emerald-600" aria-hidden="true" /> Terhubung
+                            </p>
+                        ) : (
+                            <p className="font-semibold text-red-700 dark:text-red-400">Belum terhubung: {tes.hasil.pesan}</p>
+                        )}
+                        <button type="button" onClick={() => setTes(null)} aria-label="Tutup hasil tes" className="p-1 -m-1 rounded hover:bg-black/5 dark:hover:bg-white/10">
+                            <X className="w-4 h-4" aria-hidden="true" />
+                        </button>
+                    </div>
                     {tes.hasil.ok ? (
                         <>
                             <img src={`data:image/jpeg;base64,${tes.hasil.gambar}`} alt="Pratinjau kamera"
-                                className="w-full sm:w-64 rounded-lg bg-slate-950 self-start" />
-                            <div className="space-y-1">
-                                <p className="font-semibold inline-flex items-center gap-2">
-                                    <CheckCircle2 className="w-4 h-4 text-emerald-600" aria-hidden="true" /> Terhubung
-                                </p>
-                                <p className="text-slate-600 dark:text-slate-400 tabular-nums">
-                                    {tes.hasil.lebar} × {tes.hasil.tinggi} piksel
-                                    {tes.hasil.fps ? `, sekitar ${String(tes.hasil.fps).replace('.', ',')} gambar per detik` : ''}.
-                                    Gambar pertama {String(tes.hasil.detik_gambar_pertama).replace('.', ',')} detik.
-                                </p>
-                                <p className="text-xs text-slate-500">
-                                    Gambar miring atau terbalik? Tambahkan dulu, lalu atur rotasinya di Atur.
-                                    {tes.hasil.tinggi > tes.hasil.lebar ? ' Gambar tegak cocok untuk kamera HP yang dipasang berdiri.' : ''}
-                                </p>
-                            </div>
+                                className="w-full rounded-lg bg-slate-950" />
+                            <p className="text-slate-600 dark:text-slate-400 tabular-nums">
+                                {tes.hasil.lebar} × {tes.hasil.tinggi} piksel
+                                {tes.hasil.fps ? `, sekitar ${String(tes.hasil.fps).replace('.', ',')} gambar per detik` : ''}.
+                                Gambar pertama {String(tes.hasil.detik_gambar_pertama).replace('.', ',')} detik.
+                            </p>
+                            <p className="text-xs text-slate-500">
+                                Gambar miring atau terbalik? Tambahkan dulu, lalu atur rotasinya di Atur.
+                                {tes.hasil.tinggi > tes.hasil.lebar ? ' Gambar tegak cocok untuk kamera HP yang dipasang berdiri.' : ''}
+                            </p>
                         </>
                     ) : (
-                        <div className="space-y-2">
-                            <p className="font-semibold text-red-700 dark:text-red-400">Belum terhubung: {tes.hasil.pesan}</p>
+                        <>
                             <p className="text-xs font-semibold text-slate-600 dark:text-slate-400">Periksa:</p>
                             <ol className="list-decimal pl-5 space-y-1 text-slate-700 dark:text-slate-300">
                                 {daftarPeriksa(tes.alamat).map((l) => <li key={l}>{l}</li>)}
                             </ol>
-                        </div>
+                        </>
                     )}
-                    <button type="button" onClick={() => setTes(null)} aria-label="Tutup hasil tes" className="self-start sm:ml-auto p-0.5 rounded hover:bg-black/5">
-                        <X className="w-4 h-4" />
-                    </button>
                 </div>
             )}
 
-            {/* Pesan kesalahan / info dari backend */}
-            {pesan && (
-                <div role={pesan.tipe === 'info' ? 'status' : 'alert'} className={`mb-6 p-4 rounded-xl border text-sm flex items-start gap-2 ${pesan.tipe === 'info'
-                    ? 'bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300'
-                    : 'bg-red-500/10 border-red-500/30 text-red-700 dark:text-red-400'}`}>
+            {/* Cari kamera tidak menemukan apa pun: langkah periksanya. */}
+            {pesan?.tipe === 'info' && (
+                <div role="status" className="p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-sm text-slate-700 dark:text-slate-300 flex items-start gap-2">
                     <Info className="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
                     <span className="flex-1">
                         {pesan.teks}
@@ -533,20 +464,18 @@ export default function Cameras() {
                             </ol>
                         )}
                     </span>
-                    {pesan.tipe !== 'koneksi' && (
-                        <button type="button" onClick={() => setPesan(null)} aria-label="Tutup pesan" className="p-0.5 rounded hover:bg-black/5">
-                            <X className="w-4 h-4" />
-                        </button>
-                    )}
+                    <button type="button" onClick={() => setPesan(null)} aria-label="Tutup pesan" className="p-1 -m-1 rounded hover:bg-black/5 dark:hover:bg-white/10">
+                        <X className="w-4 h-4" aria-hidden="true" />
+                    </button>
                 </div>
             )}
 
-            {/* Kamera yang ditemukan: terpasang di komputer ini, dan di jaringan */}
+            {/* Kamera yang ditemukan: terpasang di komputer ini, dan di jaringan. */}
             {kandidat && (kandidat.lokal.length > 0 || kandidat.jaringan.candidates.length > 0) && (
-                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 mb-6 overflow-hidden shadow-sm">
+                <div className="rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
                     {kandidat.lokal.length > 0 && (
                         <>
-                            <div className="p-4 border-b border-slate-200 dark:border-slate-800 font-semibold text-sm flex items-center gap-2">
+                            <div className="px-3 py-2.5 border-b border-slate-200 dark:border-slate-800 font-semibold text-sm flex items-center gap-2">
                                 <Usb className="w-4 h-4" aria-hidden="true" />
                                 Terpasang di komputer ini
                                 <span className="font-normal text-slate-500">(webcam, Iriun)</span>
@@ -554,13 +483,13 @@ export default function Cameras() {
                             <div className="divide-y divide-slate-200 dark:divide-slate-800">
                                 {kandidat.lokal.map((d) => (
                                     <button key={d.source} type="button" disabled={d.in_use} onClick={() => pilihKandidat(d.source)}
-                                        className="w-full p-4 flex items-center justify-between gap-3 hover:bg-slate-50 dark:hover:bg-slate-800/40 disabled:opacity-50 disabled:hover:bg-transparent transition-colors text-left">
-                                        <span>
+                                        className="w-full px-3 py-3 flex items-center justify-between gap-3 hover:bg-slate-50 dark:hover:bg-slate-800/40 disabled:opacity-50 disabled:hover:bg-transparent transition-colors text-left">
+                                        <span className="min-w-0">
                                             <span className="block font-medium text-sm">
                                                 {d.label}
                                                 {d.driver && <span className="text-slate-500 font-normal"> · {d.driver}</span>}
                                             </span>
-                                            <span className="block text-xs text-slate-500 font-mono">sumber: {d.source} — {d.name}</span>
+                                            <span className="block text-xs text-slate-500 font-mono break-all">sumber: {d.source} — {d.name}</span>
                                         </span>
                                         <span className="text-xs font-semibold underline underline-offset-2 whitespace-nowrap">
                                             {d.in_use ? 'Sudah dipakai' : 'Pakai kamera ini'}
@@ -573,7 +502,7 @@ export default function Cameras() {
 
                     {kandidat.jaringan.candidates.length > 0 && (
                         <>
-                            <div className="p-4 border-y border-slate-200 dark:border-slate-800 font-semibold text-sm flex items-center gap-2">
+                            <div className="px-3 py-2.5 border-y border-slate-200 dark:border-slate-800 font-semibold text-sm flex items-center gap-2">
                                 <Radar className="w-4 h-4" aria-hidden="true" />
                                 Ditemukan di jaringan
                                 <span className="font-normal text-slate-500">
@@ -583,10 +512,10 @@ export default function Cameras() {
                             <div className="divide-y divide-slate-200 dark:divide-slate-800">
                                 {kandidat.jaringan.candidates.map((k) => (
                                     <button key={`${k.ip}:${k.port}`} type="button" onClick={() => pilihKandidat(k.source)}
-                                        className="w-full p-4 flex items-center justify-between gap-3 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors text-left">
-                                        <span>
+                                        className="w-full px-3 py-3 flex items-center justify-between gap-3 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors text-left">
+                                        <span className="min-w-0">
                                             <span className="block font-medium text-sm">{k.label}</span>
-                                            <span className="block text-xs text-slate-500 font-mono">{k.source}</span>
+                                            <span className="block text-xs text-slate-500 font-mono break-all">{k.source}</span>
                                         </span>
                                         <span className="text-xs font-semibold underline underline-offset-2 whitespace-nowrap">Pakai alamat ini</span>
                                     </button>
@@ -597,11 +526,109 @@ export default function Cameras() {
                 </div>
             )}
 
-            {/* Daftar kamera: kartu di semua lebar layar, supaya status, rotasi, dan hapus
-                tetap terlihat di HP tanpa menggeser tabel. */}
+            <p className="flex items-start gap-2 text-xs text-slate-600 dark:text-slate-400">
+                <Info className="w-4 h-4 shrink-0 mt-0.5" aria-hidden="true" />
+                Sebelum memasang kamera, beri tahu penghuni dan keluarganya, dan pasang pemberitahuan bahwa ruang itu dipantau kamera.
+            </p>
+
+            {/* Menempel di dasar laci, beserta galatnya, supaya tetap terlihat walau hasil
+                tes atau pencarian membuat isi laci memanjang. */}
+            <div className="sticky bottom-0 -mx-4 -mb-4 px-4 py-3 space-y-2 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+                {pesan?.tipe === 'error' && (
+                    <p role="alert" className="text-sm text-red-700 dark:text-red-400">{pesan.teks}</p>
+                )}
+                <button type="submit" disabled={menambah} className={`${TOMBOL} w-full bg-emerald-700 hover:bg-emerald-800 text-white`}>
+                    {menambah
+                        ? <><Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> Memeriksa alamat…</>
+                        : <><Plus className="w-4 h-4" aria-hidden="true" /> Tambah kamera</>}
+                </button>
+            </div>
+        </form>
+    );
+}
+
+export default function Cameras() {
+    const kabari = useToast();
+    const [cameras, setCameras] = useState([]);
+    const [tambah, setTambah] = useState(false);        // laci Tambah kamera terbuka
+    const [atur, setAtur] = useState(null);             // id kamera yang laci Atur-nya terbuka
+    const putus = useRef(false);
+    const t = useJam(5000);
+
+    const ambilDaftar = useCallback(async () => {
+        try {
+            const r = await api('/api/cameras/');
+            if (!r.ok) throw new Error(`Backend menjawab ${r.status}`);
+            setCameras(await r.json());
+            putus.current = false;
+        } catch {
+            // Daftar disegarkan tiap 3 detik; galatnya cukup dikabarkan sekali per putus.
+            if (!putus.current) kabari(PESAN_TERPUTUS, 'galat');
+            putus.current = true;
+        }
+    }, [kabari]);
+
+    // Muat daftar di awal, lalu segarkan berkala supaya status Terhubung/Terputus ikut hidup.
+    useEffect(() => {
+        // setState-nya terjadi di callback async setelah fetch selesai, bukan sinkron.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        ambilDaftar();
+        const timer = setInterval(ambilDaftar, 3000);
+        return () => clearInterval(timer);
+    }, [ambilDaftar]);
+
+    /** Returns: true kalau berhasil, atau pesan galat. */
+    const ubahKamera = async (id, isi) => {
+        try {
+            const r = await api(`/api/cameras/${id}`, { method: 'PATCH', json: isi });
+            if (!r.ok) return bacaGalat(r);
+            await ambilDaftar();
+            return true;
+        } catch {
+            return PESAN_TERPUTUS;
+        }
+    };
+
+    const hapusKamera = async (id, namaKamera) => {
+        // Satu klik tidak boleh langsung menghentikan pemantauan sebuah ruangan.
+        const setuju = window.confirm(
+            `Hapus ${namaKamera}? Kamera berhenti memantau dan dihapus dari daftar. Riwayat insidennya tetap tersimpan.`,
+        );
+        if (!setuju) return;
+        // Laci ditutup dulu, supaya toast hasilnya tidak tertutup laci.
+        setAtur(null);
+        try {
+            const r = await api(`/api/cameras/${id}`, { method: 'DELETE' });
+            if (!r.ok && r.status !== 204) kabari(`${namaKamera} gagal dihapus: ${await bacaGalat(r)}`, 'galat');
+            else kabari(`${namaKamera} dihapus. Riwayat insidennya tetap tersimpan.`);
+            await ambilDaftar();
+        } catch {
+            kabari(PESAN_TERPUTUS, 'galat');
+        }
+    };
+
+    const camAtur = cameras.find((c) => c.camera_id === atur);
+
+    return (
+        <div className="p-4 md:p-8 w-full max-w-full min-w-0">
+            <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div className="min-w-0">
+                    <h1 className="text-xl md:text-2xl font-bold">Daftar Kamera</h1>
+                    <p className="text-xs md:text-sm text-slate-500">
+                        Setiap kamera mewakili satu ruang. Kata sandi kamera disimpan di server dan tidak ditampilkan lagi.
+                    </p>
+                </div>
+                <button type="button" onClick={() => setTambah(true)} aria-haspopup="dialog"
+                    className={`${TOMBOL} shrink-0 self-start sm:self-auto bg-emerald-700 hover:bg-emerald-800 text-white`}>
+                    <Plus className="w-4 h-4" aria-hidden="true" /> Tambah kamera
+                </button>
+            </div>
+
+            {/* Daftar kamera: kartu di semua lebar layar, supaya status dan tombolnya tetap
+                terlihat di HP. Tambah dan Atur membuka laci, jadi kartunya tidak pernah memanjang. */}
             {cameras.length === 0 ? (
                 <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-8 text-center text-sm text-slate-500">
-                    Belum ada kamera terdaftar. Tambahkan lewat formulir di atas, atau tekan Cari kamera.
+                    Belum ada kamera terdaftar. Tekan Tambah kamera untuk memasang yang pertama.
                 </div>
             ) : (
                 <ul className="grid grid-cols-1 xl:grid-cols-2 gap-4">
@@ -623,33 +650,39 @@ export default function Cameras() {
                                     <p className="text-xs text-slate-500 tabular-nums">Rotasi {cam.rotate}&deg; · Video {labelPrivasi(cam.privasi).toLowerCase()}</p>
                                 </div>
                             </div>
-                            {atur === cam.camera_id ? (
-                                <PanelKamera
-                                    key={cam.camera_id}
-                                    cam={cam}
-                                    t={t}
-                                    onUbah={ubahKamera}
-                                    onHapus={hapusKamera}
-                                    onTutup={() => setAtur(null)}
-                                />
-                            ) : (
-                                <div className="mt-3 flex gap-2">
-                                    <Link to={`/dashboard/camera-test?kamera=${cam.camera_id}`} className={TOMBOL_NETRAL}>
-                                        <ScanEye className="w-4 h-4" aria-hidden="true" /> Uji
-                                    </Link>
-                                    <button type="button" onClick={() => setAtur(cam.camera_id)} className={TOMBOL_NETRAL}>
-                                        <Settings2 className="w-4 h-4" aria-hidden="true" /> Atur
-                                    </button>
-                                    <button type="button" onClick={() => hapusKamera(cam.camera_id, cam.name)}
-                                        aria-label={`Hapus ${cam.name}`} title={`Hapus ${cam.name}`}
-                                        className={`${TOMBOL_NETRAL} px-3 hover:text-red-700 dark:hover:text-red-400`}>
-                                        <Trash2 className="w-4 h-4" aria-hidden="true" />
-                                    </button>
-                                </div>
-                            )}
+                            <div className="mt-3 flex gap-2">
+                                <Link to={`/dashboard/camera-test?kamera=${cam.camera_id}`} className={TOMBOL_NETRAL}>
+                                    <ScanEye className="w-4 h-4" aria-hidden="true" /> Uji
+                                </Link>
+                                <button type="button" onClick={() => setAtur(cam.camera_id)} aria-haspopup="dialog" className={TOMBOL_NETRAL}>
+                                    <Settings2 className="w-4 h-4" aria-hidden="true" /> Atur
+                                </button>
+                                <button type="button" onClick={() => hapusKamera(cam.camera_id, cam.name)}
+                                    aria-label={`Hapus ${cam.name}`} title={`Hapus ${cam.name}`}
+                                    className={`${TOMBOL_NETRAL} px-3 hover:text-red-700 dark:hover:text-red-400`}>
+                                    <Trash2 className="w-4 h-4" aria-hidden="true" />
+                                </button>
+                            </div>
                         </li>
                     ))}
                 </ul>
+            )}
+
+            {tambah && (
+                <Dialog laci judul="Tambah kamera" keterangan="Satu kamera untuk satu ruang." onTutup={() => setTambah(false)}>
+                    <FormTambah onSelesai={(namaBaru) => {
+                        setTambah(false);
+                        kabari(`${namaBaru} ditambahkan. Atur rotasi dan tampilan videonya lewat Atur.`);
+                        ambilDaftar();
+                    }} />
+                </Dialog>
+            )}
+
+            {camAtur && (
+                <Dialog laci fokusKolom={false} judul={camAtur.name} keterangan={`Pengaturan kamera ${camAtur.camera_id}`}
+                    onTutup={() => setAtur(null)}>
+                    <PanelKamera key={camAtur.camera_id} cam={camAtur} t={t} onUbah={ubahKamera} onHapus={hapusKamera} />
+                </Dialog>
             )}
         </div>
     );
