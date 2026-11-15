@@ -57,28 +57,44 @@ def save_gif(frames: list[np.ndarray], target: Path, fps: float):
 
 # ---------------------------------------------------------------- mode thresholds
 def parse_threshold_cfg(text: str) -> dict:
-    conf, fa, ta, ar = (float(v) for v in text.split(","))
-    return {"conf": conf, "fall": fa, "trans": ta, "ar": ar}
+    parts = [float(v) for v in text.split(",")]
+    conf, fa, ta, ar = parts[:4]
+    rot = bool(int(parts[4])) if len(parts) > 4 else False
+    return {"conf": conf, "fall": fa, "trans": ta, "ar": ar, "rotate": rot}
 
 
 def analyse(model, img: np.ndarray, cfg: dict) -> dict:
-    """Pose lalu sudut/AR dengan fallback yang sama seperti pipeline EXP-009."""
-    """Pose lalu sudut/AR dengan penanganan frame kosong sebagai unknown."""
-    res = model(img, verbose=False, conf=cfg["conf"])[0]
-    if len(res.boxes) == 0:
-        return {"detected": False, "angle": 90.0, "ar": 0.5, "kpts": None, "bbox": None, "src": "no person -> fallback 90"}
-        return {"detected": False, "angle": None, "ar": None, "kpts": None, "bbox": None, "src": "no person detected (unknown)"}
-
-    i = int(res.boxes.conf.argmax().item())
-    x1, y1, x2, y2 = res.boxes.xyxy[i].tolist()
-    ar = max(1.0, x2 - x1) / max(1.0, y2 - y1)
-    kpts = res.keypoints.data[i].cpu().numpy()
-    if (kpts[5][2] + kpts[6][2]) / 2 > 0.25 and (kpts[11][2] + kpts[12][2]) / 2 > 0.25:
-        angle, src = calculate_spine_angle(kpts), "shoulder-hip"
+    """Pose lalu sudut/AR dengan penanganan frame kosong sebagai unknown dan opsi rotasi."""
+    rotate = cfg.get("rotate", False)
+    if rotate:
+        dets = predict(model, img, imgsz=640, conf=cfg["conf"], rotate=True)
+        if not dets:
+            return {"detected": False, "angle": None, "ar": None, "kpts": None, "bbox": None, "src": "no person detected (unknown)"}
+        best = max(dets, key=lambda d: d[0])
+        conf, box, kpts = best
+        x1, y1, x2, y2 = box.tolist()
+        ar = max(1.0, x2 - x1) / max(1.0, y2 - y1)
+        if (kpts[5][2] + kpts[6][2]) / 2 > 0.25 and (kpts[11][2] + kpts[12][2]) / 2 > 0.25:
+            angle, src = calculate_spine_angle(kpts), "shoulder-hip (rotated)"
+        else:
+            angle = 90.0 if ar < 0.8 else (20.0 if ar > 1.3 else 50.0)
+            src = "bbox fallback (hip/shoulder hidden)"
+        return {"detected": True, "angle": angle, "ar": ar, "kpts": kpts, "bbox": (x1, y1, x2, y2), "src": src}
     else:
-        angle = 90.0 if ar < 0.8 else (20.0 if ar > 1.3 else 50.0)
-        src = "bbox fallback (hip/shoulder hidden)"
-    return {"detected": True, "angle": angle, "ar": ar, "kpts": kpts, "bbox": (x1, y1, x2, y2), "src": src}
+        res = model(img, verbose=False, conf=cfg["conf"])[0]
+        if len(res.boxes) == 0:
+            return {"detected": False, "angle": None, "ar": None, "kpts": None, "bbox": None, "src": "no person detected (unknown)"}
+
+        i = int(res.boxes.conf.argmax().item())
+        x1, y1, x2, y2 = res.boxes.xyxy[i].tolist()
+        ar = max(1.0, x2 - x1) / max(1.0, y2 - y1)
+        kpts = res.keypoints.data[i].cpu().numpy()
+        if (kpts[5][2] + kpts[6][2]) / 2 > 0.25 and (kpts[11][2] + kpts[12][2]) / 2 > 0.25:
+            angle, src = calculate_spine_angle(kpts), "shoulder-hip"
+        else:
+            angle = 90.0 if ar < 0.8 else (20.0 if ar > 1.3 else 50.0)
+            src = "bbox fallback (hip/shoulder hidden)"
+        return {"detected": True, "angle": angle, "ar": ar, "kpts": kpts, "bbox": (x1, y1, x2, y2), "src": src}
 
 
 def render_threshold_panel(img: np.ndarray, info: dict, cfg: dict, gt: int, title: str):
@@ -119,8 +135,9 @@ def render_threshold_panel(img: np.ndarray, info: dict, cfg: dict, gt: int, titl
         cv2.rectangle(out, (0, 0), (out.shape[1] - 1, out.shape[0] - 1), border_color, 6)
 
     status_tag = "UNDETECTED" if not info["detected"] else ("WRONG" if wrong else "ok")
+    rot_str = " +rot" if cfg.get("rotate") else ""
     lines = [
-        f"{title}  conf>{cfg['conf']:.2f}  fall<{cfg['fall']:.0f} trans<{cfg['trans']:.0f}",
+        f"{title}{rot_str}  conf>{cfg['conf']:.2f}  fall<{cfg['fall']:.0f} trans<{cfg['trans']:.0f}",
         f"GT: {CLASS_NAMES.get(gt, 'unknown')}   PRED: {pred_label}  {status_tag}",
         f"angle={angle_str}  AR={ar_str}",
         info["src"],
@@ -134,6 +151,8 @@ def render_threshold_panel(img: np.ndarray, info: dict, cfg: dict, gt: int, titl
 
 def run_thresholds(args):
     before, after = parse_threshold_cfg(args.before), parse_threshold_cfg(args.after)
+    if getattr(args, "rotate_after", False):
+        after["rotate"] = True
     img_dir = Path(args.data_dir) / "images" / args.split
     lbl_dir = Path(args.data_dir) / "labels" / args.split
     out_dir = Path(args.out)
@@ -295,6 +314,7 @@ def main():
     th.add_argument("--mode", choices=["gif", "misses"], default="gif")
     th.add_argument("--before", default="0.25,35,55,1.25", help="conf,fall,trans,ar (default = demo_pose_fall.py)")
     th.add_argument("--after", default="0.25,40,60,1.25", help="conf,fall,trans,ar (default = tuning data baru)")
+    th.add_argument("--rotate-after", action="store_true", help="Aktifkan TTA rotasi pada sisi AFTER")
     th.add_argument("--max-frames", type=int, default=60)
     th.add_argument("--fps", type=float, default=3.0)
     th.add_argument("--out", default="ml/outputs/viz")
