@@ -22,11 +22,24 @@ def calculate_spine_angle(kpts: np.ndarray) -> float:
 
 
 def predict_class(angle: float, aspect_ratio: float, fall_angle: float, trans_angle: float, ar_thresh: float) -> int:
-    """Aturan postur berbasis sudut dan aspect ratio. 2: lying, 1: transitional, 0: normal."""
-    if angle < fall_angle or (aspect_ratio > ar_thresh and angle < (fall_angle + 12.0)):
+    """Aturan postur berbasis sudut dan aspect ratio. 2: lying, 1: transitional, 0: normal.
+
+    Perbaikan:
+    - Bungkuk tajam (sudut 30-40 deg) dengan tubuh masih tegak ramping (AR < 0.80)
+      diklasifikasikan sebagai TRANSITIONAL (1), bukan LYING (2).
+    - LYING dipicu jika sudut < 30 deg mendatar, atau sudut < fall_angle dengan AR >= 0.80,
+      atau AR membujur horizontal (> ar_thresh).
+    """
+    is_very_flat = angle < 30.0
+    is_moderate_fall = (angle < fall_angle) and (aspect_ratio >= 0.80)
+    is_wide_fall = (aspect_ratio > ar_thresh) and (angle < (fall_angle + 12.0))
+
+    if is_very_flat or is_moderate_fall or is_wide_fall:
         return 2
-    if angle < trans_angle or aspect_ratio > 0.95:
+
+    if angle < trans_angle or (aspect_ratio > 0.95 and angle < 70.0):
         return 1
+
     return 0
 
 
@@ -38,32 +51,73 @@ def iou(a, b) -> float:
     return inter / union if union > 0 else 0.0
 
 
-def predict(model, img, imgsz, conf, rotate, device=None):
-    """-> list (conf, xyxy, kpts 17x3) dalam koordinat gambar asli."""
-    h, w = img.shape[:2]
-    views = [(None, img)]
-    if rotate:
-        views += [(name, cv2.rotate(img, code)) for name, code in ROTATIONS.items()]
+def nms_detections(dets: list, iou_thresh: float = 0.45) -> list:
+    """Menyaring deteksi yang tumpang-tindih antar sudut pandang rotasi (Cross-View NMS)."""
+    if not dets:
+        return []
+    # Urutkan berdasarkan confidence tertinggi
+    dets = sorted(dets, key=lambda d: d[0], reverse=True)
+    keep = []
+    for d in dets:
+        conf, box, kpts = d
+        overlap = False
+        for k in keep:
+            if iou(box, k[1]) > iou_thresh:
+                overlap = True
+                break
+        if not overlap:
+            keep.append(d)
+    return keep
 
+
+def predict(model, img, imgsz, conf, rotate, device=None):
+    """Inferensi pose cerdas dengan Conditional Fallback TTA dan Cross-View NMS.
+
+    Logika:
+    1. Pandangan Asli: Jalankan model pada citra asli terlebih dahulu.
+       Jika sudah ada orang terdeteksi, langsung kembalikan (hemat komputasi, nol noise galon/benda).
+    2. Fallback Penyelamat: HANYA jika citra asli kosong (0 orang terdeteksi) dan rotate=True,
+       jalankan rotasi CW dan CCW untuk menyelamatkan korban jatuh akibat upright bias COCO.
+    3. Cross-View NMS: Menghilangkan deteksi duplikat bertumpuk.
+    """
+    h, w = img.shape[:2]
+
+    # 1. Jalankan inferensi pada sudut pandang normal (asli)
+    res = model(img, imgsz=imgsz, conf=conf, device=device, verbose=False)[0]
     dets = []
-    for name, view in views:
-        res = model(view, imgsz=imgsz, conf=conf, device=device, verbose=False)[0]
-        if len(res.boxes) == 0:
-            continue
+    if len(res.boxes) > 0:
         boxes = res.boxes.xyxy.cpu().numpy()
         confs = res.boxes.conf.cpu().numpy()
         kpts = res.keypoints.data.cpu().numpy()
         for bx, c, k in zip(boxes, confs, kpts):
-            if name is None:
-                dets.append((float(c), bx, k))
+            dets.append((float(c), bx, k))
+        # Jika orang sudah terdeteksi di gambar normal, langsung selesai (tanpa rotasi)
+        return dets
+
+    # 2. HANYA jika tidak ada orang terdeteksi pada citra asli dan rotate=True:
+    # Aktifkan rotasi penyelamat untuk mendeteksi korban jatuh mendatar
+    if rotate:
+        for name, code in ROTATIONS.items():
+            rot_img = cv2.rotate(img, code)
+            res_rot = model(rot_img, imgsz=imgsz, conf=conf, device=device, verbose=False)[0]
+            if len(res_rot.boxes) == 0:
                 continue
+            boxes = res_rot.boxes.xyxy.cpu().numpy()
+            confs = res_rot.boxes.conf.cpu().numpy()
+            kpts = res_rot.keypoints.data.cpu().numpy()
             unrot = UNROTATE[name]
-            corners = np.array([unrot(x, y, w, h) for x, y in ((bx[0], bx[1]), (bx[2], bx[3]))])
-            box = np.array([corners[:, 0].min(), corners[:, 1].min(), corners[:, 0].max(), corners[:, 1].max()])
-            k2 = k.copy()
-            for i in range(17):
-                k2[i, 0], k2[i, 1] = unrot(k[i, 0], k[i, 1], w, h)
-            dets.append((float(c), box, k2))
+            for bx, c, k in zip(boxes, confs, kpts):
+                corners = np.array([unrot(x, y, w, h) for x, y in ((bx[0], bx[1]), (bx[2], bx[3]))])
+                box = np.array([corners[:, 0].min(), corners[:, 1].min(), corners[:, 0].max(), corners[:, 1].max()])
+                k2 = k.copy()
+                for i in range(17):
+                    k2[i, 0], k2[i, 1] = unrot(k[i, 0], k[i, 1], w, h)
+                dets.append((float(c), box, k2))
+
+        # Terapkan Cross-View NMS untuk menghilangkan deteksi bertumpuk
+        if len(dets) > 1:
+            dets = nms_detections(dets, iou_thresh=0.45)
+
     return dets
 
 
