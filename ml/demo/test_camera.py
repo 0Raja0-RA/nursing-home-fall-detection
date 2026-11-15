@@ -128,6 +128,32 @@ class PoseKeypointSmoother:
         self.last_seen.clear()
 
 
+def list_available_cameras(max_cams: int = 6):
+    """Memindai dan mencetak daftar indeks kamera yang terhubung di sistem Windows/Linux."""
+    print("==================================================")
+    print("🔍 MEMINDAI INDEKS KAMERA DI SISTEM (0 - 5)...")
+    print("==================================================")
+    found = 0
+    for idx in range(max_cams):
+        cap = cv2.VideoCapture(idx, cv2.CAP_DSHOW) if sys.platform.startswith("win") else cv2.VideoCapture(idx)
+        if cap.isOpened():
+            w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            fps = cap.get(cv2.CAP_PROP_FPS)
+            print(f"  ✅ [Indeks {idx}] : AKTIF & TERSEDIA ({w}x{h} @ {fps:.0f} FPS)")
+            cap.release()
+            found += 1
+        else:
+            print(f"  ❌ [Indeks {idx}] : Tidak Terdeteksi / Nonaktif")
+    print("--------------------------------------------------")
+    if found == 0:
+        print("⚠️ Tidak ada kamera yang terdeteksi.")
+    else:
+        print(f"Total {found} perangkat video aktif.")
+        print("Tips: Jalankan 'python ml/demo/test_camera.py --source <nomor_indeks>'")
+    print("==================================================")
+
+
 def open_camera(source: str, width: int = 640, height: int = 480):
     """Membuka kamera dengan fallback DirectShow di Windows dan resolusi optimal."""
     src = int(source) if source.isdigit() else source
@@ -202,7 +228,12 @@ def main():
     parser.add_argument("--ar-thresh", type=float, default=1.25, help="Ambang aspect ratio tubuh rebah (default: 1.25)")
     parser.add_argument("--no-smooth", action="store_true", help="Nonaktifkan 1-Euro Keypoint Smoothing Filter")
     parser.add_argument("--no-auto-snap", action="store_true", help="Nonaktifkan fitur auto-screenshot gesture secara default")
+    parser.add_argument("--list-cams", action="store_true", help="Pindai dan tampilkan semua indeks kamera yang tersedia di laptop")
     args = parser.parse_args()
+
+    if args.list_cams:
+        list_available_cameras()
+        return
 
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
     print(f"🚀 Memuat model {args.model} pada device: {device}...")
