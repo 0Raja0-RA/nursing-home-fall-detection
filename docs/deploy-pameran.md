@@ -32,9 +32,11 @@ Vercel (*.vercel.app) ── hanya halaman depan proyek, tanpa token pengunjung
 ## Hari pameran
 
 1. Jalankan `run-pameran.bat`.
-2. Launcher membangun dashboard bila perlu, membuka tunnel, lalu menyalakan backend dengan token pengunjung baru. `DASHBOARD_URL` untuk tombol Telegram diarahkan ke alamat tunnel.
+2. Launcher membangun dashboard bila perlu, membuka tunnel, lalu menyalakan backend dengan token pengunjung baru. `DASHBOARD_URL` untuk tombol Telegram diarahkan ke alamat tunnel. Sesudah itu launcher menunggu, biasanya kurang dari satu menit, sampai alamat tunnel tersambung, terdaftar di DNS, dan halaman `/login` menjawab lewat internet. Baru setelah itu alamat dan QR dicetak dan browser dibuka. Alamat quick tunnel yang baru dibuat belum langsung terdaftar di DNS, jadi browser yang dibuka terlalu cepat mendapat `DNS_PROBE_FINISHED_NXDOMAIN`.
 3. Halaman QR terbuka di browser. Tampilkan di layar stand. Tim masuk lewat alamat `/login` yang tercetak di terminal, memakai akun demo dari `backend\.env`. Pengunjung yang memindai QR melihat halaman Login dengan tombol "Masuk sebagai pengunjung". Mereka hanya bisa melihat Pemantauan dan Riwayat, dan alarm tidak berbunyi di HP mereka.
 4. Tekan `Ctrl+C` di jendela launcher untuk menghentikan backend dan tunnel sekaligus.
+
+Bila launcher menulis `[PERINGATAN] cloudflared belum tersambung`, pesan cloudflared di bawahnya menunjukkan sebabnya, misalnya jaringan yang menutup port 7844. Bila menulis bahwa alamat belum bisa dibuka dari laptop ini, tunggu satu menit lalu muat ulang, atau coba dari HP dengan data seluler. Pemeriksaan DNS memakai DNS publik lewat HTTPS (`dns.google`); bila jaringan tempat pameran memblokirnya, launcher menulis begitu dan langsung mencoba alamat tunnel sampai bisa dibuka.
 
 Bila internet di lokasi buruk, jalankan `run-pameran.bat --tanpa-tunnel`. Dashboard tetap bisa dibuka di laptop itu (`http://127.0.0.1:8000/login`), tetapi tidak dari HP pengunjung. Cadangan lama, `run-backend.bat` + `run-frontend.bat`, juga tetap bisa dipakai.
 

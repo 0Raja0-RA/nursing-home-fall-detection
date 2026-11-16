@@ -5,7 +5,12 @@ Dipanggil oleh run-pameran.bat. Urutannya:
 1. Build dashboard (`npm run build`) bila belum ada atau sudah lebih tua dari kode.
 2. Buka Cloudflare quick tunnel ke backend, lalu baca alamat https-nya.
 3. Jalankan backend dengan token pengunjung baru dan alamat tunnel itu.
-4. Tampilkan QR pengunjung di terminal dan di halaman browser lokal.
+4. Tunggu sampai alamat tunnel benar-benar bisa dibuka dari internet.
+5. Tampilkan QR pengunjung di terminal dan di halaman browser lokal.
+
+Langkah 4 penting: alamat quick tunnel baru butuh beberapa detik sampai terdaftar di DNS.
+Browser yang dibuka terlalu cepat mendapat DNS_PROBE_FINISHED_NXDOMAIN, dan jawaban
+"tidak ada" itu sempat disimpan resolver, jadi muat ulang pun masih gagal sebentar.
 
 Token pengunjung dibuat baru setiap kali launcher dijalankan, jadi QR dari hari
 sebelumnya otomatis tidak berlaku. Token ditaruh di fragmen URL (#t=...), yang tidak
@@ -20,6 +25,7 @@ from __future__ import annotations
 
 import argparse
 import html
+import json
 import os
 import re
 import secrets
@@ -29,7 +35,10 @@ import sys
 import tempfile
 import threading
 import time
+import urllib.parse
+import urllib.request
 import webbrowser
+from collections import deque
 from pathlib import Path
 
 AKAR = Path(__file__).resolve().parents[1]
@@ -79,7 +88,7 @@ def cari_cloudflared() -> str | None:
     return None
 
 
-def buka_tunnel() -> tuple[subprocess.Popen, str]:
+def buka_tunnel() -> tuple[subprocess.Popen, str, threading.Event, deque]:
     cloudflared = cari_cloudflared()
     if cloudflared is None:
         sys.exit(
@@ -94,6 +103,8 @@ def buka_tunnel() -> tuple[subprocess.Popen, str]:
     )
     alamat: list[str] = []
     siap = threading.Event()
+    terdaftar = threading.Event()
+    galat: deque[str] = deque(maxlen=6)
 
     def baca() -> None:
         # Terus dibaca sampai proses selesai, supaya pipa tidak penuh dan cloudflared macet.
@@ -101,12 +112,73 @@ def buka_tunnel() -> tuple[subprocess.Popen, str]:
             if not alamat and (cocok := POLA_TUNNEL.search(baris)):
                 alamat.append(cocok.group(0))
                 siap.set()
+            if "Registered tunnel connection" in baris:
+                terdaftar.set()
+            elif " ERR " in baris or " WRN " in baris:
+                galat.append(baris.strip())
 
     threading.Thread(target=baca, daemon=True).start()
     if not siap.wait(60):
         proses.terminate()
         sys.exit("[GAGAL] Tunnel tidak memberi alamat dalam 60 detik. Periksa koneksi internet.")
-    return proses, alamat[0]
+    return proses, alamat[0], terdaftar, galat
+
+
+# DNS publik lewat HTTPS. Google lebih dulu: di sebagian laptop Windows, Python belum memuat
+# sertifikat akar yang dipakai cloudflare-dns.com, jadi permintaannya gagal verifikasi.
+DNS_HTTPS = ("https://dns.google/resolve", "https://cloudflare-dns.com/dns-query")
+
+
+def ada_di_dns(nama: str) -> bool | None:
+    """Tanya DNS publik lewat HTTPS apakah nama tunnel sudah terdaftar.
+
+    Sengaja tidak memakai resolver laptop: jawaban "tidak ada" yang diterimanya terlalu
+    cepat akan disimpan, dan browser lalu ikut gagal walau tunnel sudah siap.
+
+    Returns: True bila terdaftar, False bila belum, None bila tidak ada layanan DNS lewat
+    HTTPS yang bisa dihubungi (mis. diblokir jaringan tempat pameran).
+    """
+    for dasar in DNS_HTTPS:
+        permintaan = urllib.request.Request(
+            f"{dasar}?name={urllib.parse.quote(nama)}&type=A", headers={"accept": "application/dns-json"},
+        )
+        try:
+            with urllib.request.urlopen(permintaan, timeout=5) as r:
+                jawaban = json.load(r)
+        except Exception:
+            continue
+        return jawaban.get("Status") == 0 and bool(jawaban.get("Answer"))
+    return None
+
+
+def tunggu_tunnel(alamat: str, terdaftar: threading.Event, galat: deque, batas: float = 120) -> bool:
+    """Tunggu sampai alamat tunnel bisa dibuka: tersambung, terdaftar di DNS, lalu /login menjawab."""
+    lapor("Tunnel     : menunggu alamat bisa dibuka dari internet...")
+    mulai = time.monotonic()
+    if not terdaftar.wait(60):
+        lapor("[PERINGATAN] cloudflared belum tersambung ke Cloudflare. Pesan terakhirnya:")
+        for baris in galat or ["(tidak ada pesan galat)"]:
+            lapor(f"    {baris}")
+        return False
+    nama = urllib.parse.urlparse(alamat).hostname or ""
+    while (terdaftar_dns := ada_di_dns(nama)) is False:
+        if time.monotonic() - mulai > batas:
+            return False
+        time.sleep(2)
+    if terdaftar_dns is None:
+        # Tanpa DNS lewat HTTPS, alamatnya langsung dicoba. Jawaban "tidak ada" yang sempat
+        # disimpan resolver laptop habis dalam sekitar satu menit, dan percobaan berulang di
+        # bawah menunggu sampai saat itu, jadi browser tetap baru dibuka setelah alamatnya siap.
+        lapor("Tunnel     : DNS lewat HTTPS tidak bisa dihubungi; langsung mencoba alamatnya.")
+    while time.monotonic() - mulai < batas:
+        try:
+            with urllib.request.urlopen(f"{alamat}/login", timeout=8) as r:
+                if r.status == 200:
+                    lapor(f"Tunnel     : siap ({round(time.monotonic() - mulai)} detik).")
+                    return True
+        except Exception:
+            time.sleep(2)
+    return False
 
 
 def jalankan_backend(token: str, alamat: str) -> subprocess.Popen:
@@ -176,10 +248,19 @@ def main() -> None:
 
     build_dashboard(args.build)
     token = secrets.token_urlsafe(16)
-    tunnel, alamat = (None, LOKAL) if args.tanpa_tunnel else buka_tunnel()
+    if args.tanpa_tunnel:
+        tunnel, alamat, terdaftar, galat = None, LOKAL, None, None
+    else:
+        tunnel, alamat, terdaftar, galat = buka_tunnel()
     backend = jalankan_backend(token, alamat)
     try:
         tunggu_backend(backend)
+        # Browser baru dibuka setelah alamat tunnel benar-benar bisa dibuka. Bila belum siap
+        # dalam 2 menit, launcher tetap jalan supaya dashboard di laptop ini bisa dipakai.
+        if tunnel is not None and not tunggu_tunnel(alamat, terdaftar, galat):
+            lapor("[PERINGATAN] Alamat tunnel belum bisa dibuka dari laptop ini. Bila browser menulis")
+            lapor("             DNS_PROBE_FINISHED_NXDOMAIN, tunggu satu menit lalu muat ulang, atau coba")
+            lapor("             dari HP dengan data seluler. Dashboard lokal tetap di " + f"{LOKAL}/login")
         url_pengunjung = f"{alamat}/lihat#t={token}"
         url_tim = f"{alamat}/login"
 
