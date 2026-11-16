@@ -9,6 +9,9 @@ import { useToast } from '../context/toast';
 import Dialog from '../components/Dialog';
 
 const ROTASI = [0, 90, 180, 270];
+
+/** Alamat panjang dipotong di tengah, supaya awal (protokol, host) dan akhir (jalur) tetap terlihat. */
+const potongTengah = (s, maks = 40) => (s && s.length > maks ? `${s.slice(0, maks - 16)}…${s.slice(-15)}` : s);
 const INPUT = 'w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500';
 const LABEL = 'block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5';
 const TOMBOL = 'min-h-11 px-4 rounded-xl text-sm font-medium inline-flex items-center justify-center gap-2 transition-colors disabled:opacity-60';
@@ -400,6 +403,7 @@ function FormTambah({ onSelesai }) {
                     <label>
                         <span className={LABEL}>Kata sandi kamera <span className="font-normal text-slate-500">(opsional)</span></span>
                         <input type="password" value={sandi} onChange={(e) => setSandi(e.target.value)} autoComplete="new-password" className={INPUT} />
+                        <span className="block mt-1 text-xs text-slate-500">Disimpan di server dan tidak ditampilkan lagi.</span>
                     </label>
                 </div>
             )}
@@ -618,7 +622,7 @@ export default function Cameras() {
                 <div className="min-w-0">
                     <h1 className="text-xl md:text-2xl font-bold">Daftar Kamera</h1>
                     <p className="text-xs md:text-sm text-slate-500">
-                        Setiap kamera mewakili satu ruang. Kata sandi kamera disimpan di server dan tidak ditampilkan lagi.
+                        Satu kamera untuk satu ruang.
                     </p>
                 </div>
                 <button type="button" onClick={() => setTambah(true)} aria-haspopup="dialog"
@@ -649,7 +653,11 @@ export default function Cameras() {
                                         <span className="text-xs text-slate-500 font-mono shrink-0">{cam.camera_id}</span>
                                     </div>
                                     <StatusKameraDaftar cam={cam} />
-                                    <p className="text-xs text-slate-500 font-mono break-all">{cam.source}</p>
+                                    {/* Alamat panjang dipotong di tengah; alamat lengkapnya ada di laci Atur. */}
+                                    <p className="text-xs text-slate-500 font-mono break-all" title={cam.source}>
+                                        <span className="sr-only">{cam.source}</span>
+                                        <span aria-hidden="true">{potongTengah(cam.source)}</span>
+                                    </p>
                                     <p className="text-xs text-slate-500 tabular-nums">Rotasi {cam.rotate}&deg; · Video {labelPrivasi(cam.privasi).toLowerCase()}</p>
                                 </div>
                             </div>

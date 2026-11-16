@@ -108,8 +108,7 @@ function PratinjauAmbang({ ambang, ambangKini }) {
     if (!hasil.episode) {
         return (
             <div role="status" className={`${kotak} ${pudar} text-slate-500`}>
-                Pratinjau: belum ada episode berbaring dalam 30 hari terakhir. Angkanya terisi setelah sistem
-                berjalan beberapa hari.
+                Pratinjau terisi setelah sistem mencatat orang berbaring.
             </div>
         );
     }
@@ -321,7 +320,7 @@ export default function Settings() {
             <div className="mb-4 xl:mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
                 <h1 className="text-xl md:text-2xl font-bold">Pengaturan</h1>
                 <p className="text-xs md:text-sm text-slate-500">
-                    Berlaku untuk seluruh panti, kecuali suara dan notifikasi yang diatur per perangkat.
+                    Berlaku untuk seluruh panti. Suara dan notifikasi diatur per perangkat.
                 </p>
             </div>
 
@@ -330,8 +329,10 @@ export default function Settings() {
                 <div className="contents xl:flex xl:flex-col xl:gap-4 xl:min-h-0 xl:overflow-y-auto">
                     <Bagian id="atur-deteksi" judul="Deteksi" keterangan="Berlaku untuk semua kamera." className="xl:flex-1"
                         penjelasan={<>
-                            <p>Model menentukan cara sistem membaca postur. Mengganti model mereset hitungan durasi berbaring di semua kamera.</p>
-                            <p>Waktu tunggu yang lebih pendek berarti lebih banyak alarm palsu. Yang lebih panjang berarti pertolongan bisa terlambat.</p>
+                            <p className="paragraf-penuh">Model menentukan cara sistem membaca postur. Mengganti model mereset hitungan durasi berbaring di semua kamera.</p>
+                            {/* Batasan model yang dipindah dari deskripsi kartunya, supaya kartu cukup dua kalimat. */}
+                            <p className="paragraf-penuh">Kerangka tubuh bisa tidak membaca tubuh yang tertutup selimut atau perabot. Kotak tubuh sering membaca orang berbaring sebagai transisi, karena contoh orang berbaring di data latihnya sangat sedikit.</p>
+                            <p className="paragraf-penuh">Waktu tunggu yang lebih pendek berarti lebih banyak alarm palsu. Yang lebih panjang berarti pertolongan bisa terlambat.</p>
                             {daftarMode.some((m) => m.teknis) && (
                                 <dl className="space-y-1 text-xs text-slate-500">
                                     {daftarMode.map((m) => (
@@ -413,9 +414,9 @@ export default function Settings() {
                 <div className="contents xl:flex xl:flex-col xl:gap-4 xl:min-h-0 xl:overflow-y-auto">
                     <Bagian id="atur-suara" judul="Suara dan notifikasi" keterangan="Diatur per perangkat ini."
                         penjelasan={<>
-                            <p>Browser yang memutuskan boleh tidaknya halaman berbunyi dan memberi notifikasi, jadi pengaturan ini berlaku per perangkat.</p>
-                            <p>Alarm berbunyi berulang sampai ada yang menekan Saya ke sana. Browser menahan suara sampai ada klik pertama di halaman, jadi klik sekali setiap kali dashboard dibuka.</p>
-                            <p>Notifikasi muncul saat ada alarm dan tab FallDetect sedang tidak dilihat, berisi nama ruang tanpa foto. Alarm sungguhan tetap tampil sampai ada yang menuju lokasi. Untuk komputer jaga; di HP, perawat dikabari lewat Telegram.</p>
+                            <p className="paragraf-penuh">Browser yang memutuskan boleh tidaknya halaman berbunyi dan memberi notifikasi, jadi pengaturan ini berlaku per perangkat.</p>
+                            <p className="paragraf-penuh">Alarm berbunyi berulang sampai ada yang menekan Saya ke sana. Browser menahan suara sampai ada klik pertama di halaman, jadi klik sekali setiap kali dashboard dibuka.</p>
+                            <p className="paragraf-penuh">Notifikasi muncul saat ada alarm dan tab FallDetect sedang tidak dilihat, berisi nama ruang tanpa foto. Alarm sungguhan tetap tampil sampai ada yang menuju lokasi. Untuk komputer jaga; di HP, perawat dikabari lewat Telegram.</p>
                         </>}>
                         <div className="flex items-center gap-3">
                             <span className="flex-1 min-w-0 inline-flex items-center gap-2 text-sm">
@@ -445,9 +446,9 @@ export default function Settings() {
 
                     <Bagian id="atur-eskalasi" judul="Bila tidak ada yang merespons" keterangan="Pengingat bila belum ada yang menekan Saya ke sana."
                         penjelasan={<>
-                            <p>Alarm yang dibiarkan tidak boleh mati diam-diam. Setelah {eskalasi} menit, banner menulis Belum ada yang merespons beserta lamanya, dan grup Telegram menerima pengingat sebagai balasan ke pesan alarm, setiap {eskalasi} menit, paling banyak 3 kali.</p>
+                            <p className="paragraf-penuh">Alarm yang dibiarkan tidak boleh mati diam-diam. Setelah {eskalasi} menit, banner menulis Belum ada yang merespons beserta lamanya, dan grup Telegram menerima pengingat sebagai balasan ke pesan alarm, setiap {eskalasi} menit, paling banyak 3 kali.</p>
                             <p>Belum ada angka yang teruji untuk panti, jadi sesuaikan dengan pengalaman perawat.</p>
-                            <p>Jam shift membagi Ringkasan shift di Riwayat Insiden untuk serah terima: 3 shift mulai pukul 07.00, 14.00, dan 21.00; 2 shift mulai pukul 07.00 dan 19.00.</p>
+                            <p className="paragraf-penuh">Jam shift membagi Ringkasan shift di Riwayat Insiden untuk serah terima: 3 shift mulai pukul 07.00, 14.00, dan 21.00; 2 shift mulai pukul 07.00 dan 19.00.</p>
                         </>}>
                         <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-2">
                             <label htmlFor="eskalasi" className={LABEL}>Ingatkan setelah</label>
@@ -487,10 +488,10 @@ export default function Settings() {
                             </button>
                         )}
                         penjelasan={<>
-                            <p>Pesan alarm dikirim ke grup perawat, dengan tombol Saya ke sana dan Alarm palsu. Membalas pesan alarm di grup menambah catatan insiden.</p>
-                            <p>Token bot dan ID grup diatur di server oleh pengelola sistem, bukan dari halaman ini, karena keduanya rahasia.</p>
+                            <p className="paragraf-penuh">Pesan alarm dikirim ke grup perawat, dengan tombol Saya ke sana dan Alarm palsu. Membalas pesan alarm di grup menambah catatan insiden.</p>
+                            <p className="paragraf-penuh">Token bot dan ID grup diatur di server oleh pengelola sistem, bukan dari halaman ini, karena keduanya rahasia.</p>
                             <p>Latihan tidak dikirim secara bawaan, supaya grup tidak terbiasa mengabaikan pesan alarm.</p>
-                            <p>Kabar kamera dikirim setelah 30 detik tanpa gambar dan saat kamera pulih, juga saat Mode perawatan dimulai, diperpanjang, atau selesai.</p>
+                            <p className="paragraf-penuh">Kabar kamera dikirim setelah 30 detik tanpa gambar dan saat kamera pulih, juga saat Mode perawatan dimulai, diperpanjang, atau selesai.</p>
                         </>}>
                         {tg && (
                             <div className="space-y-0.5">
@@ -512,7 +513,7 @@ export default function Settings() {
 
                     <Bagian id="atur-privasi" judul="Privasi" keterangan="Foto penghuni yang tergeletak adalah data kesehatan."
                         penjelasan={<>
-                            <p>Semua pesan dilindungi supaya tidak bisa diteruskan atau disimpan dari Telegram. Foto dan klip di server hanya bisa dilihat setelah masuk, di Riwayat Insiden.</p>
+                            <p className="paragraf-penuh">Semua pesan dilindungi supaya tidak bisa diteruskan atau disimpan dari Telegram. Foto dan klip di server hanya bisa dilihat setelah masuk, di Riwayat Insiden.</p>
                             <p>Masa simpan diubah lewat <code>FOTO_MASA_SIMPAN_HARI</code> dan <code>KLIP_MASA_SIMPAN_HARI</code> di berkas <code>backend/.env</code>. Angka 0 berarti tidak disimpan sama sekali.</p>
                         </>}>
                         {tg && (
@@ -545,7 +546,7 @@ export default function Settings() {
 
                     <Bagian id="atur-tentang" judul="Tentang sistem" keterangan="Bukan alat kesehatan bersertifikat."
                         className="max-xl:order-2 xl:flex-1"
-                        penjelasan={<p>FallDetect adalah prototipe proyek mahasiswa. Alarm adalah pemberitahuan kemungkinan jatuh dan tetap perlu diperiksa langsung oleh perawat.</p>}>
+                        penjelasan={<p className="paragraf-penuh">FallDetect adalah prototipe proyek mahasiswa. Alarm adalah pemberitahuan kemungkinan jatuh dan tetap perlu diperiksa langsung oleh perawat.</p>}>
                         <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-0.5 text-sm">
                             <dt className="text-slate-500">Model aktif</dt>
                             <dd>{modeBerlaku?.label || '…'}</dd>

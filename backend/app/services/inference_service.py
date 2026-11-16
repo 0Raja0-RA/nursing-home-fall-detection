@@ -40,15 +40,15 @@ log = get_logger("app.services.inference_service")
 MODE_BBOX = "bbox"
 MODE_POSE = "pose"
 
-# Nama dan akibatnya ditulis untuk perawat; nama teknisnya di "teknis". README (bagian
-# Model kedua) menjelaskan alasannya lebih panjang.
+# Nama dan akibatnya ditulis untuk perawat, paling banyak dua kalimat pendek (sekitar 100
+# huruf); penjelasan lanjutnya di ikon ⓘ Deteksi di Pengaturan. Nama teknisnya di "teknis".
+# README (bagian Model kedua) menjelaskan alasannya lebih panjang.
 MODE_INFO = [
     {
         "id": MODE_POSE,
         "label": "Kerangka tubuh",
-        "description": "Postur dihitung dari sudut tulang belakang (bahu ke pinggul), jadi kasur dan "
-                       "sofa tidak terbaca sebagai orang jatuh. Bahu dan pinggul harus terlihat; tubuh "
-                       "yang tertutup selimut atau perabot bisa tidak terbaca.",
+        "description": "Membaca sudut bahu ke pinggul, jadi kasur dan sofa tidak terbaca jatuh. "
+                       "Bahu dan pinggul harus terlihat.",
         "teknis": "YOLO11-Pose (yolo11n-pose.pt), model rilis Ultralytics, dengan ambang sudut dari "
                   "eksperimen tim.",
         "recommended": True,
@@ -56,9 +56,8 @@ MODE_INFO = [
     {
         "id": MODE_BBOX,
         "label": "Kotak tubuh",
-        "description": "Postur dibaca langsung dari model buatan tim. Model ini dilatih dengan sangat "
-                       "sedikit contoh orang berbaring, jadi orang berbaring sering terbaca transisi dan "
-                       "alarm bisa terlambat atau tidak berbunyi.",
+        "description": "Model buatan tim dengan sedikit contoh orang berbaring. "
+                       "Alarm bisa terlambat atau tidak berbunyi.",
         "teknis": "Model custom EXP-006 (best.pt), dilatih pada UR Fall Detection: 12 gambar berlabel "
                   "lying_on_ground dari sekitar 1.500.",
         "recommended": False,

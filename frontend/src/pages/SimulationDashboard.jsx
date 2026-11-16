@@ -262,7 +262,7 @@ export default function SimulationDashboard() {
                 >
                     {(tutup) => (
                         <div className="space-y-3">
-                            <p className="text-xs text-slate-600 dark:text-slate-400">
+                            <p className="paragraf-penuh text-xs text-slate-600 dark:text-slate-400">
                                 Menjalankan alur alarm sungguhan di satu kamera: hitungan, banner, Saya ke sana, dan
                                 riwayat. Semuanya bertanda latihan dan tidak ikut dihitung.
                             </p>
@@ -449,7 +449,7 @@ export default function SimulationDashboard() {
                                         >
                                             {(tutup) => (
                                                 <div className="space-y-3">
-                                                    <p className="text-xs text-slate-600 dark:text-slate-400">
+                                                    <p className="paragraf-penuh text-xs text-slate-600 dark:text-slate-400">
                                                         Deteksi jatuh dan video dijeda, misalnya saat penghuni dimandikan. Selama
                                                         jeda, jatuh di ruang ini tidak terdeteksi. Alarm yang sudah muncul tetap
                                                         harus ditangani.

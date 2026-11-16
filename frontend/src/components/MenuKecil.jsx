@@ -1,7 +1,9 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { Info, X } from 'lucide-react';
 
-const LEBAR = 320;
+// 400 px: penjelasan ⓘ memuat sekitar 44 huruf per baris, dan paragraf panjangnya bisa
+// rata kiri-kanan tanpa celah antarkata yang terlalu lebar (prinsip 10).
+const LEBAR = 400;
 
 /**
  * Lapisan kecil yang menempel di tombol pemicunya, misalnya penjelasan ⓘ di Pengaturan.
@@ -98,7 +100,7 @@ export default function MenuKecil({ pemicu, judul, children }) {
                         <X className="w-4 h-4" aria-hidden="true" />
                     </button>
                 </div>
-                <div className="px-4 pb-4 pt-1">{typeof children === 'function' ? children(tutup) : children}</div>
+                <div className="@container px-4 pb-4 pt-1">{typeof children === 'function' ? children(tutup) : children}</div>
             </div>
         </>
     );

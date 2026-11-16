@@ -21,7 +21,7 @@ import { msDari, useJam } from '../waktu';
 
 const SKRIP_UJI = [
     'Berdiri di tengah ruang dengan seluruh tubuh terlihat. Harapan: Terpantau.',
-    'Berbaring di lantai dekat kamera lebih lama dari ambang. Harapan: Berbaring, lalu Kemungkinan jatuh.',
+    'Berbaring di lantai melewati ambang. Harapan: Berbaring, lalu Kemungkinan jatuh.',
     'Ulangi di tengah ruang dan di titik terjauh dari kamera.',
     'Uji negatif: duduk di kursi, berlutut, lalu membungkuk mengambil barang. Harapan: tidak sampai alarm.',
     'Bila orang sering tidak terbaca, ubah posisi atau sudut kamera sampai seluruh tubuh masuk bingkai.',
@@ -249,11 +249,12 @@ export default function LiveCamera() {
                     <h2 className="font-semibold">Skrip uji posisi kamera</h2>
                     <span className="text-xs text-slate-500">Bacaan sekarang: <b className="font-semibold">{status.label}</b></span>
                 </div>
-                <p className="text-xs text-slate-500 mt-1">
-                    Nyalakan Mode uji dulu: alarm selama uji dicatat sebagai latihan, tidak dihitung, dan tidak dikirim ke
-                    Telegram kecuali latihan dinyalakan di Pengaturan. Gunakan relawan yang setuju, bukan penghuni.
+                {/* Lebar dibatasi sekitar 60 huruf supaya baris tidak membentang selebar layar. */}
+                <p className="text-xs text-slate-500 mt-1 max-w-[60ch]">
+                    Nyalakan Mode uji dulu: alarm selama uji dicatat sebagai latihan dan tidak dihitung. Gunakan
+                    relawan yang setuju, bukan penghuni.
                 </p>
-                <ol className="list-decimal pl-5 mt-2 space-y-1">
+                <ol className="list-decimal pl-5 mt-2 space-y-1 max-w-[60ch]">
                     {SKRIP_UJI.map((l) => <li key={l}>{l}</li>)}
                 </ol>
             </div>

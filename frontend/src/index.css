@@ -41,4 +41,34 @@
     --color-slate-500: oklch(0.5 0.04 257);
     --color-slate-400: oklch(70.4% 0.04 256.788);
   }
+
+  /* Banner alarm menempel di atas halaman. Saat halaman digulir, elemen yang difokus keyboard
+     tidak boleh tertutup olehnya (WCAG 2.4.11). Di HP ada bilah atas setinggi 3.5rem. */
+  html {
+    scroll-padding-top: calc(3.5rem + var(--tinggi-banner, 0px));
+  }
+  @media (width >= 48rem) {
+    html {
+      scroll-padding-top: var(--tinggi-banner, 0px);
+    }
+  }
+
+  /* Paragraf rata kiri tidak menyisakan satu kata di baris terakhirnya. */
+  p {
+    text-wrap: pretty;
+  }
+}
+
+@layer components {
+  /* Paragraf penjelasan tiga baris atau lebih: rata kiri-kanan hanya di layar minimal 640 px
+     dan di kotak minimal 360 px (wadah terdekat berkelas @container), dengan pemenggalan kata
+     bila browser mendukung. Di HP dan di kotak sempit tetap rata kiri. Prinsip 10. */
+  @media (width >= 40rem) {
+    @container (width >= 360px) {
+      .paragraf-penuh {
+        text-align: justify;
+        hyphens: auto;
+      }
+    }
+  }
 }
