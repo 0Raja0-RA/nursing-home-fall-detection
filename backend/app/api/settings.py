@@ -26,6 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.auth import wajib_login, wajib_tim
 from app.core.config import get_settings
 from app.db.database import get_db
+from app.services.camera_service import samarkan_sumber
 from app.db.repository import (
     KUNCI_ESKALASI,
     KUNCI_POLA_SHIFT,
@@ -90,7 +91,8 @@ async def _jawaban(db: AsyncSession) -> SettingsResponse:
         fall_duration_threshold=settings.FALL_DURATION_THRESHOLD,
         possible_fall_threshold=settings.POSSIBLE_FALL_THRESHOLD,
         confidence_threshold=settings.CONFIDENCE_THRESHOLD,
-        camera_source=settings.CAMERA_SOURCE,
+        # Sandi di alamat kamera (rtsp://user:sandi@...) tidak ikut dikirim ke browser.
+        camera_source=samarkan_sumber(settings.CAMERA_SOURCE),
         detection_mode=inference_service.mode_aktif(),
         available_modes=inference_service.MODE_INFO,
         telegram_configured=bool(settings.TELEGRAM_BOT_TOKEN and settings.TELEGRAM_CHAT_ID),
@@ -124,9 +126,16 @@ async def muat_dari_db(session: AsyncSession) -> None:
 
 
 @router.get("/", response_model=SettingsResponse)
-async def get_current_settings(db: AsyncSession = Depends(get_db)):
-    """Ambil konfigurasi aktif saat ini, beserta daftar mode yang tersedia."""
-    return await _jawaban(db)
+async def get_current_settings(db: AsyncSession = Depends(get_db), user=Depends(wajib_login)):
+    """Ambil konfigurasi aktif saat ini, beserta daftar mode yang tersedia.
+
+    Pengunjung pameran tetap menerima ambang dan label putusan untuk layarnya, tetapi
+    tanpa alamat kamera bawaan.
+    """
+    jawaban = await _jawaban(db)
+    if user.role == "pengunjung":
+        jawaban.camera_source = ""
+    return jawaban
 
 
 @router.put("/threshold", response_model=SettingsResponse)

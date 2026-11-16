@@ -43,12 +43,12 @@ def _isi_penyangga(p, camera_id, dari, sampai):
 
 def test_penyangga_menjarangkan_dan_membuang_frame_lama(setelan):
     p = klip.PenyanggaKlip()
-    _isi_penyangga(p, "cam-01", 1000.0, 1040.0)
+    _isi_penyangga(p, "cam-01", 1000.0, 1060.0)
     frame = p.potong("cam-01", 0, 10_000)
     jarak = [b[0] - a[0] for a, b in zip(frame, frame[1:])]
     assert min(jarak) >= 1 / klip.FPS - 1e-6, "paling banyak FPS frame per detik"
     assert frame[-1][0] - frame[0][0] <= klip.BUFFER_DETIK, "hanya BUFFER_DETIK detik terakhir"
-    assert frame[0][0] > 1005.0, "frame awal sudah dibuang"
+    assert frame[0][0] >= 1060.0 - klip.BUFFER_DETIK, "frame awal sudah dibuang"
     assert p.potong("cam-02", 0, 10_000) == []
 
 
@@ -146,6 +146,17 @@ async def test_rekam_memotong_dari_sebelum_tergeletak_sampai_sesudah_alarm(db):
     assert alert.klip_detik == pytest.approx(waktu[-1] - waktu[0], abs=0.11)
     pesan = db.siar.await_args.args[0]
     assert pesan.event == "alert_update" and pesan.data["klip_status"] == "tersimpan"
+
+
+@pytest.mark.asyncio
+async def test_ambang_terbesar_tetap_merekam_gerak_jatuh(db):
+    """Ambang 30 detik (batas atas di Pengaturan): klip tetap mulai 5 detik sebelum orangnya
+    terbaca tergeletak, bukan di tengah masa tergeletak."""
+    alarm = 5000.0
+    _isi_penyangga(klip.penyangga, "cam-01", alarm - 60, alarm + klip.DETIK_SESUDAH)
+    await klip.rekam(1, "cam-01", alarm, detik_tergeletak=30.0, tunggu=0)
+    waktu = [f["t"] for f in klip.baca_berkas(1)["frame"]]
+    assert -35.0 <= waktu[0] < -34.5
 
 
 @pytest.mark.asyncio

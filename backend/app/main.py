@@ -125,9 +125,9 @@ app.include_router(shift.router, prefix="/api/ringkasan-shift", tags=["Shift"], 
 app.include_router(ws_router, tags=["WebSocket"])
 
 
-@app.get("/", tags=["Health"])
+@app.get("/api/health", tags=["Health"])
 async def health_check():
-    """Health check endpoint."""
+    """Health check endpoint. Tanpa login."""
     return {"status": "ok", "service": "fall-detection-backend"}
 
 
@@ -159,3 +159,8 @@ if _DIST is not None and (_DIST / "index.html").is_file():
         return FileResponse(_INDEX, headers={"Cache-Control": "no-cache"})
 
     log.info(f"🖥️  Dashboard disajikan dari {_DIST}")
+else:
+    # Tanpa build dashboard (pengembangan dengan Vite), alamat akar tetap menjawab health
+    # check seperti dulu. Dengan build, alamat akar adalah landing page, supaya tautan
+    # "Apa yang disimpan dan siapa yang melihat" tetap terbuka saat dimuat ulang atau dibagikan.
+    app.get("/", include_in_schema=False)(health_check)

@@ -9,7 +9,7 @@ Base URL: `http://localhost:8000`
 
 ## Login dan sesi
 
-Semua endpoint wajib login, kecuali `GET /`, `GET /api/auth/status`,
+Semua endpoint wajib login, kecuali `GET /api/health`, `GET /api/auth/status`,
 `POST /api/auth/login`, `POST /api/auth/pengunjung`, dan `POST /api/auth/logout`. Tanpa
 sesi yang sah, jawabannya `401`. Ini juga berlaku untuk video MJPEG dan WebSocket.
 
@@ -61,11 +61,18 @@ hubung. Kata sandi minimal 8 karakter, disimpan sebagai hash scrypt.
 
 ## Health Check
 
-### `GET /`
+### `GET /api/health`
 
 ```json
 { "status": "ok", "service": "fall-detection-backend" }
 ```
+
+Bila backend menyajikan build dashboard (`FRONTEND_DIST`), `GET /` adalah landing page. Tanpa
+build, `GET /` menjawab sama dengan health check.
+
+Untuk pengunjung (sesi QR), `source` di `GET /api/cameras/` dan `camera_source` di
+`GET /api/settings/` dikosongkan, dan `GET /api/cameras/devices` ditolak `403`. Untuk tim,
+kata sandi di alamat kamera disamarkan menjadi `***`.
 
 ---
 
@@ -171,7 +178,7 @@ Waktu disimpan UTC tanpa zona.
 | GET | `/api/cameras/` | Kamera terdaftar beserta status runtime-nya |
 | POST | `/api/cameras/` | Daftarkan kamera baru; sumbernya diperiksa dulu |
 | GET | `/api/cameras/{id}` | Satu kamera |
-| PATCH | `/api/cameras/{id}` | Ubah `name`, `source`, `rotate`, `enabled`, `denah_baris`/`denah_kolom` (1-12, `0` mengeluarkan dari denah), `privasi` (`utuh`, `buram`, `kerangka`); kamera dinyalakan ulang bila perlu, `privasi` berlaku seketika |
+| PATCH | `/api/cameras/{id}` | Ubah `name`, `source`, `rotate`, `enabled`, `denah_baris`/`denah_kolom` (1-8, `0` mengeluarkan dari denah), `privasi` (`utuh`, `buram`, `kerangka`); kamera dinyalakan ulang bila perlu, `privasi` berlaku seketika |
 | DELETE | `/api/cameras/{id}` | Matikan dan hapus kamera. Nomornya tidak dipakai lagi |
 | GET | `/api/cameras/{id}/stream` | Video MJPEG dengan kotak deteksi, dalam tampilan privasi kamera. `?asli=true` memakai video asli selama sedang dibuka; pengunjung `403` |
 | POST | `/api/cameras/{id}/buka-asli` | Video asli kamera berprivasi selama 15 detik, hanya saat ada alarm yang belum ditangani di ruang itu (`409` bila tidak). Akun tim saja; setiap pembukaan dicatat di `akses_video`. Waktu habisnya di `asli_sampai` |

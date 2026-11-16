@@ -272,9 +272,10 @@ class CameraUpdate(BaseModel):
     rotate: Optional[int] = None
     enabled: Optional[bool] = None
     privasi: Optional[Privasi] = None
-    # Letak di denah unit (1-12). Kirim 0 untuk mengeluarkan kamera dari denah.
-    denah_baris: Optional[int] = Field(None, ge=0, le=12)
-    denah_kolom: Optional[int] = Field(None, ge=0, le=12)
+    # Letak di denah unit (1-8, sama dengan pilihan di laci Atur). Kirim 0 untuk mengeluarkan
+    # kamera dari denah.
+    denah_baris: Optional[int] = Field(None, ge=0, le=8)
+    denah_kolom: Optional[int] = Field(None, ge=0, le=8)
 
     @field_validator("name", "source")
     @classmethod

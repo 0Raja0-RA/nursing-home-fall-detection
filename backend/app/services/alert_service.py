@@ -73,7 +73,8 @@ class AlertService:
                 # bukan nama ruang, jadi kolomnya dibiarkan kosong.
                 camera_name=nama_kamera if nama_kamera != camera_id else None,
                 severity=AlertSeverity.CRITICAL,
-                message=f"{awalan}Terdeteksi jatuh pada {nama_kamera} selama {duration:.1f} detik.",
+                # Prinsip 1: kemungkinan, bukan kepastian. Tidak pernah "Terdeteksi jatuh".
+                message=f"{awalan}Kemungkinan jatuh di {nama_kamera}, terbaca berbaring {duration:.1f} detik.",
                 fall_duration=duration,
                 simulated=disimulasikan,
                 # Ambang dan mode saat ini ikut dicatat: tanpa keduanya, angka alarm

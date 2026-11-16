@@ -81,6 +81,11 @@ _BELUM_DINILAI = and_(
     or_(AlertRecord.verdict.is_(None), AlertRecord.verdict == Putusan.BELUM_YAKIN.value),
 )
 _TERBUKA = or_(AlertRecord.acknowledged.is_(False), AlertRecord.acknowledged.is_(None))
+# Antrean dan angka Perlu tindakan tanpa latihan: latihan keluar dari semua angka, dan lencana
+# menu tidak boleh memerah karena latihan (prinsip 3 dan 8). Latihan yang masih terbuka tetap
+# tampil di banner (status=terbuka, 24 jam pertama) dan bisa ditutup dari sana; sesudahnya
+# lewat tab Semua dengan Tampilkan latihan.
+_TERBUKA_SUNGGUHAN = and_(_TERBUKA, AlertRecord.simulated.is_(False))
 
 
 @router.get("/", response_model=list[AlertResponse])
@@ -116,7 +121,7 @@ def _saring(query, acknowledged, status_, camera_id, verdict, simulated, sejak, 
     if status_ == "terbuka":
         query = query.where(_TERBUKA)
     elif status_ == "perlu_tindakan":
-        query = query.where(or_(_TERBUKA, _BELUM_DINILAI))
+        query = query.where(or_(_TERBUKA_SUNGGUHAN, _BELUM_DINILAI))
     elif status_ == "selesai":
         query = query.where(AlertRecord.acknowledged.is_(True), ~_BELUM_DINILAI)
     if camera_id:
@@ -213,12 +218,12 @@ async def ringkasan(db: AsyncSession = Depends(get_db)):
 
     # Alarm sungguhan: bukan latihan, dan bukan jatuh terlewat yang dicatat manual.
     sungguhan = and_(AlertRecord.simulated.is_(False), AlertRecord.terlewat.is_(False))
-    belum_ditangani = await hitung(_TERBUKA)
+    belum_ditangani = await hitung(_TERBUKA_SUNGGUHAN)
     belum_dinilai = await hitung(_BELUM_DINILAI)
     return AlertSummary(
         perlu_tindakan=belum_ditangani + belum_dinilai,
         belum_ditangani=belum_ditangani,
-        sedang_ditangani=await hitung(_TERBUKA, AlertRecord.claimed_by.is_not(None)),
+        sedang_ditangani=await hitung(_TERBUKA_SUNGGUHAN, AlertRecord.claimed_by.is_not(None)),
         belum_dinilai=belum_dinilai,
         total=await hitung(sungguhan),
         jatuh=await hitung(sungguhan, AlertRecord.verdict == Putusan.JATUH.value),

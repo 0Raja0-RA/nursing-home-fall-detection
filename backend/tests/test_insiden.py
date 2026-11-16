@@ -199,6 +199,8 @@ def test_filter_antrean(uji):
     assert _id(k.get("/api/alerts/", params={"simulated": "false"})) == [1, 3]
     assert _id(k.get("/api/alerts/", params={"camera_id": "cam-02"})) == [2]
     assert _id(k.get("/api/alerts/", params={"sejak": "2026-11-12T00:00:00"})) == [1, 2]
+    # Latihan yang masih terbuka tetap di banner (terbuka), tetapi tidak di antrean Perlu tindakan.
+    assert _id(k.get("/api/alerts/", params={"status": "perlu_tindakan"})) == [1, 3]
 
     k.put("/api/alerts/1/ack", json={"verdict": "jatuh"})
     k.put("/api/alerts/2/ack")                      # latihan: tidak perlu dinilai
@@ -212,14 +214,15 @@ def test_filter_antrean(uji):
 def test_ringkasan(uji):
     k = uji.klien
     awal = k.get("/api/alerts/ringkasan").json()
-    assert awal["belum_ditangani"] == 3 and awal["perlu_tindakan"] == 3
+    # Latihan (#2) keluar dari semua angka, juga selama masih terbuka (prinsip 8).
+    assert awal["belum_ditangani"] == 2 and awal["perlu_tindakan"] == 2
     assert awal["total"] == 2 and awal["latihan"] == 1 and awal["telegram_gagal"] == 1
 
     k.put("/api/alerts/1/claim")
     k.put("/api/alerts/3/ack", json={"verdict": "palsu", "reason": "orang_lain"})
     d = k.get("/api/alerts/ringkasan").json()
     assert d["sedang_ditangani"] == 1
-    assert d["belum_ditangani"] == 2 and d["belum_dinilai"] == 0 and d["perlu_tindakan"] == 2
+    assert d["belum_ditangani"] == 1 and d["belum_dinilai"] == 0 and d["perlu_tindakan"] == 1
     assert d["palsu"] == 1 and d["jatuh"] == 0
 
 

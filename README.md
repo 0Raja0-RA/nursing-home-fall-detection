@@ -262,7 +262,7 @@ Semua endpoint wajib login, kecuali health check, `/api/auth/status`, `/api/auth
 
 | Method | Endpoint                     | Description                                        |
 | ------ | ---------------------------- | -------------------------------------------------- |
-| GET    | `/`                          | Health check                                        |
+| GET    | `/api/health`                | Health check                                        |
 | GET    | `/api/auth/status`           | Ada akun atau belum, dan akses pengunjung aktif     |
 | POST   | `/api/auth/pengunjung`       | Tukar token QR dengan sesi lihat-saja (12 jam)      |
 | POST   | `/api/auth/login`            | Masuk; sesi disimpan di cookie HttpOnly             |

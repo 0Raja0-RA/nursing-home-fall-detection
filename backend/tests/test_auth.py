@@ -195,7 +195,7 @@ def test_api_menolak_tanpa_login(klien, jalur):
 
 
 def test_health_check_tetap_terbuka(klien):
-    assert klien.get("/").status_code == 200
+    assert klien.get("/api/health").json()["status"] == "ok"
 
 
 def test_masuk_dan_keluar(klien):
@@ -252,6 +252,33 @@ def test_pengunjung_dari_qr_hanya_bisa_melihat(klien):
     ]
     assert [r.status_code for r in ditolak] == [403] * len(ditolak)
     assert ditolak[0].json()["detail"] == "Pengunjung hanya bisa melihat."
+
+
+def test_pengunjung_tidak_menerima_alamat_kamera(klien, monkeypatch):
+    """Alamat kamera adalah alat kerja tim: pengunjung tidak menerimanya sama sekali, dan tim
+    menerimanya tanpa kata sandi. Daftar kamera lokal (membuka webcam) khusus tim."""
+    import asyncio
+
+    from app.db.models import CameraRecord
+
+    monkeypatch.setattr(get_settings(), "CAMERA_SOURCE", "rtsp://admin:rahasia@10.0.0.5:554/s")
+
+    async def tambah_kamera():
+        async with klien.factory() as sesi:
+            sesi.add(CameraRecord(id="cam-09", name="Kamar 9", source="rtsp://admin:rahasia@10.0.0.9/s", enabled=False))
+            await sesi.commit()
+
+    asyncio.run(tambah_kamera())
+
+    assert _masuk_pengunjung(klien).status_code == 200
+    assert [c["source"] for c in klien.get("/api/cameras/").json()] == [""]
+    assert klien.get("/api/cameras/cam-09").json()["source"] == ""
+    assert klien.get("/api/settings/").json()["camera_source"] == ""
+    assert klien.get("/api/cameras/devices").status_code == 403
+
+    assert _masuk(klien).status_code == 200
+    assert klien.get("/api/cameras/").json()[0]["source"] == "rtsp://admin:***@10.0.0.9/s"
+    assert klien.get("/api/settings/").json()["camera_source"] == "rtsp://admin:***@10.0.0.5:554/s"
 
 
 def test_token_qr_salah_ditolak_dan_tebakannya_dibatasi(klien):

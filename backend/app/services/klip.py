@@ -43,10 +43,13 @@ from app.core.logging import get_logger
 log = get_logger("app.services.klip")
 
 FPS = 4.0                       # cukup untuk melihat gerak jatuh, ringan di memori
-BUFFER_DETIK = 30.0
 DETIK_SESUDAH = 5.0
 JEDA_SEBELUM_TERGELETAK = 5.0   # gerak jatuhnya terjadi sebelum timer mulai
-DETIK_SEBELUM_MAKS = 20.0       # sisakan ruang di penyangga untuk DETIK_SESUDAH
+# Ambang terbesar di Pengaturan 30 detik, jadi klip bisa mulai 35 detik sebelum alarm dan
+# gerak jatuhnya tetap terekam. Dengan batas 20 detik, klip di ambang di atas 15 detik
+# mulai sesudah orangnya sudah tergeletak.
+DETIK_SEBELUM_MAKS = 35.0
+BUFFER_DETIK = 45.0             # DETIK_SEBELUM_MAKS + DETIK_SESUDAH, ditambah cadangan 5 detik
 LEBAR = 640
 MUTU = 70
 

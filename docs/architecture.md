@@ -224,7 +224,7 @@ tetap tampil di layar penekannya, supaya Tandai Ditangani ada di tempat yang sam
 
 Bukti di laci detail Riwayat Insiden: foto saat alarm, dan klip dari sekitar 5 detik
 sebelum orangnya terbaca berbaring sampai 5 detik sesudah alarm. Pipeline menitipkan
-4 gambar per detik (lebar 640 px) dari 30 detik terakhir di memori, dan klip dipotong
+4 gambar per detik (lebar 640 px) dari 45 detik terakhir di memori, dan klip dipotong
 dari situ saat alarm. Bila kamera tidak mengirim gambar, laci menulis bahwa klipnya
 tidak ada, bukan menampilkan ruang kosong.
 

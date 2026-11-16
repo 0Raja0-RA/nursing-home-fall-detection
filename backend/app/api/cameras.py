@@ -63,12 +63,15 @@ log = get_logger("app.api.cameras")
 
 router = APIRouter()
 
-def _gabung(record: CameraRecord) -> CameraInfo:
+def _gabung(record: CameraRecord, pengunjung: bool = False) -> CameraInfo:
     """Gabungkan data kamera dari database dengan status runtime-nya.
 
     Kamera yang terdaftar tapi belum/tidak berjalan tetap dikembalikan, dengan
     is_active=False. Itu disengaja: pengguna harus tetap melihat kamera yang
     alamatnya salah atau yang sedang mati, supaya bisa memperbaikinya.
+
+    `pengunjung`: alamat kamera dikosongkan. Isinya IP dan jalur jaringan panti, alat
+    kerja tim yang tidak ikut tampil di layar pengunjung pameran.
     """
     runtime = registry.latest_status.get(record.id)
     dasar = runtime.model_dump() if runtime else CameraStatus(camera_id=record.id).model_dump()
@@ -88,8 +91,9 @@ def _gabung(record: CameraRecord) -> CameraInfo:
     return CameraInfo(
         **dasar,
         name=record.name,
-        # Kata sandi kamera tidak ikut dikirim ke browser.
-        source=samarkan_sumber(record.source),
+        # Kata sandi kamera tidak ikut dikirim ke browser, dan pengunjung tidak menerima
+        # alamatnya sama sekali.
+        source="" if pengunjung else samarkan_sumber(record.source),
         rotate=record.rotate,
         enabled=record.enabled,
         privasi=record.privasi or "utuh",
@@ -100,14 +104,15 @@ def _gabung(record: CameraRecord) -> CameraInfo:
 
 
 @router.get("/", response_model=list[CameraInfo])
-async def get_cameras(db: AsyncSession = Depends(get_db)):
+async def get_cameras(db: AsyncSession = Depends(get_db), user=Depends(wajib_login)):
     """Ambil semua kamera terdaftar beserta status terakhirnya.
 
     Status runtime diisi oleh detection_pipeline setiap frame. Kamera yang baru
     didaftarkan tapi belum menghasilkan frame tetap muncul, dengan status default.
     """
     repo = CameraRepository(db)
-    return [_gabung(r) for r in await repo.list_cameras()]
+    pengunjung = user.role == "pengunjung"
+    return [_gabung(r, pengunjung) for r in await repo.list_cameras()]
 
 
 @router.post("/scan", response_model=ScanResponse)
@@ -140,7 +145,7 @@ async def tes_koneksi_kamera(payload: TesKoneksiRequest, db: AsyncSession = Depe
 
 
 @router.get("/devices", response_model=list[LocalDevice])
-async def perangkat_lokal(db: AsyncSession = Depends(get_db)):
+async def perangkat_lokal(db: AsyncSession = Depends(get_db), _tim=Depends(wajib_tim)):
     """Kamera yang terpasang langsung di komputer ini, beserta namanya.
 
     OpenCV hanya menerima kamera lokal sebagai angka indeks dan tidak bisa
@@ -195,12 +200,12 @@ async def tambah_kamera(payload: CameraCreate, db: AsyncSession = Depends(get_db
 
 
 @router.get("/{camera_id}", response_model=CameraInfo)
-async def get_camera(camera_id: str, db: AsyncSession = Depends(get_db)):
+async def get_camera(camera_id: str, db: AsyncSession = Depends(get_db), user=Depends(wajib_login)):
     """Ambil satu kamera berdasarkan ID."""
     record = await CameraRepository(db).get_camera(camera_id)
     if record is None:
         raise HTTPException(status_code=404, detail="Camera not found")
-    return _gabung(record)
+    return _gabung(record, user.role == "pengunjung")
 
 
 @router.patch("/{camera_id}", response_model=CameraInfo)
