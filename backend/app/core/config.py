@@ -71,7 +71,7 @@ class Settings(BaseSettings):
     #    sebagai batas bawah keyakinan, dan cukup MIN_KEYPOINTS_PEMICU sendi.
     # Harga yang dibayar: kasur atau sofa yang melebar bisa memicu timer.
     TRIGGER_MIN_CONF: float = 0.25
-    MIN_KEYPOINTS_PEMICU: int = 3
+    MIN_KEYPOINTS_PEMICU: int = 4
     # Khusus mode pose: minimal berapa dari 17 sendi yang harus terbaca (keyakinan
     # >= 0.3) agar sebuah kotak dianggap manusia. Kursi dan colokan tidak punya
     # sendi yang masuk akal. Dibuat longgar (bukan semua sendi) supaya orang yang

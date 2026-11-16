@@ -262,12 +262,27 @@ def _postur_dari_pose(kpts: np.ndarray, aspect_ratio: float) -> tuple[PostureCla
         # direset). Postur dihitung supaya kotaknya tetap bisa digambar.
         sudut = _sudut_kepala_pinggul(kpts)
         if sudut is None:
-            if aspect_ratio < 0.8:
-                sudut = 90.0
-            elif aspect_ratio > _AR_TEBAKAN_REBAH:
-                sudut = 20.0
+            # Fallback kasus dada ke atas (close-up webcam / duduk di meja)
+            conf_kepala = max(kpts[0][2], (kpts[1][2] + kpts[2][2]) / 2)
+            if conf_bahu >= _KP_MIN_CONF and conf_kepala >= _KP_MIN_CONF:
+                mid_bahu_x = (kpts[_KP_BAHU_KIRI][0] + kpts[_KP_BAHU_KANAN][0]) / 2
+                mid_bahu_y = (kpts[_KP_BAHU_KIRI][1] + kpts[_KP_BAHU_KANAN][1]) / 2
+                head_pt = kpts[0][:2] if kpts[0][2] >= _KP_MIN_CONF else ((kpts[1][:2] + kpts[2][:2]) / 2)
+                dx = head_pt[0] - mid_bahu_x
+                dy = mid_bahu_y - head_pt[1]  # Positif jika kepala di atas bahu
+                if dy > 0:
+                    sudut = math.degrees(math.atan2(dy, abs(dx)))
+                    mutu = float(min(conf_bahu, conf_kepala))
+                else:
+                    sudut = 20.0
+                    mutu = float(conf_bahu)
             else:
-                sudut = 50.0
+                if aspect_ratio < 0.8:
+                    sudut = 90.0
+                elif aspect_ratio > _AR_TEBAKAN_REBAH:
+                    sudut = 20.0
+                else:
+                    sudut = 50.0
 
     if sudut < _SUDUT_REBAH or (aspect_ratio > _AR_REBAH and sudut < _SUDUT_REBAH_LONGGAR):
         postur = PostureClass.LYING_ON_GROUND
