@@ -407,8 +407,10 @@ export default function Settings() {
                     </Bagian>
                 </div>
 
-                {/* Kolom 2: perangkat ini, pengingat, dan riwayat perubahan yang mengisi sisa tinggi. */}
-                <div className="contents xl:flex xl:flex-col xl:gap-4 xl:min-h-0">
+                {/* Kolom 2: perangkat ini, pengingat, dan riwayat perubahan yang mengisi sisa tinggi.
+                    Bila teks lebih besar atau spasinya dinaikkan (WCAG 1.4.12), kolomnya ikut
+                    menggulir, jadi kartu riwayat tidak terhimpit sampai judulnya terpotong. */}
+                <div className="contents xl:flex xl:flex-col xl:gap-4 xl:min-h-0 xl:overflow-y-auto">
                     <Bagian id="atur-suara" judul="Suara dan notifikasi" keterangan="Diatur per perangkat ini."
                         penjelasan={<>
                             <p>Browser yang memutuskan boleh tidaknya halaman berbunyi dan memberi notifikasi, jadi pengaturan ini berlaku per perangkat.</p>
@@ -463,7 +465,7 @@ export default function Settings() {
                     </Bagian>
 
                     <Bagian id="atur-riwayat" judul="Riwayat perubahan" keterangan="Terbaru di atas, beserta siapa yang mengubah."
-                        className="max-xl:order-1 xl:flex-1 xl:min-h-0">
+                        className="max-xl:order-1 xl:flex-1 xl:min-h-40">
                         <div className="xl:flex-1 xl:min-h-0 xl:overflow-y-auto xl:overscroll-contain">
                             <RiwayatPerubahan riwayat={riwayat} daftarMode={daftarMode} opsiFoto={opsiFoto} />
                         </div>

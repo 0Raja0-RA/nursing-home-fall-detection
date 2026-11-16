@@ -167,7 +167,7 @@ function PemutarKlip({ alert, onTutup }) {
                         : sedangMain ? <Pause className="w-5 h-5" aria-hidden="true" />
                             : <Play className="w-5 h-5" aria-hidden="true" />}
                 </button>
-                <div className="flex-1 min-w-0 pb-5">
+                <div className="flex-1 min-w-0 pb-6">
                     <input type="range" min={0} max={n - 1} step={1} value={idx}
                         onChange={(e) => { setJalan(false); setIdx(Number(e.target.value)); }}
                         aria-label="Posisi klip" aria-valuetext={teksWaktu(frame.t)}
@@ -176,7 +176,7 @@ function PemutarKlip({ alert, onTutup }) {
                         {penanda.map((p) => (
                             <span key={p.label} className="absolute top-0 -translate-x-1/2 flex flex-col items-center" style={{ left: p.left }}>
                                 <span className={`w-0.5 h-2 ${p.kelas}`} />
-                                <span className="text-[11px] leading-none text-slate-500 whitespace-nowrap mt-0.5">{p.label}</span>
+                                <span className="text-xs leading-none text-slate-500 whitespace-nowrap mt-0.5">{p.label}</span>
                             </span>
                         ))}
                     </div>

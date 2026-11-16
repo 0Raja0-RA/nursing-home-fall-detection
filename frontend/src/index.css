@@ -13,6 +13,15 @@
   /* Teks sekunder tema terang: slate-500 sedikit digelapkan, 6,0:1 di putih (bawaan 4,76:1).
      Prinsip 10 di docs/architecture.md. */
   --color-slate-500: oklch(0.5 0.04 257);
+
+  /* Inter (berkasnya diimpor di main.jsx): x-height 9% lebih tinggi daripada Segoe UI pada
+     ukuran yang sama, dan tampil sama di laptop dan HP. */
+  --font-sans: "Inter Variable", "Segoe UI", system-ui, -apple-system, Roboto, "Noto Sans", Arial, sans-serif;
+
+  /* Huruf terkecil 13 px (bawaan text-xs 12 px), teks isi 14 px dengan tinggi baris 1,5. */
+  --text-xs: 0.8125rem;
+  --text-xs--line-height: 1.125rem;
+  --text-sm--line-height: 1.3125rem;
 }
 
 @layer base {

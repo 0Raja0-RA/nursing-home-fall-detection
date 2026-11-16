@@ -92,7 +92,7 @@ function Ruang({ alert }) {
             {alert.camera_name || alert.camera_id}
             {alert.simulated && <FlaskConical className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" aria-label="Latihan" />}
             {alert.terlewat && (
-                <span className="text-[11px] px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200 font-semibold">
+                <span className="text-xs px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200 font-medium">
                     terlewat
                 </span>
             )}
