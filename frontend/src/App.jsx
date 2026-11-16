@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, NavLink, Navigate, useLocation,
 import { LayoutDashboard, History, Settings as SettingsIcon, Video, Sun, Moon, LogOut, Menu, X, Loader2, ServerOff, ALargeSmall } from 'lucide-react';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { LiveProvider, useLive } from './context/LiveContext';
+import logoKecil from './assets/logo-falldetect-kecil.svg';
 import LayarDinding from './pages/LayarDinding';
 import { AuthProvider } from './context/AuthContext';
 import { useAuth, usePengunjung } from './context/auth';
@@ -88,9 +89,8 @@ function TataLetakDashboard() {
       `}>
         <div className="mb-8 px-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="w-8 h-8 rounded-lg bg-emerald-700 flex items-center justify-center text-white font-bold">
-              FD
-            </span>
+            {/* Versi kecil logo (perisai dan salib): logo lengkap baru terbaca mulai 48 px. */}
+            <img src={logoKecil} alt="" className="w-8 h-8" />
             <span className="font-bold tracking-tight text-lg">FallDetect</span>
           </div>
           {/* Tombol Tutup Sidebar khusus Mobile */}
@@ -191,9 +191,7 @@ function TataLetakDashboard() {
           >
             <Menu className="w-5 h-5" />
           </button>
-          <span aria-hidden="true" className="w-7 h-7 rounded-lg bg-emerald-700 flex items-center justify-center text-white text-xs font-bold">
-            FD
-          </span>
+          <img src={logoKecil} alt="" className="w-7 h-7" />
           <span className="font-bold tracking-tight">FallDetect</span>
         </div>
         <AlertBanner />

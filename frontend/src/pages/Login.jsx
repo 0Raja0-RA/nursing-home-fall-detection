@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Mail, Lock, LogIn, ArrowLeft, AlertCircle, Eye } from 'lucide-react';
 import { api, PESAN_TERPUTUS } from '../api';
 import { useAuth } from '../context/auth';
+import logo from '../assets/logo-falldetect.svg';
 
 const INPUT = 'w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl py-3 pl-11 pr-4 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all text-sm';
 
@@ -78,9 +79,7 @@ export default function Login() {
             {/* Kartu Login */}
             <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 p-8 mt-12 sm:mt-0">
                 <div className="text-center mb-8">
-                    <div className="w-16 h-16 bg-emerald-700 rounded-2xl mx-auto flex items-center justify-center text-white font-bold text-2xl mb-4 shadow-lg shadow-emerald-700/30">
-                        FD
-                    </div>
+                    <img src={logo} alt="FallDetect" className="w-16 h-16 mx-auto mb-4 object-contain" />
                     <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Login Caregiver</h1>
                     <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">
                         Masuk untuk mengakses sistem pemantauan panti jompo.

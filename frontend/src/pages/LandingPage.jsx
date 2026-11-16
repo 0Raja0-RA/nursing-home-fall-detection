@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ArrowRight, Footprints, HeartHandshake, Moon, Sun, TriangleAlert, Video } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
-import logoSvg from '../assets/logo.svg';
+import logo from '../assets/logo-falldetect.svg';
 
 // Isinya mengikuti perilaku sistem sebenarnya (docs/architecture.md, prinsip privasi).
 // Angka masa simpan adalah bawaan; pengelola bisa mengubahnya di backend/.env.
@@ -117,7 +117,7 @@ export default function LandingPage() {
                     <div className="flex items-center gap-2.5">
                         {/* Di HP logo diperkecil dan subjudul disembunyikan, supaya tombol masuk
                             tidak menimpa nama FallDetect di layar 360 px. */}
-                        <img src={logoSvg} alt="" className="w-12 h-12 sm:w-20 sm:h-20 object-contain" />
+                        <img src={logo} alt="" className="w-12 h-12 sm:w-20 sm:h-20 object-contain" />
                         <div>
                             <span className="text-2xl sm:text-3xl font-bold tracking-tight block text-slate-900 dark:text-white">FallDetect</span>
                             <span className="hidden sm:block text-2xs text-emerald-700 dark:text-emerald-400 font-medium">Pemantauan jatuh untuk panti</span>
