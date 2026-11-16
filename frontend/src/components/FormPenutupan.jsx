@@ -58,7 +58,10 @@ export default function FormPenutupan({ alert, onSelesai, onBatal, polos = false
     const [sibuk, setSibuk] = useState(false);
     const [galat, setGalat] = useState('');
 
-    const siap = latihan || (putusan && (putusan !== 'palsu' || alasan));
+    // Alasan "Lainnya" wajib dijelaskan: tanpa penjelasan, alasan itu tidak bisa dipakai
+    // untuk memperbaiki model atau ambang.
+    const perluCatatan = putusan === 'palsu' && alasan === 'lainnya';
+    const siap = latihan || (putusan && (putusan !== 'palsu' || alasan) && (!perluCatatan || catatan.trim()));
 
     const kirim = async (e) => {
         e.preventDefault();
@@ -111,10 +114,11 @@ export default function FormPenutupan({ alert, onSelesai, onBatal, polos = false
 
             <label className="block text-sm">
                 <span className="font-medium">Catatan tindakan</span>{' '}
-                <span className="text-slate-500">({alasan === 'lainnya' ? 'jelaskan singkat' : 'opsional'})</span>
+                <span className="text-slate-500">({perluCatatan ? 'wajib, jelaskan singkat' : 'opsional'})</span>
                 <textarea
                     rows={2}
                     maxLength={500}
+                    required={perluCatatan}
                     value={catatan}
                     onChange={(e) => setCatatan(e.target.value)}
                     placeholder="Contoh: dibantu duduk, tidak ada luka."
@@ -141,7 +145,7 @@ export default function FormPenutupan({ alert, onSelesai, onBatal, polos = false
                 </button>
                 {!siap && !latihan && (
                     <p className="text-xs text-slate-500 self-center">
-                        {putusan === 'palsu' ? 'Pilih alasannya dulu.' : 'Pilih salah satu jawaban dulu.'}
+                        {!putusan ? 'Pilih salah satu jawaban dulu.' : !alasan && putusan === 'palsu' ? 'Pilih alasannya dulu.' : 'Tulis singkat alasannya di catatan.'}
                     </p>
                 )}
             </div>

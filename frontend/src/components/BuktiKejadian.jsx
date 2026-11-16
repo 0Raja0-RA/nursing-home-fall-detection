@@ -168,7 +168,8 @@ function PemutarKlip({ alert, onTutup }) {
                             : <Play className="w-5 h-5" aria-hidden="true" />}
                 </button>
                 <div className="flex-1 min-w-0 pb-6">
-                    <input type="range" min={0} max={n - 1} step={1} value={idx}
+                    {/* data-simpan-langsung: menggeser klip bukan isian formulir yang perlu dijaga Dialog. */}
+                    <input type="range" min={0} max={n - 1} step={1} value={idx} data-simpan-langsung
                         onChange={(e) => { setJalan(false); setIdx(Number(e.target.value)); }}
                         aria-label="Posisi klip" aria-valuetext={teksWaktu(frame.t)}
                         className="w-full accent-slate-900 dark:accent-slate-100" />

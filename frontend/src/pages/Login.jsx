@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Mail, Lock, LogIn, ArrowLeft, AlertCircle, Eye } from 'lucide-react';
+import { Mail, Lock, LogIn, ArrowLeft, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { api, PESAN_TERPUTUS } from '../api';
 import { useAuth } from '../context/auth';
 import logo from '../assets/logo-falldetect.svg';
 
-const INPUT = 'w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl py-3 pl-11 pr-4 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm';
+const INPUT = 'w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl py-3 pl-11 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm';
 
 /**
  * Token pengunjung dari QR di stand: /lihat#t=TOKEN.
@@ -24,6 +24,7 @@ export default function Login() {
     const { status, sesiHabis, masuk, masukPengunjung } = useAuth();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [lihatSandi, setLihatSandi] = useState(false);
     const [errorMsg, setErrorMsg] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [infoBackend, setInfoBackend] = useState(null);   // { ada_akun, pengunjung_aktif }
@@ -63,6 +64,7 @@ export default function Login() {
 
     const handleLogin = (e) => {
         e.preventDefault();
+        if (isLoading) return;
         jalankan(() => masuk(email, password));
     };
 
@@ -72,7 +74,7 @@ export default function Login() {
             {/* Tombol Kembali */}
             <button
                 onClick={() => navigate('/')}
-                className="absolute top-6 left-6 flex items-center gap-2 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors text-sm font-medium"
+                className="absolute top-6 left-6 flex items-center gap-2 pointer-coarse:min-h-11 pointer-coarse:top-3 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors text-sm font-medium"
             >
                 <ArrowLeft className="w-4 h-4" /> Kembali ke Beranda
             </button>
@@ -101,7 +103,7 @@ export default function Login() {
                 )}
 
                 {errorMsg && (
-                    <div role="alert" className="mb-6 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-xs text-red-600 dark:text-red-400 flex items-center gap-2">
+                    <div role="alert" className="mb-6 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-xs text-red-700 dark:text-red-400 flex items-center gap-2">
                         <AlertCircle className="w-4 h-4 flex-shrink-0" aria-hidden="true" />
                         <span>{errorMsg}</span>
                     </div>
@@ -126,10 +128,11 @@ export default function Login() {
                                 autoCorrect="off"
                                 spellCheck={false}
                                 enterKeyHint="next"
+                                maxLength={64}
                                 required
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
-                                className={INPUT}
+                                className={`${INPUT} pr-4`}
                                 placeholder="nama@panti.com"
                             />
                         </div>
@@ -146,23 +149,36 @@ export default function Login() {
                             </div>
                             <input
                                 id="password"
-                                type="password"
+                                type={lihatSandi ? 'text' : 'password'}
                                 autoComplete="current-password"
                                 enterKeyHint="go"
                                 required
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
-                                className={INPUT}
+                                className={`${INPUT} pr-12`}
                                 placeholder="••••••••"
                             />
+                            {/* Mengetik sandi di HP mudah salah; sandi bisa diperiksa sebelum dikirim. */}
+                            <button
+                                type="button"
+                                onClick={() => setLihatSandi((v) => !v)}
+                                aria-pressed={lihatSandi}
+                                aria-label="Tampilkan kata sandi"
+                                title={lihatSandi ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'}
+                                className="absolute inset-y-0 right-0 w-11 flex items-center justify-center rounded-r-xl text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+                            >
+                                {lihatSandi ? <EyeOff className="w-5 h-5" aria-hidden="true" /> : <Eye className="w-5 h-5" aria-hidden="true" />}
+                            </button>
                         </div>
                     </div>
 
                     {/* Tombol Submit */}
+                    {/* aria-disabled, bukan disabled: tombol yang dinonaktifkan kehilangan fokus, dan
+                        setelah galat fokusnya jatuh ke <body>. */}
                     <button
                         type="submit"
-                        disabled={isLoading}
-                        className="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-emerald-700/30 transition-colors flex items-center justify-center gap-2 disabled:opacity-70 text-sm"
+                        aria-disabled={isLoading}
+                        className="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-emerald-700/30 transition-colors flex items-center justify-center gap-2 aria-disabled:opacity-70 text-sm"
                     >
                         {isLoading ? 'Memeriksa…' : <><LogIn className="w-5 h-5" aria-hidden="true" /> Masuk ke Dashboard</>}
                     </button>
@@ -173,9 +189,9 @@ export default function Login() {
                     <div className="mt-6 pt-6 border-t border-slate-200 dark:border-slate-800">
                         <button
                             type="button"
-                            onClick={() => jalankan(() => masukPengunjung(tokenQr))}
-                            disabled={isLoading}
-                            className="w-full min-h-11 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-100 font-medium text-sm flex items-center justify-center gap-2 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-70"
+                            onClick={() => { if (!isLoading) jalankan(() => masukPengunjung(tokenQr)); }}
+                            aria-disabled={isLoading}
+                            className="w-full min-h-11 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-100 font-medium text-sm flex items-center justify-center gap-2 hover:bg-slate-100 dark:hover:bg-slate-800 aria-disabled:opacity-70"
                         >
                             <Eye className="w-5 h-5" aria-hidden="true" /> Masuk sebagai pengunjung
                         </button>

@@ -31,10 +31,13 @@ export function jamDari(ms) {
  *   ambang: batas sebelum alarm, dalam detik (boleh kosong).
  *   latihan: dipicu Mode latihan, bukan kejadian sungguhan.
  *   sisaJeda: detik tersisa Mode perawatan; 0 atau kosong bila tidak dijeda.
+ *   tanpaKabar: dashboard tidak mendapat jawaban dari server, jadi keadaan kamera tidak
+ *     diketahui. Tampil seperti Terputus (prinsip 2), dengan kata yang jujur.
  *
  * Returns: { kode, label }. kode menentukan bentuk dan warna di StatusKamera.
  */
-export function bacaStatus({ aktif, state, adaOrang, durasi, ambang, latihan, sisaJeda }) {
+export function bacaStatus({ aktif, state, adaOrang, durasi, ambang, latihan, sisaJeda, tanpaKabar }) {
+    if (tanpaKabar) return { kode: 'terputus', label: 'Tanpa kabar dari server' };
     if (!aktif) return { kode: 'terputus', label: 'Terputus' };
     if (sisaJeda > 0) return { kode: 'perawatan', label: `Mode perawatan ${mmss(sisaJeda)}` };
     const awalan = latihan ? 'Latihan · ' : '';

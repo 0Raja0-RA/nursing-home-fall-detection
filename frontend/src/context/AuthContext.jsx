@@ -21,9 +21,13 @@ export function AuthProvider({ children }) {
             if (r.ok) {
                 setAkun(await r.json());
                 setStatus('masuk');
-            } else {
+            } else if (r.status === 401 || r.status === 403) {
                 setAkun(null);
                 setStatus('keluar');
+            } else {
+                // Galat server (5xx) bukan tanda sesi berakhir: pengguna tidak dilempar ke Login
+                // tanpa penjelasan, melainkan melihat layar server bermasalah dengan Coba lagi.
+                setStatus('terputus');
             }
         } catch {
             setStatus('terputus');

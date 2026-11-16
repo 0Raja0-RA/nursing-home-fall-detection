@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, NavLink, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, History, Settings as SettingsIcon, Video, Sun, Moon, LogOut, Menu, X, Loader2, ServerOff, ALargeSmall } from 'lucide-react';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
@@ -7,7 +7,6 @@ import logoKecil from './assets/logo-falldetect-kecil.svg';
 import LayarDinding from './pages/LayarDinding';
 import { AuthProvider } from './context/AuthContext';
 import { useAuth, usePengunjung } from './context/auth';
-import { API_BASE } from './config';
 import AlertBanner from './components/AlertBanner';
 import ToastProvider from './components/Toast';
 
@@ -36,7 +35,8 @@ function Lencana({ ringkasan }) {
           ? 'bg-amber-100 text-amber-900 ring-1 ring-inset ring-amber-600 dark:bg-amber-950 dark:text-amber-200 dark:ring-amber-400'
           : 'bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-100'}`}
     >
-      {ringkasan.perlu_tindakan}
+      {/* Empat digit melipat label menu; jumlah pastinya ada di Riwayat Insiden. */}
+      {ringkasan.perlu_tindakan > 999 ? '999+' : ringkasan.perlu_tindakan}
       <span className="sr-only"> perlu tindakan</span>
     </span>
   );
@@ -88,9 +88,11 @@ function TataLetakDashboard() {
         fixed md:sticky md:top-0 md:h-dvh md:self-start inset-y-0 left-0 z-50
         w-64 in-[.teks-besar]:w-72 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800
         flex flex-col p-4 shrink-0 overflow-y-auto overscroll-contain
-        transition-transform duration-300 ease-laci motion-reduce:transition-none
-        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+        transition-[translate,visibility] duration-300 ease-laci motion-reduce:transition-none
+        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0 max-md:invisible'}
       `}>
+        {/* max-md:invisible: menu yang tertutup di HP tidak menerima fokus Tab dan tidak dibacakan.
+            visibility ikut ditransisikan, jadi menu tetap terlihat selama bergeser keluar. */}
         <div className="mb-8 px-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             {/* Versi kecil logo (perisai dan salib): logo lengkap baru terbaca mulai 48 px. */}
@@ -101,7 +103,7 @@ function TataLetakDashboard() {
           <button
             onClick={() => setSidebarOpen(false)}
             aria-label="Tutup menu"
-            className="md:hidden p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+            className="md:hidden size-11 -mr-2.5 inline-flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
           >
             <X className="w-5 h-5" />
           </button>
@@ -142,7 +144,7 @@ function TataLetakDashboard() {
             ) : (
               <>
                 <p className="text-xs text-slate-500">Sedang bertugas</p>
-                <p className="font-semibold text-sm truncate">{akun?.display_name}</p>
+                <p className="font-semibold text-sm truncate" title={akun?.display_name}>{akun?.display_name}</p>
                 <p className="text-xs text-slate-500">{akun?.role === 'pengelola' ? 'Pengelola' : 'Perawat'}</p>
               </>
             )}
@@ -152,7 +154,7 @@ function TataLetakDashboard() {
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setDarkMode(!darkMode)}
-                className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:opacity-80 transition-opacity"
+                className="p-2.5 pointer-coarse:p-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:opacity-80 transition-opacity"
                 title="Ubah tema"
                 aria-label="Ubah tema"
               >
@@ -161,7 +163,7 @@ function TataLetakDashboard() {
               <button
                 onClick={() => setTeksBesar(!teksBesar)}
                 aria-pressed={teksBesar}
-                className={`p-2.5 rounded-xl hover:opacity-80 transition-opacity ${teksBesar
+                className={`p-2.5 pointer-coarse:p-3 rounded-xl hover:opacity-80 transition-opacity ${teksBesar
                   ? 'bg-slate-200 text-slate-900 ring-1 ring-inset ring-slate-900 dark:bg-slate-700 dark:text-slate-100 dark:ring-slate-100'
                   : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'}`}
                 title="Teks besar"
@@ -172,7 +174,7 @@ function TataLetakDashboard() {
             </div>
             <button
               onClick={keluarSekarang}
-              className="flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-medium hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              className="flex items-center gap-2 px-3 py-2 pointer-coarse:min-h-11 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-medium hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
             >
               <LogOut className="w-4 h-4" /> Keluar
             </button>
@@ -191,7 +193,7 @@ function TataLetakDashboard() {
             type="button"
             onClick={() => setSidebarOpen(true)}
             aria-label="Buka menu"
-            className="p-2 -ml-2 rounded-lg text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+            className="size-11 -ml-2.5 inline-flex items-center justify-center rounded-lg text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
           >
             <Menu className="w-5 h-5" />
           </button>
@@ -237,12 +239,31 @@ function LayarPenuh({ children }) {
 function Terlindungi({ children }) {
   const { status, periksa } = useAuth();
   const lokasi = useLocation();
+  // Pemeriksaan sesi yang menggantung (server lambat) tidak boleh berputar tanpa kabar.
+  const [lama, setLama] = useState(false);
+  useEffect(() => {
+    if (status !== 'memuat') return undefined;
+    const t = setTimeout(() => setLama(true), 8000);
+    return () => { clearTimeout(t); setLama(false); };
+  }, [status]);
 
   if (status === 'memuat') {
     return (
       <LayarPenuh>
         <Loader2 className="w-6 h-6 animate-spin" aria-hidden="true" />
-        <p className="text-sm">Memeriksa sesi…</p>
+        <p className="text-sm" role="status">Memeriksa sesi…</p>
+        {lama && (
+          <>
+            <p className="text-sm text-slate-500 max-w-sm">Lebih lama dari biasanya. Server FallDetect mungkin sedang sibuk atau jaringannya lambat.</p>
+            <button
+              type="button"
+              onClick={periksa}
+              className="min-h-11 px-4 rounded-xl border border-slate-300 dark:border-slate-700 text-sm font-medium hover:bg-slate-100 dark:hover:bg-slate-800"
+            >
+              Coba lagi
+            </button>
+          </>
+        )}
       </LayarPenuh>
     );
   }
@@ -250,9 +271,10 @@ function Terlindungi({ children }) {
     return (
       <LayarPenuh>
         <ServerOff className="w-8 h-8" aria-hidden="true" />
-        <p className="font-semibold">Backend tidak bisa dihubungi</p>
+        <p className="font-semibold">Server FallDetect tidak bisa dipakai</p>
         <p className="text-sm text-slate-500 max-w-sm">
-          Dashboard butuh backend di {API_BASE}. Jalankan run-backend.bat, lalu coba lagi.
+          Server tidak menjawab atau sedang bermasalah. Pastikan server di laptop jaga menyala
+          (run-backend.bat), lalu coba lagi.
         </p>
         <button
           type="button"

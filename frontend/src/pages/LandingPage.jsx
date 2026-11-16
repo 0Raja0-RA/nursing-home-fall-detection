@@ -9,13 +9,13 @@ import logo from '../assets/logo-falldetect.svg';
 const DATA_DISIMPAN = [
     {
         apa: 'Video langsung',
-        isi: 'Tidak direkam terus-menerus. Gambar diproses saat itu juga; hanya 30 detik terakhir yang ditahan di memori, dan baru disimpan bila ada alarm. Tampilan tiap kamera bisa utuh, buram, atau kerangka tubuh saja, dan kamera baru bawaannya buram.',
+        isi: 'Tidak direkam terus-menerus. Gambar diproses saat itu juga; hanya 45 detik terakhir yang ditahan di memori, dan baru disimpan bila ada alarm. Tampilan tiap kamera bisa utuh, buram, atau kerangka tubuh saja, dan kamera baru bawaannya buram.',
         siapa: 'tim perawat yang sudah masuk, dan pengunjung pameran lewat QR di stand, dengan tampilan yang sama',
     },
     {
         apa: 'Foto saat alarm',
         isi: 'Satu foto per alarm, dalam tampilan privasi kamera yang sama dengan videonya, dihapus otomatis setelah 30 hari. Foto yang dikirim ke grup Telegram bawaannya diburamkan, dan pesannya tidak bisa diteruskan atau disimpan.',
-        siapa: 'siapa pun yang bisa melihat videonya di dasbor, dan anggota grup Telegram perawat dalam versi buram',
+        siapa: 'siapa pun yang bisa melihat videonya di dasbor, dan anggota grup Telegram perawat, bawaannya dalam versi buram',
     },
     {
         apa: 'Klip kejadian',
@@ -201,8 +201,9 @@ export default function LandingPage() {
                         </h2>
                         <p className="mt-4 text-slate-600 dark:text-slate-400 leading-relaxed">
                             Gambar dari kamar penghuni adalah data kesehatan. Database, foto, dan klip tersimpan di komputer
-                            yang menjalankan FallDetect; yang keluar hanya pesan alarm ke grup Telegram perawat. Tidak ada
-                            pengenalan wajah.
+                            yang menjalankan FallDetect. Yang dikirim ke luar hanya pesan ke grup Telegram perawat (alarm,
+                            pengingat, dan kabar kamera), dan saat pameran, tampilan dashboard untuk pengunjung yang memindai
+                            QR. Tidak ada pengenalan wajah.
                         </p>
                     </div>
                     <dl className="divide-y divide-slate-200 dark:divide-slate-800">

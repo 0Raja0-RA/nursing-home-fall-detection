@@ -111,7 +111,8 @@ export function Penjelasan({ judul, children }) {
     return (
         <MenuKecil judul={judul} pemicu={(p) => (
             <button type="button" {...p} aria-label={`Penjelasan: ${judul}`}
-                className="inline-flex items-center justify-center w-6 h-6 shrink-0 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:text-slate-500 dark:hover:text-slate-200 dark:hover:bg-slate-800">
+                // Di layar sentuh sasaran 44 px; margin negatif menjaga tata letak kartunya.
+                className="inline-flex items-center justify-center w-6 h-6 pointer-coarse:size-11 pointer-coarse:-m-2.5 shrink-0 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:text-slate-500 dark:hover:text-slate-200 dark:hover:bg-slate-800">
                 <Info className="w-4 h-4" aria-hidden="true" />
             </button>
         )}>

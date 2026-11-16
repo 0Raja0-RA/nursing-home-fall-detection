@@ -18,6 +18,21 @@ export default function Dialog({ judul, keterangan, onTutup, onEsc, children, le
     const ref = useRef(null);
     const idJudul = useId();
 
+    // Isian yang sudah diubah tidak dibuang oleh ketukan meleset di latar atau Esc: selama
+    // masih ada formulir yang diisi, penutupan seperti itu bertanya dulu. Tombol Tutup dan
+    // Batal tetap langsung menutup, karena itu pilihan yang disengaja. Kontrol yang tersimpan
+    // seketika (di dalam [data-simpan-langsung]) tidak dihitung sebagai isian.
+    const diubah = useRef(false);
+    // Formulir yang terakhir dikirim. Bila masih terpasang (mis. simpannya gagal), isiannya
+    // masih ada dan belum tersimpan; formulir yang berhasil biasanya hilang dari laci.
+    const formTerkirim = useRef(null);
+    const adaIsianBelumTersimpan = () => Boolean(ref.current?.querySelector('form'))
+        && (diubah.current || Boolean(formTerkirim.current?.isConnected));
+    const tutupBila = (tutup) => {
+        if (!adaIsianBelumTersimpan() || window.confirm('Tutup tanpa menyimpan? Isian yang sudah diubah akan hilang.')) tutup();
+    };
+    const bukanSimpanLangsung = (e) => !(e.target instanceof Element && e.target.closest('[data-simpan-langsung]'));
+
     // useLayoutEffect, bukan useEffect: pembersihannya berjalan sebelum React melepas
     // <dialog> dari halaman, jadi close() masih sempat mengembalikan fokus ke pembukanya.
     useLayoutEffect(() => {
@@ -50,7 +65,8 @@ export default function Dialog({ judul, keterangan, onTutup, onEsc, children, le
             ? 'sticky top-0 z-10 flex items-start justify-between gap-3 px-4 py-3 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900'
             : 'flex items-start justify-between gap-3'}>
             <div className="min-w-0">
-                <h2 id={idJudul} className="font-semibold text-lg leading-snug">{judul}</h2>
+                {/* wrap-anywhere: nama ruang tanpa spasi terlipat, tidak menabrak tombol Tutup. */}
+                <h2 id={idJudul} className="font-semibold text-lg leading-snug wrap-anywhere">{judul}</h2>
                 {keterangan && <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{keterangan}</p>}
             </div>
             <button type="button" onClick={onTutup} aria-label="Tutup"
@@ -65,14 +81,23 @@ export default function Dialog({ judul, keterangan, onTutup, onEsc, children, le
             ref={ref}
             aria-labelledby={idJudul}
             // Esc menutup dialog, kecuali onEsc memutuskan lain (mis. selama formulir di
-            // dalam laci masih terbuka, supaya ketikannya tidak hilang).
-            onCancel={(e) => { e.preventDefault(); (onEsc || onTutup)(); }}
+            // dalam laci masih terbuka, supaya ketikannya tidak hilang). onEsc yang memutuskan
+            // sendiri tidak ditanyai lagi.
+            onCancel={(e) => { e.preventDefault(); if (onEsc) onEsc(); else tutupBila(onTutup); }}
+            // Mengetik atau memilih menandai isian. Mengirim formulir memindahkan tandanya ke
+            // formulir itu: selama ia masih terpasang, isiannya dianggap belum tersimpan.
+            onInput={(e) => { if (bukanSimpanLangsung(e)) diubah.current = true; }}
+            onSubmit={(e) => {
+                if (!bukanSimpanLangsung(e)) return;
+                diubah.current = false;
+                formTerkirim.current = e.target;
+            }}
             // Browser bisa menutup dialog tanpa bisa dicegah, mis. Esc kedua tanpa interaksi
             // lain di antaranya. Keadaan React disamakan di sini. Dialog yang sudah terbuka
             // lagi (StrictMode memasang ulang efeknya) diabaikan.
             onClose={() => { if (!ref.current?.open) onTutup(); }}
             // Klik di latar (bukan di isi) mengenai elemen dialog itu sendiri.
-            onClick={(e) => { if (e.target === ref.current) onTutup(); }}
+            onClick={(e) => { if (e.target === ref.current) tutupBila(onTutup); }}
             // overscroll-contain: menggulir sampai ujung isi dialog tidak ikut menggulir halaman di belakangnya.
             className={`p-0 overscroll-contain border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 shadow-xl backdrop:bg-slate-950/60 ${bentuk}`}
         >

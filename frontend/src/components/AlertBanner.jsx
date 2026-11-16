@@ -13,6 +13,7 @@ import { jamDari } from '../statusKamera';
 import { durasiTeks, msDari, useJam } from '../waktu';
 import Dialog from './Dialog';
 import FormPenutupan from './FormPenutupan';
+import MenuKecil from './MenuKecil';
 
 const JUDUL_HALAMAN = 'FallDetect';
 const BISU_MENIT = 5;
@@ -57,20 +58,41 @@ const peringkat = (a) => (a.simulated ? 2 : 0) + (a.claimed_by ? 1 : 0);
 const bandingkan = (a, b) => peringkat(a) - peringkat(b)
     || msDari(a.created_at) - msDari(b.created_at) || a.id - b.id;
 
-/** Satu tombol di daftar alarm lain. Warnanya ada di ikon, supaya terbaca di latar apa pun. */
-function AlarmLain({ a, sekarang, onPilih }) {
+// Alarm lain yang tampil sebagai chip di banner: tiga di layar lebar, satu di HP. Sisanya ada di
+// daftar "+N lagi", supaya banner yang menempel tidak menutup layar saat alarm banyak.
+const MAKS_CHIP = 3;
+
+/**
+ * Satu tombol di daftar alarm lain. Warnanya ada di ikon, supaya terbaca di latar apa pun.
+ * Di chip, nama ruang tidak boleh menyusut habis; keterangannya yang dipotong lebih dulu.
+ * `penuh`: baris di daftar lengkap, tanpa pemotongan.
+ */
+function AlarmLain({ a, sekarang, onPilih, penuh = false, className = '' }) {
     const nama = a.camera_name || a.camera_id;
     const Ikon = a.simulated ? FlaskConical : a.claimed_by ? Footprints : TriangleAlert;
     const warna = a.simulated ? 'text-blue-700' : a.claimed_by ? 'text-amber-600' : 'text-red-700';
-    const keadaan = a.claimed_by
-        ? `${a.claimed_by} menuju`
-        : `belum direspons ${durasiTeks((sekarang - msDari(a.created_at)) / 1000)}`;
+    const keadaan = a.simulated
+        ? 'latihan'
+        : a.claimed_by
+            ? `${a.claimed_by} menuju`
+            : `belum direspons ${durasiTeks((sekarang - msDari(a.created_at)) / 1000)}`;
     return (
-        <button type="button" onClick={onPilih}
-            className="min-h-9 px-2.5 rounded-lg bg-white text-slate-900 border border-black/10 text-xs font-medium inline-flex items-center gap-1.5 hover:bg-slate-100 max-w-full">
-            <Ikon className={`w-3.5 h-3.5 shrink-0 ${warna}`} aria-hidden="true" />
-            <span className="truncate">{nama}</span>
-            <span className="font-normal text-slate-600 whitespace-nowrap">· {a.simulated ? 'latihan' : keadaan}</span>
+        <button type="button" onClick={onPilih} title={penuh ? undefined : `${nama} · ${keadaan}`}
+            className={`min-h-9 px-2.5 rounded-lg bg-white text-slate-900 border border-black/10 text-xs font-medium hover:bg-slate-100 ${penuh
+                ? 'w-full py-2 flex items-start gap-1.5 text-left'
+                : 'inline-flex items-center gap-1.5 max-w-full sm:max-w-80'} ${className}`}>
+            <Ikon className={`w-3.5 h-3.5 shrink-0 ${penuh ? 'mt-0.5' : ''} ${warna}`} aria-hidden="true" />
+            {penuh ? (
+                <span className="min-w-0 wrap-anywhere">
+                    {nama} <span className="font-normal text-slate-600">· {keadaan}</span>
+                </span>
+            ) : (
+                <>
+                    {/* Paling sedikit 6 huruf nama tetap terlihat; nama pendek tidak diberi ruang kosong. */}
+                    <span className={`${nama.length > 6 ? 'min-w-[6ch]' : ''} truncate`}>{nama}</span>
+                    <span className="min-w-0 shrink-[3] truncate font-normal text-slate-600">· {keadaan}</span>
+                </>
+            )}
         </button>
     );
 }
@@ -253,10 +275,11 @@ export default function AlertBanner() {
                     <div className="flex items-start gap-3 min-w-0 flex-1">
                         <Ikon className="w-6 h-6 shrink-0 mt-0.5" aria-hidden="true" />
                         <div className="min-w-0">
-                            <p className="font-semibold text-base">
+                            {/* wrap-anywhere: nama ruang tanpa spasi tetap terlipat, tidak terpotong di tepi layar. */}
+                            <p className="font-semibold text-base wrap-anywhere">
                                 {latihan ? `Latihan, ${nama}` : `Kemungkinan jatuh, ${nama}`}
                                 {urut.length > 1 && (
-                                    <span className={`ml-2 text-xs font-medium tabular-nums ${gaya.redup}`}>
+                                    <span className={`ml-2 text-xs font-medium tabular-nums whitespace-nowrap ${gaya.redup}`}>
                                         {urut.indexOf(a) + 1} dari {urut.length}
                                     </span>
                                 )}
@@ -321,11 +344,35 @@ export default function AlertBanner() {
                 </div>
 
                 {lain.length > 0 && (
-                    <div className="flex flex-wrap items-center gap-2" aria-label="Alarm lain">
-                        <span className={`text-xs ${gaya.redup}`}>Alarm lain:</span>
-                        {lain.map((x) => (
-                            <AlarmLain key={x.id} a={x} sekarang={sekarang} onPilih={() => { setMenutup(null); setFokusId(x.id); }} />
+                    <div role="group" aria-label="Alarm lain" className="flex max-sm:flex-nowrap sm:flex-wrap items-center gap-2 min-w-0">
+                        <span className={`text-xs shrink-0 ${gaya.redup}`}>Alarm lain:</span>
+                        {lain.slice(0, MAKS_CHIP).map((x, i) => (
+                            <AlarmLain key={x.id} a={x} sekarang={sekarang} className={i > 0 ? 'max-sm:hidden' : 'max-sm:min-w-0'}
+                                onPilih={() => { setMenutup(null); setFokusId(x.id); }} />
                         ))}
+                        {lain.length > 1 && (
+                            <MenuKecil
+                                judul={`Alarm lain (${lain.length})`}
+                                pemicu={(p) => (
+                                    <button type="button" {...p}
+                                        className={`min-h-9 px-2.5 rounded-lg border text-xs font-semibold shrink-0 whitespace-nowrap ${gaya.garis} ${lain.length > MAKS_CHIP ? '' : 'sm:hidden'}`}>
+                                        <span className="sm:hidden">+{lain.length - 1} lagi</span>
+                                        <span className="max-sm:hidden">+{lain.length - MAKS_CHIP} lagi</span>
+                                    </button>
+                                )}
+                            >
+                                {(tutup) => (
+                                    <ul className="space-y-1.5">
+                                        {lain.map((x) => (
+                                            <li key={x.id}>
+                                                <AlarmLain a={x} sekarang={sekarang} penuh
+                                                    onPilih={() => { tutup(); setMenutup(null); setFokusId(x.id); }} />
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
+                            </MenuKecil>
+                        )}
                     </div>
                 )}
             </div>
@@ -348,7 +395,8 @@ export default function AlertBanner() {
                 <div role="status" className="bg-amber-50 dark:bg-amber-950 border-b border-amber-500/30 text-amber-700 dark:text-amber-400 text-xs px-4 py-2 flex items-center gap-2">
                     <VolumeX className="w-4 h-4 shrink-0" aria-hidden="true" />
                     <span>Suara alarm belum aktif. Browser menunggu klik pertama di halaman ini.</span>
-                    <button type="button" onClick={aktifkanSuara} className="ml-auto font-semibold underline underline-offset-2 whitespace-nowrap">
+                    {/* Di layar sentuh tingginya 44 px; margin negatif menjaga tinggi strip. */}
+                    <button type="button" onClick={aktifkanSuara} className="ml-auto inline-flex items-center pointer-coarse:min-h-11 pointer-coarse:-my-3 px-1 font-semibold underline underline-offset-2 whitespace-nowrap">
                         Aktifkan suara
                     </button>
                 </div>

@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, ChevronRight, Download, FlaskConical, Inbox, Loader2, Plus } from 'lucide-react';
-import { api, bacaGalat, PESAN_TERPUTUS } from '../api';
+import { api, bacaGalat, PESAN_TERPUTUS, pesanGalat } from '../api';
 import { usePengunjung } from '../context/auth';
 import { useLive } from '../context/LiveContext';
 import { useToast } from '../context/toast';
@@ -18,7 +18,13 @@ const RENTANG = [
     { id: 'semua', label: 'Semua waktu' },
 ];
 const PER_HALAMAN = 50;
-const SELECT = 'bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500';
+// Batas baris per permintaan di backend (GET /api/alerts/, limit <= 200). Lebih dari itu
+// lewat filter rentang atau ruang, atau Unduh CSV yang memuat semuanya.
+const BATAS_API = 200;
+// max-w: pilihan ruang tidak selebar nama ruang terpanjang, supaya baris filter tidak pecah.
+const SELECT = 'max-w-full sm:max-w-64 pointer-coarse:min-h-11 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500';
+/** Angka dengan pemisah ribuan: 3.033, bukan 3033. */
+const angka = (n) => (typeof n === 'number' ? n.toLocaleString('id-ID') : n);
 
 // `bertumpuk`: tanggal di baris kedua, supaya kolom Waktu di tabel tidak memakan
 // lebar yang dibutuhkan kolom Penanganan di layar 1024 px.
@@ -70,32 +76,34 @@ function KartuMetrik({ metrik, perluTindakan, labelRentang, keAntrean, kePalsu }
         <section aria-label={`Angka ${labelRentang}, tanpa latihan`} className="mb-3">
             <p className="text-xs text-slate-500 mb-1.5">Angka {labelRentang.toLowerCase()}, tanpa latihan.</p>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 lg:gap-3">
-                <Kartu judul="Perlu tindakan" nilai={perluTindakan ?? '–'}
+                <Kartu judul="Perlu tindakan" nilai={angka(perluTindakan) ?? '–'}
                     keterangan="belum ditangani atau dinilai" onPilih={keAntrean} />
                 <Kartu judul="Median waktu respons"
                     nilai={metrik.median_respons_detik != null ? durasiTeks(metrik.median_respons_detik) : '–'}
-                    keterangan={metrik.jumlah_respons ? `dari ${metrik.jumlah_respons} alarm, sampai klaim` : 'belum ada respons'} />
+                    keterangan={metrik.jumlah_respons ? `dari ${angka(metrik.jumlah_respons)} alarm, sampai klaim` : 'belum ada respons'} />
                 <Kartu judul="Alarm palsu"
-                    nilai={dinilai ? `${metrik.palsu} dari ${dinilai}` : '–'}
+                    nilai={dinilai ? `${angka(metrik.palsu)} dari ${angka(dinilai)}` : '–'}
                     keterangan={dinilai ? `${persen}% dari yang dinilai` : 'belum ada yang dinilai'}
                     onPilih={kePalsu} />
-                <Kartu judul="Telegram gagal" nilai={metrik.telegram_gagal} peringatan={metrik.telegram_gagal > 0}
-                    keterangan={`dari ${metrik.total} alarm`} />
+                <Kartu judul="Telegram gagal" nilai={angka(metrik.telegram_gagal)} peringatan={metrik.telegram_gagal > 0}
+                    keterangan={`dari ${angka(metrik.total)} alarm`} />
                 {/* Recall: jatuh yang memicu alarm dibanding semua jatuh yang diketahui, termasuk yang
                     terlewat dan dicatat manual. Tanpa catatan terlewat, angka ini tidak bisa dihitung. */}
                 <Kartu judul="Jatuh terdeteksi"
-                    nilai={metrik.jatuh + metrik.terlewat ? `${metrik.jatuh} dari ${metrik.jatuh + metrik.terlewat}` : '–'}
+                    nilai={metrik.jatuh + metrik.terlewat ? `${angka(metrik.jatuh)} dari ${angka(metrik.jatuh + metrik.terlewat)}` : '–'}
                     keterangan={metrik.jatuh + metrik.terlewat
-                        ? `${metrik.terlewat} terlewat, dicatat manual`
+                        ? `${angka(metrik.terlewat)} terlewat, dicatat manual`
                         : 'belum ada jatuh tercatat'} />
             </div>
         </section>
     );
 }
 
+// Nama ruang boleh terlipat (juga nama tanpa spasi), supaya kolom Putusan, Telegram, dan
+// tombol detail tidak terdorong keluar tabel, dan kartu di HP tidak meluap.
 function Ruang({ alert }) {
     return (
-        <span className="inline-flex items-center gap-2 font-medium whitespace-nowrap">
+        <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-0.5 font-medium min-w-0 wrap-anywhere">
             {alert.camera_name || alert.camera_id}
             {alert.simulated && <FlaskConical className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" aria-label="Latihan" />}
             {alert.terlewat && (
@@ -114,13 +122,20 @@ const dua = (n) => String(n).padStart(2, '0');
  * Catat jatuh yang tidak memicu alarm, misalnya penghuni ditemukan di lantai. Tanpa catatan
  * ini, jatuh yang terlewat tidak pernah muncul di riwayat dan recall tidak bisa dihitung.
  */
-function FormTerlewat({ kamera, onSelesai, onBatal }) {
+function FormTerlewat({ kamera, galatKamera, onSelesai, onBatal }) {
     const [ruang, setRuang] = useState('');
     const terpilih = ruang || kamera[0]?.[0] || '';     // daftar kamera bisa datang sesudah formulir dibuka
     const [waktu, setWaktu] = useState('');
     const [catatan, setCatatan] = useState('');
     const [sibuk, setSibuk] = useState(false);
     const [galat, setGalat] = useState('');
+    // Galat dari server mendapat fokus: tombol Simpan nonaktif selama mengirim, jadi tanpa ini
+    // fokus jatuh ke <body>.
+    const refGalat = useRef(null);
+    useEffect(() => { if (galat) refGalat.current?.focus(); }, [galat]);
+    const d = new Date();
+    // Kejadian tidak mungkin di masa depan; browser menolak sebelum dikirim.
+    const batasWaktu = `${d.getFullYear()}-${dua(d.getMonth() + 1)}-${dua(d.getDate())}T23:59`;
 
     const isiSekarang = () => {
         const d = new Date();
@@ -155,8 +170,10 @@ function FormTerlewat({ kamera, onSelesai, onBatal }) {
                         </select>
                     </label>
                 ) : (
-                    <p className="text-sm text-slate-500 self-center">
-                        Belum ada kamera terdaftar. Tambahkan dulu di Daftar Kamera.
+                    <p role={galatKamera ? 'alert' : undefined} className="text-sm text-slate-500 self-center">
+                        {galatKamera
+                            ? 'Daftar ruang tidak bisa dimuat dari server. Tutup formulir ini lalu buka lagi untuk mencoba ulang.'
+                            : 'Belum ada kamera terdaftar. Tambahkan dulu di Daftar Kamera.'}
                     </p>
                 )}
                 {/* Tombol di luar <label>: label tanpa htmlFor menamai elemen pertama di dalamnya,
@@ -169,7 +186,7 @@ function FormTerlewat({ kamera, onSelesai, onBatal }) {
                         </button>
                     </div>
                     <input id="terlewat-waktu" type="datetime-local" value={waktu} onChange={(e) => setWaktu(e.target.value)}
-                        required className={`${INPUT} mt-1`} />
+                        max={batasWaktu} required className={`${INPUT} mt-1`} />
                 </div>
             </div>
             <label className="block text-sm font-medium">
@@ -177,7 +194,7 @@ function FormTerlewat({ kamera, onSelesai, onBatal }) {
                 <textarea value={catatan} onChange={(e) => setCatatan(e.target.value)} rows={2} maxLength={500}
                     placeholder="Mis. ditemukan di lantai kamar mandi, sadar, dibantu duduk" className={`${INPUT} mt-1`} />
             </label>
-            {galat && <p role="alert" className="text-sm text-red-700 dark:text-red-400">{galat}</p>}
+            {galat && <p ref={refGalat} tabIndex={-1} role="alert" className="text-sm text-red-700 dark:text-red-400 focus:outline-none">{galat}</p>}
             <div className="flex justify-end gap-2 pt-1">
                 <button type="button" onClick={onBatal} className="min-h-10 px-4 rounded-lg border border-slate-300 dark:border-slate-700 text-sm font-medium hover:bg-slate-100 dark:hover:bg-slate-800">
                     Batal
@@ -212,9 +229,11 @@ export default function AlertHistory() {
 
     const [daftar, setDaftar] = useState([]);
     const [adaLagi, setAdaLagi] = useState(false);
+    const [mentok, setMentok] = useState(false);     // sudah BATAS_API baris; sisanya lewat filter atau CSV
     const [memuat, setMemuat] = useState(true);
     const [galat, setGalat] = useState('');
     const [kamera, setKamera] = useState([]);
+    const [galatKamera, setGalatKamera] = useState(false);
     const [metrik, setMetrik] = useState(null);
     const [formTerlewat, setFormTerlewat] = useState(false);
     const kabari = useToast();
@@ -241,16 +260,18 @@ export default function AlertHistory() {
 
     const ambil = useCallback(async () => {
         const q = saringan();
-        q.set('limit', String(batas + 1));
+        // Satu baris lebih untuk tahu masih ada lagi, tanpa melewati batas backend (422).
+        q.set('limit', String(Math.min(batas + 1, BATAS_API)));
         try {
             const r = await api(`/api/alerts/?${q}`);
-            if (!r.ok) throw new Error(String(r.status));
+            if (!r.ok) throw new Error(`Riwayat tidak bisa dimuat: ${await bacaGalat(r)}`);
             const d = await r.json();
             setDaftar(d.slice(0, batas));
             setAdaLagi(d.length > batas);
+            setMentok(batas >= BATAS_API && d.length >= BATAS_API);
             setGalat('');
-        } catch {
-            setGalat(PESAN_TERPUTUS);
+        } catch (err) {
+            setGalat(pesanGalat(err));
         } finally {
             setMemuat(false);
         }
@@ -307,12 +328,21 @@ export default function AlertHistory() {
         ambilMetrik();
     }, [ambilMetrik, alarmAktif, ringkasan]);
 
-    useEffect(() => {
+    const ambilKamera = useCallback(() => {
         api('/api/cameras/')
-            .then((r) => (r.ok ? r.json() : []))
-            .then((d) => setKamera(d.map((c) => ({ id: c.camera_id, nama: c.name }))))
-            .catch(() => { /* filter ruang tetap berisi ruang dari daftar insiden */ });
+            .then((r) => {
+                if (!r.ok) throw new Error(String(r.status));
+                return r.json();
+            })
+            .then((d) => {
+                setKamera(d.map((c) => ({ id: c.camera_id, nama: c.name })));
+                setGalatKamera(false);
+            })
+            // Filter ruang tetap berisi ruang dari daftar insiden; formulir Catat jatuh terlewat
+            // memberi tahu bahwa daftar ruangnya gagal dimuat, bukan "belum ada kamera".
+            .catch(() => setGalatKamera(true));
     }, []);
+    useEffect(() => { ambilKamera(); }, [ambilKamera]);
 
     // Ruang yang kameranya sudah dihapus tetap bisa dipilih, dengan nama saat kejadian.
     const pilihanKamera = useMemo(() => {
@@ -336,7 +366,9 @@ export default function AlertHistory() {
 
     const detailSegar = detail ? (daftar.find((a) => a.id === detail.id) || detail) : null;
     // Tab aktif: garis bawah di latar yang sedikit terangkat, bukan blok terbalik (prinsip 3).
-    const tabKelas = (aktif) => `min-h-9 px-3.5 rounded-lg text-sm font-medium inline-flex items-center gap-2 whitespace-nowrap ${aktif
+    // Di HP ketiga tab berbagi lebar layar dan labelnya boleh terlipat; di 360 px "Ringkasan
+    // shift" sebelumnya terpotong di luar layar.
+    const tabKelas = (aktif) => `flex-1 sm:flex-none min-h-9 pointer-coarse:min-h-11 px-2 sm:px-3.5 rounded-lg text-sm font-medium inline-flex flex-wrap items-center justify-center gap-x-2 text-center sm:whitespace-nowrap ${aktif
         ? 'bg-slate-100 text-slate-900 shadow-[inset_0_-2px_0_var(--color-slate-900)] dark:bg-slate-800 dark:text-slate-100 dark:shadow-[inset_0_-2px_0_var(--color-slate-100)]'
         : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`;
     const tombolKepala = 'min-h-10 px-3 rounded-lg border border-slate-300 dark:border-slate-700 text-sm font-medium inline-flex items-center gap-2 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-60';
@@ -346,8 +378,9 @@ export default function AlertHistory() {
         /* Mulai 1024 px halaman ini setinggi layar dikurangi banner alarm (--tinggi-banner,
            diisi AlertBanner) dan tidak menggulir: bagian atas diam, tabel mengisi sisa
            tinggi, dan hanya barisnya yang menggulir di bawah kepala tabel yang menempel.
-           Di bawah 1024 px halaman mengalir dan menggulir seperti biasa. */
-        <div className="p-4 md:p-6 lg:px-8 lg:pt-6 lg:pb-5 w-full max-w-full min-w-0 lg:h-[calc(100dvh-var(--tinggi-banner,0px))] lg:flex lg:flex-col lg:overflow-hidden">
+           Di bawah 1024 px halaman mengalir dan menggulir seperti biasa. Tinggi minimumnya
+           menjaga tabel tetap terbaca saat banner alarm tinggi; sisanya digulir halaman. */
+        <div className="p-4 md:p-6 lg:px-8 lg:pt-6 lg:pb-5 w-full max-w-full min-w-0 lg:h-[calc(100dvh-var(--tinggi-banner,0px))] lg:min-h-[30rem] lg:flex lg:flex-col lg:overflow-hidden">
             <div className="mb-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div className="min-w-0">
                     <h1 className="text-xl md:text-2xl font-bold">Riwayat Insiden</h1>
@@ -357,7 +390,8 @@ export default function AlertHistory() {
                 </div>
                 {!pengunjung && tab !== 'shift' && (
                     <div className="flex flex-wrap gap-2 shrink-0">
-                        <button type="button" onClick={() => setFormTerlewat(true)} aria-haspopup="dialog" className={tombolKepala}>
+                        <button type="button" aria-haspopup="dialog" className={tombolKepala}
+                            onClick={() => { if (galatKamera) ambilKamera(); setFormTerlewat(true); }}>
                             <Plus className="w-4 h-4" aria-hidden="true" /> Catat jatuh terlewat
                         </button>
                         <button type="button" onClick={unduh} disabled={mengunduh}
@@ -381,19 +415,21 @@ export default function AlertHistory() {
             />}
 
             <div className="flex flex-wrap items-center gap-2 mb-3">
-                <div role="tablist" aria-label="Kelompok insiden" className="inline-flex self-start shrink-0 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-1 gap-1">
-                    <button type="button" role="tab" aria-selected={tab === 'perlu_tindakan'}
+                {/* Kelompok tombol beralih (aria-pressed), bukan role="tab": pola tab menjanjikan
+                    tabpanel dan navigasi panah yang tidak ada di sini. */}
+                <div role="group" aria-label="Kelompok insiden" className="flex w-full sm:inline-flex sm:w-auto self-start shrink-0 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-1 gap-1">
+                    <button type="button" aria-pressed={tab === 'perlu_tindakan'}
                         onClick={() => { setTab('perlu_tindakan'); setBatas(PER_HALAMAN); }}
                         className={tabKelas(tab === 'perlu_tindakan')}>
                         Perlu tindakan
-                        {ringkasan && <span className="tabular-nums font-normal">({ringkasan.perlu_tindakan})</span>}
+                        {ringkasan && <span className="tabular-nums font-normal">({angka(ringkasan.perlu_tindakan)})</span>}
                     </button>
-                    <button type="button" role="tab" aria-selected={tab === 'semua'}
+                    <button type="button" aria-pressed={tab === 'semua'}
                         onClick={() => { setTab('semua'); setBatas(PER_HALAMAN); }}
                         className={tabKelas(tab === 'semua')}>
                         Semua
                     </button>
-                    <button type="button" role="tab" aria-selected={tab === 'shift'}
+                    <button type="button" aria-pressed={tab === 'shift'}
                         onClick={() => setTab('shift')}
                         className={tabKelas(tab === 'shift')}>
                         Ringkasan shift
@@ -436,6 +472,7 @@ export default function AlertHistory() {
                     <FormTerlewat
                         // Hanya kamera terdaftar: ruang yang kameranya sudah dihapus tidak bisa dicatat.
                         kamera={kamera.map((k) => [k.id, k.nama])}
+                        galatKamera={galatKamera}
                         onBatal={() => setFormTerlewat(false)}
                         onSelesai={(a) => {
                             setFormTerlewat(false);
@@ -468,12 +505,16 @@ export default function AlertHistory() {
                     <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-10 text-center">
                         <Inbox className="w-8 h-8 mx-auto text-slate-400" aria-hidden="true" />
                         <p className="mt-3 font-semibold">
-                            {tab === 'perlu_tindakan' ? 'Tidak ada yang perlu ditindaklanjuti' : 'Tidak ada insiden pada pilihan ini'}
+                            {tab !== 'perlu_tindakan'
+                                ? 'Tidak ada insiden pada pilihan ini'
+                                : kameraId ? 'Tidak ada yang perlu ditindaklanjuti di ruang ini' : 'Tidak ada yang perlu ditindaklanjuti'}
                         </p>
                         <p className="text-sm text-slate-500 mt-1">
-                            {tab === 'perlu_tindakan'
-                                ? 'Semua alarm sudah ditangani dan dinilai.'
-                                : 'Ubah filter ruang, putusan, atau rentang waktu.'}
+                            {tab !== 'perlu_tindakan'
+                                ? 'Ubah filter ruang, putusan, atau rentang waktu.'
+                                : kameraId
+                                    ? 'Filter ruang masih aktif. Pilih Semua ruang untuk melihat seluruh antrean.'
+                                    : 'Semua alarm sudah ditangani dan dinilai.'}
                         </p>
                     </div>
                 ) : (
@@ -520,6 +561,11 @@ export default function AlertHistory() {
                                         </button>
                                     </div>
                                 )}
+                                {mentok && (
+                                    <p className="p-3 text-center text-sm text-slate-500 border-t border-slate-200 dark:border-slate-800">
+                                        Menampilkan {BATAS_API} insiden terbaru. Persempit rentang waktu atau ruang, atau unduh CSV untuk semuanya.
+                                    </p>
+                                )}
                             </div>
                         </div>
 
@@ -550,6 +596,11 @@ export default function AlertHistory() {
                                     Muat lebih banyak
                                 </button>
                             </div>
+                        )}
+                        {mentok && (
+                            <p className="lg:hidden mt-4 text-center text-sm text-slate-500">
+                                Menampilkan {BATAS_API} insiden terbaru. Persempit rentang waktu atau ruang, atau unduh CSV untuk semuanya.
+                            </p>
                         )}
                     </>
                 )}

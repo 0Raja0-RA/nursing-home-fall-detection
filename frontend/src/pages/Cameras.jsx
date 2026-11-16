@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { CheckCircle2, Clock, Info, Loader2, Plug, Plus, Power, Radar, ScanEye, Settings2, Trash2, Usb, VideoOff, X } from 'lucide-react';
-import { api, bacaGalat, PESAN_TERPUTUS } from '../api';
+import { api, bacaGalat, PESAN_TERPUTUS, pesanGalat } from '../api';
 import { API_BASE } from '../config';
 import { jamDari } from '../statusKamera';
 import { msDari, useJam } from '../waktu';
@@ -59,9 +59,19 @@ function daftarPeriksa(alamat) {
 }
 
 /** Status kamera beserta alasannya, bukan sekadar Terhubung atau Terputus. */
-function StatusKameraDaftar({ cam }) {
+function StatusKameraDaftar({ cam, tanpaKabar }) {
     const ms = msDari(cam.last_frame_at);
     const jam = Number.isFinite(ms) ? jamDari(ms) : null;
+    if (tanpaKabar) {
+        return (
+            <p className="text-xs text-slate-700 dark:text-slate-300">
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 mr-1.5 rounded border border-dashed border-slate-400 font-medium">
+                    <VideoOff className="w-3 h-3" aria-hidden="true" /> Tidak diketahui
+                </span>
+                Server tidak menjawab.
+            </p>
+        );
+    }
     if (!cam.enabled) {
         return (
             <p className="text-xs text-slate-500">
@@ -102,12 +112,12 @@ function StatusKameraDaftar({ cam }) {
 }
 
 /** Gambar diam terakhir kamera, disegarkan berkala. Bukan stream, supaya daftar ini ringan. */
-function GambarMini({ cam, t }) {
+function GambarMini({ cam, t, tanpaKabar = false }) {
     const src = `${API_BASE}/api/cameras/${cam.camera_id}/snapshot?t=${t}`;
     // Alamat gambar berganti setiap beberapa detik, jadi gambar yang tadi gagal
     // otomatis dicoba lagi: kamera yang tadi mati bisa sudah hidup.
     const [srcGagal, setSrcGagal] = useState(null);
-    const kosong = !cam.is_active || srcGagal === src;
+    const kosong = tanpaKabar || !cam.is_active || srcGagal === src;
     return (
         <div className="relative aspect-video bg-slate-950 rounded-xl overflow-hidden">
             {kosong ? (
@@ -138,7 +148,7 @@ const labelPrivasi = (id) => PRIVASI.find((p) => p.id === id)?.label || 'Utuh';
  * nama, alamat, nyala/mati, dan hapus. Kabarnya ditulis di dalam laci, karena toast
  * tertutup selama laci terbuka.
  */
-function PanelKamera({ cam, t, onUbah, onHapus }) {
+function PanelKamera({ cam, t, onUbah, onHapus, tanpaKabar = false }) {
     const [nama, setNama] = useState(cam.name);
     const [alamat, setAlamat] = useState('');
     const [sibuk, setSibuk] = useState('');
@@ -154,10 +164,12 @@ function PanelKamera({ cam, t, onUbah, onHapus }) {
     };
 
     return (
-        <div className="space-y-5">
+        // data-simpan-langsung: tiap pilihan di laci ini tersimpan seketika, dan nama serta alamat
+        // punya tombol simpannya sendiri, jadi Dialog tidak menanyakan isian saat laci ditutup.
+        <div className="space-y-5" data-simpan-langsung>
             <div>
-                <StatusKameraDaftar cam={cam} />
-                <div className="mt-2"><GambarMini cam={cam} t={t} /></div>
+                <StatusKameraDaftar cam={cam} tanpaKabar={tanpaKabar} />
+                <div className="mt-2"><GambarMini cam={cam} t={t} tanpaKabar={tanpaKabar} /></div>
                 <fieldset className="mt-2">
                     <legend className="text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
                         Putar gambar (searah jarum jam). Model membaca gambar yang sudah diputar.
@@ -285,7 +297,12 @@ function FormTambah({ onSelesai }) {
 
     const tambahKamera = async (e) => {
         e.preventDefault();
-        if (!nama.trim() || !alamat.trim() || menambah) return;
+        if (menambah) return;
+        // `required` meloloskan isian berisi spasi saja; tanpa pesan ini tombolnya tampak mati.
+        if (!nama.trim() || !alamat.trim()) {
+            setPesan({ tipe: 'error', teks: !nama.trim() ? 'Isi nama ruangnya dulu.' : 'Isi alamat kameranya dulu.' });
+            return;
+        }
         if (sandi && !pengguna) {
             setPesan({ tipe: 'error', teks: 'Isi nama pengguna kamera juga, atau kosongkan kata sandinya.' });
             return;
@@ -379,12 +396,12 @@ function FormTambah({ onSelesai }) {
         <form onSubmit={tambahKamera} className="space-y-4">
             <label className="block">
                 <span className={LABEL}>Nama ruang</span>
-                <input value={nama} onChange={(e) => setNama(e.target.value)} required maxLength={100}
+                <input value={nama} onChange={(e) => setNama(e.target.value)} required maxLength={100} readOnly={menambah}
                     placeholder="Contoh: Kamar 101" className={INPUT} />
             </label>
             <label className="block">
                 <span className={LABEL}>Alamat kamera</span>
-                <input value={alamat} onChange={(e) => setAlamat(e.target.value)} required
+                <input value={alamat} onChange={(e) => setAlamat(e.target.value)} required readOnly={menambah}
                     placeholder="http://192.168.43.1:8080/video" inputMode="url" spellCheck={false} autoCapitalize="none" autoCorrect="off"
                     className={`${INPUT} font-mono`} />
                 <span className="block text-xs text-slate-500 mt-1">
@@ -542,7 +559,7 @@ function FormTambah({ onSelesai }) {
                 tes atau pencarian membuat isi laci memanjang. */}
             <div className="sticky bottom-0 -mx-4 -mb-4 px-4 py-3 space-y-2 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
                 {pesan?.tipe === 'error' && (
-                    <p role="alert" className="text-sm text-red-700 dark:text-red-400">{pesan.teks}</p>
+                    <p role="alert" className="text-sm text-red-700 dark:text-red-400 wrap-anywhere">{pesan.teks}</p>
                 )}
                 <button type="submit" disabled={menambah} className={`${TOMBOL} w-full bg-emerald-700 hover:bg-emerald-800 text-white`}>
                     {menambah
@@ -559,21 +576,27 @@ export default function Cameras() {
     const [cameras, setCameras] = useState([]);
     const [tambah, setTambah] = useState(false);        // laci Tambah kamera terbuka
     const [atur, setAtur] = useState(null);             // id kamera yang laci Atur-nya terbuka
-    const putus = useRef(false);
+    // memuat | siap | galat. Galat bukan "belum ada kamera", dan status kartu dari polling
+    // terakhir tidak boleh tampil Terhubung selama server tidak menjawab.
+    const [statusDaftar, setStatusDaftar] = useState('memuat');
+    const [galatDaftar, setGalatDaftar] = useState('');
+    const [terakhirOk, setTerakhirOk] = useState(null);
+    const tanpaKabar = statusDaftar === 'galat';
     const t = useJam(5000);
 
     const ambilDaftar = useCallback(async () => {
         try {
             const r = await api('/api/cameras/');
-            if (!r.ok) throw new Error(`Backend menjawab ${r.status}`);
+            if (!r.ok) throw new Error(await bacaGalat(r));
             setCameras(await r.json());
-            putus.current = false;
-        } catch {
-            // Daftar disegarkan tiap 3 detik; galatnya cukup dikabarkan sekali per putus.
-            if (!putus.current) kabari(PESAN_TERPUTUS, 'galat');
-            putus.current = true;
+            setStatusDaftar('siap');
+            setTerakhirOk(Date.now());
+        } catch (err) {
+            // Daftar disegarkan tiap 3 detik; keadaannya tampil di halaman, bukan toast berulang.
+            setStatusDaftar('galat');
+            setGalatDaftar(pesanGalat(err));
         }
-    }, [kabari]);
+    }, []);
 
     // Muat daftar di awal, lalu segarkan berkala supaya status Terhubung/Terputus ikut hidup.
     useEffect(() => {
@@ -631,12 +654,23 @@ export default function Cameras() {
                 </button>
             </div>
 
+            {tanpaKabar && (
+                <div role="alert" className="mb-4 p-3 rounded-xl border border-dashed border-slate-400 dark:border-slate-500 bg-white dark:bg-slate-900 text-sm text-slate-800 dark:text-slate-100 wrap-anywhere">
+                    <b className="font-semibold">Daftar kamera tidak bisa dimuat{terakhirOk ? `; status di bawah dari ${jamDari(terakhirOk)}` : ''}.</b>{' '}
+                    {galatDaftar} Halaman mencoba lagi setiap 3 detik.
+                </div>
+            )}
+
             {/* Daftar kamera: kartu di semua lebar layar, supaya status dan tombolnya tetap
                 terlihat di HP. Tambah dan Atur membuka laci, jadi kartunya tidak pernah memanjang. */}
             {cameras.length === 0 ? (
-                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-8 text-center text-sm text-slate-500">
-                    Belum ada kamera terdaftar. Tekan Tambah kamera untuk memasang yang pertama.
-                </div>
+                statusDaftar === 'siap' ? (
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-8 text-center text-sm text-slate-500">
+                        Belum ada kamera terdaftar. Tekan Tambah kamera untuk memasang yang pertama.
+                    </div>
+                ) : statusDaftar === 'memuat' ? (
+                    <p role="status" className="p-8 text-center text-sm text-slate-500">Memuat daftar kamera…</p>
+                ) : null
             ) : (
                 <ul className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                     {cameras.map((cam) => (
@@ -645,14 +679,15 @@ export default function Cameras() {
                             : 'border-dashed border-slate-400 dark:border-slate-600'}`}>
                             <div className="flex gap-4">
                                 <div className="w-32 sm:w-40 shrink-0">
-                                    <GambarMini cam={cam} t={t} />
+                                    <GambarMini cam={cam} t={t} tanpaKabar={tanpaKabar} />
                                 </div>
                                 <div className="min-w-0 flex-1 space-y-1.5">
                                     <div className="flex items-start justify-between gap-2">
-                                        <h2 className="font-semibold truncate">{cam.name}</h2>
+                                        {/* Dua baris sebelum dipotong; nama lengkapnya di title dan di laci Atur. */}
+                                        <h2 className="font-semibold line-clamp-2 wrap-anywhere" title={cam.name}>{cam.name}</h2>
                                         <span className="text-xs text-slate-500 font-mono shrink-0">{cam.camera_id}</span>
                                     </div>
-                                    <StatusKameraDaftar cam={cam} />
+                                    <StatusKameraDaftar cam={cam} tanpaKabar={tanpaKabar} />
                                     {/* Alamat panjang dipotong di tengah; alamat lengkapnya ada di laci Atur. */}
                                     <p className="text-xs text-slate-500 font-mono break-all" title={cam.source}>
                                         <span className="sr-only">{cam.source}</span>
@@ -692,7 +727,7 @@ export default function Cameras() {
             {camAtur && (
                 <Dialog laci fokusKolom={false} judul={camAtur.name} keterangan={`Pengaturan kamera ${camAtur.camera_id}`}
                     onTutup={() => setAtur(null)}>
-                    <PanelKamera key={camAtur.camera_id} cam={camAtur} t={t} onUbah={ubahKamera} onHapus={hapusKamera} />
+                    <PanelKamera key={camAtur.camera_id} cam={camAtur} t={t} onUbah={ubahKamera} onHapus={hapusKamera} tanpaKabar={tanpaKabar} />
                 </Dialog>
             )}
         </div>

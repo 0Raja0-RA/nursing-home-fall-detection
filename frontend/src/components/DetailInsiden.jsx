@@ -98,8 +98,13 @@ function FormCatatan({ alert, onSelesai, onBatal }) {
                 value={teks}
                 onChange={(e) => setTeks(e.target.value)}
                 // Esc di sini hanya menutup formulir catatan. preventDefault mencegah Esc yang
-                // sama sampai ke <dialog> dan ikut menutup lacinya.
-                onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); onBatal(); } }}
+                // sama sampai ke <dialog> dan ikut menutup lacinya. Tulisan yang sudah diubah
+                // tidak dibuang tanpa tanya.
+                onKeyDown={(e) => {
+                    if (e.key !== 'Escape') return;
+                    e.preventDefault();
+                    if (teks === (alert.caregiver_note || '') || window.confirm('Buang catatan yang belum disimpan?')) onBatal();
+                }}
                 placeholder="Tindakan yang diambil, mis. dibantu duduk, tidak ada luka."
                 className="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 px-3 py-2 text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />

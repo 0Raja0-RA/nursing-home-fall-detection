@@ -45,7 +45,14 @@ export default function SimulationDashboard() {
     // Kamera yang permintaan Mode perawatannya sedang dikirim.
     const [mengubahJeda, setMengubahJeda] = useState('');
 
-    const { cameraData, alerts } = useLive();
+    const { cameraData: dataLangsung, alerts, connected } = useLive();
+    // Selama WebSocket putus, status terakhirnya basi: yang dipakai hasil polling REST.
+    const cameraData = connected ? dataLangsung : null;
+    // memuat | siap | galat. Galat bukan "belum ada kamera", dan kamera dari polling terakhir
+    // tidak boleh tampil Terpantau selama server tidak menjawab (prinsip 2).
+    const [statusDaftar, setStatusDaftar] = useState('memuat');
+    const [terakhirOk, setTerakhirOk] = useState(null);
+    const tanpaKabar = statusDaftar === 'galat';
     // Pengunjung pameran hanya menonton: tanpa Mode latihan dan tanpa kontrol suara.
     const pengunjung = usePengunjung();
     const suara = useStatusSuara();
@@ -58,8 +65,13 @@ export default function SimulationDashboard() {
     const ambilDaftar = useCallback(async () => {
         try {
             const r = await api('/api/cameras/');
-            if (r.ok) setCameras(await r.json());
-        } catch { /* backend belum jalan; grid tampil kosong dengan petunjuk */ }
+            if (!r.ok) throw new Error(String(r.status));
+            setCameras(await r.json());
+            setStatusDaftar('siap');
+            setTerakhirOk(Date.now());
+        } catch {
+            setStatusDaftar('galat');
+        }
     }, []);
 
     const catatRasio = useCallback((id, w, h) => {
@@ -309,13 +321,22 @@ export default function SimulationDashboard() {
                 </div>}
             </div>
 
+            {tanpaKabar && (
+                <div role="alert" className="mb-4 p-3 rounded-xl border border-dashed border-slate-400 dark:border-slate-500 bg-white dark:bg-slate-900 text-sm text-slate-800 dark:text-slate-100">
+                    <b className="font-semibold">Tidak ada kabar dari server{terakhirOk ? ` sejak ${jamDari(terakhirOk)}` : ''}.</b>{' '}
+                    Status kamera di bawah tidak diketahui dan alarm baru tidak akan tampil. Halaman mencoba lagi setiap 5 detik.
+                </div>
+            )}
+
             {/* Ringkasan: perawat tahu keadaan semua kamera tanpa memindai tiap kartu. */}
             <div className="flex flex-wrap items-center gap-2 mb-6" aria-label="Ringkasan sistem">
                 <span className={CHIP_TENANG}>
                     <Video className="w-3.5 h-3.5" aria-hidden="true" />
-                    <b className="font-semibold tabular-nums text-slate-800 dark:text-slate-100">{jumlahAktif}/{cameras.length}</b> kamera aktif
+                    {statusDaftar === 'siap'
+                        ? <><b className="font-semibold tabular-nums text-slate-800 dark:text-slate-100">{jumlahAktif}/{cameras.length}</b> kamera aktif</>
+                        : statusDaftar === 'memuat' ? 'Memuat kamera…' : 'Status kamera tidak diketahui'}
                 </span>
-                {jumlahTerputus > 0 && (
+                {jumlahTerputus > 0 && !tanpaKabar && (
                     <span className={`${CHIP} border border-dashed border-slate-400 dark:border-slate-500 text-slate-700 dark:text-slate-200`}>
                         <VideoOff className="w-3.5 h-3.5" aria-hidden="true" />
                         <b className="font-semibold tabular-nums">{jumlahTerputus}</b> terputus
@@ -334,10 +355,17 @@ export default function SimulationDashboard() {
                         Latihan berjalan di {sedangLatihan.map((c) => c.name).join(', ')}
                     </span>
                 )}
-                {/* Merah penuh hanya bila ada alarm sungguhan yang belum diklaim (prinsip 3). */}
-                <span className={chipAlarm}>
-                    <b className="font-semibold tabular-nums">{alerts.length}</b> alarm
-                </span>
+                {/* Merah penuh hanya bila ada alarm sungguhan yang belum diklaim (prinsip 3). Selama
+                    WebSocket putus, angka alarm tidak terbaru, jadi tidak ditulis seolah tenang. */}
+                {connected ? (
+                    <span className={chipAlarm}>
+                        <b className="font-semibold tabular-nums">{alerts.length}</b> alarm
+                    </span>
+                ) : (
+                    <span className={`${CHIP} border border-dashed border-slate-400 dark:border-slate-500 text-slate-700 dark:text-slate-200`}>
+                        Alarm tidak terpantau
+                    </span>
+                )}
                 {!pengunjung && <span className={CHIP_TENANG}>
                     {suara === 'aktif'
                         ? <><Volume2 className="w-3.5 h-3.5" aria-hidden="true" /> Suara aktif</>
@@ -345,7 +373,7 @@ export default function SimulationDashboard() {
                     <button
                         type="button"
                         onClick={tesSuara}
-                        className="ml-1 font-medium text-slate-800 dark:text-slate-100 underline underline-offset-2"
+                        className="ml-1 inline-flex items-center pointer-coarse:min-h-11 pointer-coarse:-my-3 font-medium text-slate-800 dark:text-slate-100 underline underline-offset-2"
                     >
                         Tes suara
                     </button>
@@ -371,31 +399,44 @@ export default function SimulationDashboard() {
                 menyusun ulang DOM, supaya aliran MJPEG-nya tidak terputus. */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full items-start">
                 {cameras.length === 0 && (
-                    <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-10 text-center text-sm text-slate-500 shadow-sm">
-                        Belum ada kamera yang terdaftar. Tambahkan di halaman <strong>Daftar Kamera</strong>,
-                        dan kamera itu akan langsung muncul di sini.
+                    <div role={statusDaftar === 'galat' ? 'alert' : 'status'}
+                        className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-10 text-center text-sm text-slate-500 shadow-sm">
+                        {statusDaftar === 'memuat'
+                            ? 'Memuat daftar kamera…'
+                            : statusDaftar === 'galat'
+                                ? 'Daftar kamera tidak bisa dimuat dari server. Halaman mencoba lagi setiap 5 detik.'
+                                : pengunjung
+                                    ? 'Belum ada kamera yang terdaftar.'
+                                    : <>Belum ada kamera yang terdaftar. Tambahkan di halaman <strong>Daftar Kamera</strong>,
+                                        dan kamera itu akan langsung muncul di sini.</>}
                     </div>
                 )}
 
                 {cameras.map((cam) => {
                     // Status langsung dari WebSocket kalau ada, kalau tidak dari hasil polling.
                     const live = cameraData?.[cam.camera_id];
-                    const aktif = cam.is_active && (live?.is_active ?? true);
+                    // Tanpa kabar dari server, gambar terakhir tidak boleh tampil seolah siaran langsung.
+                    const aktif = !tanpaKabar && cam.is_active && (live?.is_active ?? true);
                     const state = !aktif ? 'unknown' : (live?.fall_state || cam.fall_state || 'monitoring');
                     const posture = live ? live.current_posture : cam.current_posture;
                     const conf = live?.confidence ?? cam.confidence ?? 0;
                     const durasi = live?.fall_duration ?? cam.fall_duration ?? 0;
-                    const latihan = Boolean(live?.simulated)
-                        || alerts.some((a) => a.camera_id === cam.camera_id && a.simulated);
+                    // Alarm sungguhan di ruang ini menang atas latihan yang masih terbuka, supaya
+                    // jatuh sungguhan tidak tampil biru sebagai latihan (prinsip 8).
+                    const adaAlarmSungguhan = alerts.some((a) => a.camera_id === cam.camera_id && !a.simulated);
+                    const latihan = !adaAlarmSungguhan && (Boolean(live?.simulated)
+                        || alerts.some((a) => a.camera_id === cam.camera_id && a.simulated));
                     const sisa = sisaJeda(cam);
                     const dijeda = aktif && sisa > 0;
                     const privasi = cam.privasi || 'utuh';
-                    const detikAsli = privasi !== 'utuh' ? sisaAsli(cam) : 0;
+                    // Video asli hanya untuk akun tim. Pengunjung tetap melihat tampilan privasinya
+                    // (backend menolak stream asli untuk pengunjung).
+                    const detikAsli = !pengunjung && privasi !== 'utuh' ? sisaAsli(cam) : 0;
                     const bolehBukaAsli = !pengunjung && privasi !== 'utuh' && !detikAsli
                         && alerts.some((a) => a.camera_id === cam.camera_id);
                     const status = bacaStatus({
                         aktif, state, adaOrang: Boolean(posture), durasi,
-                        ambang: pengaturan?.fall_duration_threshold, latihan, sisaJeda: sisa,
+                        ambang: pengaturan?.fall_duration_threshold, latihan, sisaJeda: sisa, tanpaKabar,
                     });
 
                     const jatuh = state === 'confirmed_fall';
@@ -423,7 +464,7 @@ export default function SimulationDashboard() {
                             <header className="p-3 bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center gap-3">
                                 <span className="font-semibold text-sm flex items-center gap-2 min-w-0">
                                     <Video className="w-4 h-4 shrink-0 text-slate-400" aria-hidden="true" />
-                                    <span className="truncate">{cam.name}</span>
+                                    <span className="truncate" title={cam.name}>{cam.name}</span>
                                 </span>
                                 {/* min-h-6 setinggi tombol Jeda, supaya kepala kartu tidak memendek
                                     saat tombol itu hilang selama Mode perawatan. */}
@@ -438,7 +479,9 @@ export default function SimulationDashboard() {
                                                 <button
                                                     type="button"
                                                     {...p}
-                                                    aria-label={`Mode perawatan untuk ${cam.name}`}
+                                                    // Diawali kata yang terlihat ("Jeda"), supaya perintah suara
+                                                    // "klik Jeda" menemukannya (WCAG 2.5.3).
+                                                    aria-label={`Jeda, Mode perawatan untuk ${cam.name}`}
                                                     title="Mode perawatan"
                                                     className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-200/70 dark:hover:bg-slate-800"
                                                 >
@@ -517,15 +560,26 @@ export default function SimulationDashboard() {
                                         onUkuran={catatRasio}
                                     />
                                 ) : (
-                                    <div className="px-6 text-center flex flex-col items-center gap-2">
-                                        <p className="text-sm font-semibold text-slate-100">{cam.name} tidak terpantau</p>
-                                        <p className="text-xs text-slate-400">Kamera tidak mengirim gambar. Periksa daya dan jaringannya.</p>
-                                        <Link
-                                            to="/dashboard/cameras"
-                                            className="mt-1 text-xs font-medium px-3 py-1.5 rounded-lg border border-slate-600 text-slate-200 hover:bg-slate-800"
-                                        >
-                                            Buka Daftar Kamera
-                                        </Link>
+                                    // min-w-0 dan wrap-anywhere: nama ruang tanpa spasi terlipat, tidak
+                                    // memotong nama dan kalimat bantuannya di kedua sisi.
+                                    <div className="px-6 text-center flex flex-col items-center gap-2 min-w-0 max-w-full">
+                                        <p className="text-sm font-semibold text-slate-100 wrap-anywhere">
+                                            {tanpaKabar ? `${cam.name}: tanpa kabar` : `${cam.name} tidak terpantau`}
+                                        </p>
+                                        <p className="text-xs text-slate-400 wrap-anywhere">
+                                            {tanpaKabar
+                                                ? 'Server tidak menjawab, jadi keadaan kamera ini tidak diketahui.'
+                                                : 'Kamera tidak mengirim gambar. Periksa daya dan jaringannya.'}
+                                        </p>
+                                        {/* Daftar Kamera khusus tim; pengunjung akan dipantulkan kembali ke sini. */}
+                                        {!pengunjung && !tanpaKabar && (
+                                            <Link
+                                                to="/dashboard/cameras"
+                                                className="mt-1 text-xs font-medium px-3 py-1.5 rounded-lg border border-slate-600 text-slate-200 hover:bg-slate-800"
+                                            >
+                                                Buka Daftar Kamera
+                                            </Link>
+                                        )}
                                     </div>
                                 )}
 

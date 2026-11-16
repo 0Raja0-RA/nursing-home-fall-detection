@@ -84,10 +84,19 @@ export function useWebSocket(url) {
                                 : prev[data.camera_id]?.terakhir_terlihat,
                         },
                     }));
-                } else if (jenis === 'alert' || jenis === 'alert_update') {
-                    // alert_update: ada yang menekan "Saya ke sana" atau mengubah putusan,
-                    // di layar ini, di perangkat lain, atau dari Telegram.
+                } else if (jenis === 'alert') {
                     setAlerts((prev) => terapkan(prev, data));
+                } else if (jenis === 'alert_update') {
+                    // alert_update: ada yang menekan "Saya ke sana" atau mengubah putusan, di
+                    // layar ini, di perangkat lain, atau dari Telegram, atau status klipnya
+                    // berubah. Alarm yang tidak sedang tampil hanya ditambahkan bila belum lewat
+                    // PULIHKAN_JAM: pembersih klip menyiarkan pembaruan untuk alarm berumur 7
+                    // hari, dan alarm lama yang terlupa tidak boleh muncul lagi sambil berbunyi.
+                    setAlerts((prev) => (
+                        prev.some((a) => a.id === data.id) || Date.now() - msDari(data.created_at) < PULIHKAN_JAM * 3600e3
+                            ? terapkan(prev, data)
+                            : prev
+                    ));
                 } else if (jenis === 'alert_ack') {
                     // Sudah ditangani -- di layar ini, di halaman Riwayat Insiden, atau
                     // oleh perawat lain. Banner di semua dashboard hilang bersamaan.

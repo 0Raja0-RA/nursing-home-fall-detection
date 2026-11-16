@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Bell, BellOff, Volume2, VolumeX } from 'lucide-react';
-import { api, bacaGalat, PESAN_TERPUTUS } from '../api';
+import { api, bacaGalat, PESAN_TERPUTUS, pesanGalat } from '../api';
 import { API_BASE } from '../config';
 import { useToast } from '../context/toast';
 import { msDari, tanggalJam } from '../waktu';
@@ -159,6 +159,10 @@ export default function Settings() {
     const [tersimpan, setTersimpan] = useState({ threshold: 10, mode: '' });
 
     const [memuat, setMemuat] = useState(true);
+    // Pengaturan gagal dimuat: nilai di layar hanya bawaan, bukan yang berlaku, jadi semua
+    // pilihan dikunci sampai pemuatan berhasil (tidak boleh tersimpan sebagai nilai rekaan).
+    const [galatMuat, setGalatMuat] = useState(false);
+    const siap = !memuat && !galatMuat;
     const [sibuk, setSibuk] = useState(false);
     const [eskalasi, setEskalasi] = useState(2);
     const [polaShift, setPolaShift] = useState('3');
@@ -167,30 +171,35 @@ export default function Settings() {
     const suara = useStatusSuara();
     const notifikasi = useStatusNotifikasi();
 
-    const terapkan = (d) => {
-        setThreshold(d.fall_duration_threshold);
-        setMode(d.detection_mode);
+    // `sebagian`: sesudah menyimpan pengaturan lain, ambang dan model yang sedang diubah
+    // (belum disimpan) tidak ditimpa nilai dari server.
+    const terapkan = (d, sebagian = false) => {
+        if (!sebagian) {
+            setThreshold(d.fall_duration_threshold);
+            setMode(d.detection_mode);
+            setTersimpan({ threshold: d.fall_duration_threshold, mode: d.detection_mode });
+        }
         setDaftarMode(d.available_modes || []);
         setTelegramSiap(d.telegram_configured);
         setTg(d.telegram);
         setOpsiFoto(d.photo_modes || []);
         setEskalasi(d.eskalasi_menit ?? 2);
         setPolaShift(d.pola_shift || '3');
-        setTersimpan({ threshold: d.fall_duration_threshold, mode: d.detection_mode });
         setSimpan({ foto: d.foto_masa_simpan_hari, klip: d.klip_masa_simpan_hari });
     };
 
-    const ambil = useCallback(async () => {
+    const ambil = useCallback(async (sebagian = false) => {
         try {
             const r = await api('/api/settings/');
-            if (!r.ok) throw new Error(String(r.status));
-            terapkan(await r.json());
+            if (!r.ok) throw new Error(await bacaGalat(r));
+            terapkan(await r.json(), sebagian);
+            setGalatMuat(false);
         } catch {
-            kabari(PESAN_TERPUTUS, 'galat');
+            setGalatMuat(true);
         } finally {
             setMemuat(false);
         }
-    }, [kabari]);
+    }, []);
 
     const ambilRiwayat = useCallback(async () => {
         try {
@@ -208,6 +217,14 @@ export default function Settings() {
         ambil();
         ambilRiwayat();
     }, [ambil, ambilRiwayat]);
+
+    // Selama pengaturan gagal dimuat, dicoba lagi setiap 10 detik. Kontrolnya terkunci, jadi
+    // tidak ada perubahan yang belum disimpan yang bisa tertimpa.
+    useEffect(() => {
+        if (!galatMuat) return undefined;
+        const t = setInterval(() => { ambil(); ambilRiwayat(); }, 10_000);
+        return () => clearInterval(t);
+    }, [galatMuat, ambil, ambilRiwayat]);
 
     const berubah = Number(threshold) !== Number(tersimpan.threshold) || mode !== tersimpan.mode;
 
@@ -236,25 +253,35 @@ export default function Settings() {
             ambilRiwayat();
             if (dilakukan.length) kabari(`Tersimpan: ${dilakukan.join('; ')}.`);
         } catch (err) {
-            kabari(`Gagal menyimpan: ${err.message}`, 'galat');
+            kabari(`Gagal menyimpan: ${pesanGalat(err)}`, 'galat');
         } finally {
             setSibuk(false);
         }
     };
 
-    /** Pengaturan Telegram tersimpan seketika setiap diubah. */
-    const ubahTelegram = async (isi, pesan) => {
-        setTg((t) => ({ ...t, ...isi }));
+    /**
+     * Pengaturan yang tersimpan seketika setiap diubah. Bila gagal, pilihan di layar
+     * dikembalikan ke nilai sebelumnya, supaya layar tidak menampilkan pengaturan yang
+     * tidak berlaku.
+     */
+    const simpanSeketika = async (jalur, isi, pesan, kembalikan) => {
         try {
-            const r = await api('/api/settings/telegram', { method: 'PUT', json: isi });
+            const r = await api(jalur, { method: 'PUT', json: isi });
             if (!r.ok) throw new Error(await bacaGalat(r));
-            terapkan(await r.json());
+            terapkan(await r.json(), true);
             ambilRiwayat();
             kabari(pesan);
         } catch (err) {
-            kabari(`Gagal menyimpan: ${err.message}`, 'galat');
-            ambil();
+            kembalikan();
+            kabari(`Gagal menyimpan, pilihan dikembalikan: ${pesanGalat(err)}`, 'galat');
+            ambil(true);
         }
+    };
+
+    const ubahTelegram = (isi, pesan) => {
+        const sebelum = tg;
+        setTg((t) => ({ ...t, ...isi }));
+        simpanSeketika('/api/settings/telegram', isi, pesan, () => setTg(sebelum));
     };
 
     const ujiTelegram = async () => {
@@ -271,33 +298,18 @@ export default function Settings() {
         }
     };
 
-    /** Tersimpan seketika setiap diubah, seperti pengaturan Telegram. */
-    const ubahEskalasi = async (menit) => {
+    const ubahEskalasi = (menit) => {
+        const sebelum = eskalasi;
         setEskalasi(menit);
-        try {
-            const r = await api('/api/settings/eskalasi', { method: 'PUT', json: { eskalasi_menit: menit } });
-            if (!r.ok) throw new Error(await bacaGalat(r));
-            terapkan(await r.json());
-            ambilRiwayat();
-            kabari(`Tersimpan: pengingat setelah ${menit} menit.`);
-        } catch (err) {
-            kabari(`Gagal menyimpan: ${err.message}`, 'galat');
-            ambil();
-        }
+        simpanSeketika('/api/settings/eskalasi', { eskalasi_menit: menit },
+            `Tersimpan: pengingat setelah ${menit} menit.`, () => setEskalasi(sebelum));
     };
 
-    const ubahPolaShift = async (pola) => {
+    const ubahPolaShift = (pola) => {
+        const sebelum = polaShift;
         setPolaShift(pola);
-        try {
-            const r = await api('/api/settings/shift', { method: 'PUT', json: { pola_shift: pola } });
-            if (!r.ok) throw new Error(await bacaGalat(r));
-            terapkan(await r.json());
-            ambilRiwayat();
-            kabari(`Tersimpan: ${pola} shift.`);
-        } catch (err) {
-            kabari(`Gagal menyimpan: ${err.message}`, 'galat');
-            ambil();
-        }
+        simpanSeketika('/api/settings/shift', { pola_shift: pola }, `Tersimpan: ${pola} shift.`,
+            () => setPolaShift(sebelum));
     };
 
     const tesSuara = async () => {
@@ -316,13 +328,24 @@ export default function Settings() {
            tiga kolom, dan Riwayat perubahan menggulir di dalam kartunya. Di bawah 1280 px
            ketiga kolom terlalu sempit, jadi kartu disusun menurun dengan gulir halaman biasa;
            kolomnya memakai display: contents supaya urutan kartu bisa diatur. */
-        <div className="p-4 md:p-6 xl:px-8 xl:pt-6 xl:pb-5 w-full max-w-full min-w-0 xl:h-[calc(100dvh-var(--tinggi-banner,0px))] xl:flex xl:flex-col xl:overflow-hidden">
+        // xl:min-h: bila banner alarm tinggi, halaman tidak menyusut sampai habis; sisanya digulir.
+        <div className="p-4 md:p-6 xl:px-8 xl:pt-6 xl:pb-5 w-full max-w-full min-w-0 xl:h-[calc(100dvh-var(--tinggi-banner,0px))] xl:min-h-[34rem] xl:flex xl:flex-col xl:overflow-hidden">
             <div className="mb-4 xl:mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
                 <h1 className="text-xl md:text-2xl font-bold">Pengaturan</h1>
                 <p className="text-xs md:text-sm text-slate-500">
                     Berlaku untuk seluruh panti. Suara dan notifikasi diatur per perangkat.
                 </p>
             </div>
+
+            {galatMuat && (
+                <div role="alert" className="mb-4 xl:mb-3 p-3 rounded-xl border border-red-500/30 bg-red-500/10 text-sm text-red-700 dark:text-red-300 flex flex-wrap items-center gap-x-3 gap-y-2">
+                    <span className="min-w-0 flex-1">
+                        Pengaturan yang berlaku tidak bisa dimuat dari server, jadi semua pilihan dikunci. Halaman
+                        mencoba lagi setiap 10 detik.
+                    </span>
+                    <button type="button" onClick={() => ambil()} className={TOMBOL_NETRAL}>Coba lagi</button>
+                </div>
+            )}
 
             <div className="grid gap-4 max-w-2xl xl:max-w-none xl:grid-cols-3 xl:grid-rows-[minmax(0,1fr)] xl:flex-1 xl:min-h-0">
                 {/* Kolom 1: deteksi. */}
@@ -353,11 +376,11 @@ export default function Settings() {
                                             key={m.id}
                                             className={`flex flex-col gap-1 rounded-xl border px-3 py-2.5 cursor-pointer transition-colors ${mode === m.id
                                                 ? 'border-slate-900 ring-1 ring-slate-900 dark:border-slate-100 dark:ring-slate-100'
-                                                : 'border-slate-300 dark:border-slate-700 hover:border-slate-500'} ${memuat ? 'opacity-50' : ''}`}
+                                                : 'border-slate-300 dark:border-slate-700 hover:border-slate-500'} ${!siap ? 'opacity-50' : ''}`}
                                         >
                                             <span className="flex items-center gap-2">
                                                 <input type="radio" name="model-deteksi" value={m.id} checked={mode === m.id}
-                                                    onChange={() => setMode(m.id)} disabled={memuat}
+                                                    onChange={() => setMode(m.id)} disabled={!siap}
                                                     className="accent-slate-700 dark:accent-slate-300" />
                                                 <span className="font-semibold text-sm text-slate-900 dark:text-slate-100">{m.label}</span>
                                                 {m.recommended && <span className="text-xs text-slate-500">· disarankan</span>}
@@ -375,7 +398,7 @@ export default function Settings() {
                             <div className="space-y-1.5">
                                 <div className="flex items-baseline justify-between gap-3">
                                     <label htmlFor="ambang" className={LABEL}>Tunggu sebelum memberi alarm</label>
-                                    <span className="text-lg font-bold text-slate-800 dark:text-slate-200 tabular-nums whitespace-nowrap">{threshold} detik</span>
+                                    <span className="text-lg font-bold text-slate-800 dark:text-slate-200 tabular-nums whitespace-nowrap">{siap ? `${threshold} detik` : '–'}</span>
                                 </div>
                                 <input
                                     id="ambang"
@@ -383,14 +406,14 @@ export default function Settings() {
                                     min="3" max="30"
                                     value={threshold}
                                     onChange={(e) => setThreshold(e.target.value)}
-                                    disabled={memuat}
+                                    disabled={!siap}
                                     aria-describedby="ambang-ket"
                                     className="w-full accent-slate-700 dark:accent-slate-300"
                                 />
                                 <p id="ambang-ket" className="text-xs text-slate-500">
-                                    Alarm berbunyi setelah {threshold} detik terbaca berbaring.
+                                    {siap ? `Alarm berbunyi setelah ${threshold} detik terbaca berbaring.` : galatMuat ? 'Nilai yang berlaku belum termuat.' : 'Memuat pengaturan…'}
                                 </p>
-                                <PratinjauAmbang ambang={threshold} ambangKini={tersimpan.threshold} />
+                                {siap && <PratinjauAmbang ambang={threshold} ambangKini={tersimpan.threshold} />}
                             </div>
 
                             {/* Di dasar kartu. Bila kolomnya harus menggulir (layar pendek), tombol
@@ -398,10 +421,10 @@ export default function Settings() {
                             <div className="mt-auto xl:sticky xl:bottom-0 xl:pt-2 bg-white dark:bg-slate-900">
                                 <button
                                     type="submit"
-                                    disabled={sibuk || memuat || !berubah}
+                                    disabled={sibuk || !siap || !berubah}
                                     className="w-full min-h-11 bg-emerald-700 hover:bg-emerald-800 disabled:bg-slate-200 disabled:text-slate-500 dark:disabled:bg-slate-800 dark:disabled:text-slate-400 text-white font-medium rounded-lg transition-colors"
                                 >
-                                    {sibuk ? 'Menyimpan…' : berubah ? 'Simpan pengaturan deteksi' : 'Pengaturan deteksi tersimpan'}
+                                    {!siap ? 'Pengaturan belum termuat' : sibuk ? 'Menyimpan…' : berubah ? 'Simpan pengaturan deteksi' : 'Pengaturan deteksi tersimpan'}
                                 </button>
                             </div>
                         </form>
@@ -453,12 +476,12 @@ export default function Settings() {
                         <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-2">
                             <label htmlFor="eskalasi" className={LABEL}>Ingatkan setelah</label>
                             <select id="eskalasi" value={eskalasi} onChange={(e) => ubahEskalasi(Number(e.target.value))}
-                                disabled={memuat} className={PILIH}>
+                                disabled={!siap} className={PILIH}>
                                 {[1, 2, 3, 5, 10].map((m) => <option key={m} value={m}>{m} menit</option>)}
                             </select>
                             <label htmlFor="pola-shift" className={LABEL}>Jam shift</label>
                             <select id="pola-shift" value={polaShift} onChange={(e) => ubahPolaShift(e.target.value)}
-                                disabled={memuat} className={PILIH}>
+                                disabled={!siap} className={PILIH}>
                                 <option value="3">3 shift: 7, 14, 21</option>
                                 <option value="2">2 shift: 7, 19</option>
                             </select>
@@ -467,7 +490,10 @@ export default function Settings() {
 
                     <Bagian id="atur-riwayat" judul="Riwayat perubahan" keterangan="Terbaru di atas, beserta siapa yang mengubah."
                         className="max-xl:order-1 xl:flex-1 xl:min-h-40">
-                        <div className="xl:flex-1 xl:min-h-0 xl:overflow-y-auto xl:overscroll-contain">
+                        {/* Bisa difokus, supaya daftar yang menggulir di dalam kartunya juga bisa
+                            digulir dengan keyboard (WCAG 2.1.1). Isinya tidak memuat tombol. */}
+                        <div tabIndex={0} role="region" aria-label="Riwayat perubahan pengaturan"
+                            className="xl:flex-1 xl:min-h-0 xl:overflow-y-auto xl:overscroll-contain rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
                             <RiwayatPerubahan riwayat={riwayat} daftarMode={daftarMode} opsiFoto={opsiFoto} />
                         </div>
                     </Bagian>
@@ -496,13 +522,13 @@ export default function Settings() {
                         {tg && (
                             <div className="space-y-0.5">
                                 <label className="flex items-center gap-3 text-sm cursor-pointer min-h-7">
-                                    <input type="checkbox" checked={tg.send_drills} className="accent-blue-600"
+                                    <input disabled={!siap} type="checkbox" checked={tg.send_drills} className="accent-blue-600"
                                         onChange={(e) => ubahTelegram({ send_drills: e.target.checked },
                                             e.target.checked ? 'Tersimpan: latihan ikut dikirim ke Telegram.' : 'Tersimpan: latihan tidak dikirim ke Telegram.')} />
                                     Kirim juga latihan ke Telegram
                                 </label>
                                 <label className="flex items-center gap-3 text-sm cursor-pointer min-h-7">
-                                    <input type="checkbox" checked={tg.camera_offline} className="accent-slate-700"
+                                    <input disabled={!siap} type="checkbox" checked={tg.camera_offline} className="accent-slate-700"
                                         onChange={(e) => ubahTelegram({ camera_offline: e.target.checked },
                                             e.target.checked ? 'Tersimpan: grup dikabari saat kamera terputus.' : 'Tersimpan: grup tidak dikabari soal kamera.')} />
                                     Kabari grup saat kamera terputus atau dijeda
@@ -521,7 +547,7 @@ export default function Settings() {
                                 <legend className={`${LABEL} mb-1`}>Foto di pesan Telegram</legend>
                                 {opsiFoto.map((o) => (
                                     <label key={o.id} className="flex items-center gap-3 text-sm cursor-pointer min-h-7">
-                                        <input type="radio" name="foto-telegram" value={o.id} checked={tg.photo_mode === o.id}
+                                        <input disabled={!siap} type="radio" name="foto-telegram" value={o.id} checked={tg.photo_mode === o.id}
                                             onChange={() => ubahTelegram({ photo_mode: o.id }, `Tersimpan: ${o.label.toLowerCase()}.`)}
                                             className="accent-slate-700" />
                                         {o.label}

@@ -59,29 +59,30 @@ export default function LiveCamera() {
         return () => { batal = true; clearInterval(t); };
     }, [cari]);
 
+    const live = cameraData?.[kameraId];
+    const kamera = daftarKamera.find((c) => c.camera_id === kameraId);
+    const aktif = (kamera?.is_active ?? false) && (live?.is_active ?? true);
+
     // MJPEG adalah respons HTTP yang tidak pernah selesai. Kalau elemen <img>-nya
     // dibuang tanpa mengosongkan src lebih dulu, browser menahan koneksi itu tetap
     // terbuka, dan setelah beberapa kali berpindah halaman batas koneksi per host
-    // habis sehingga dashboard terlihat membeku.
+    // habis sehingga dashboard terlihat membeku. Kamera yang terputus tidak diminta
+    // videonya: jawabannya 404 dan gambar rusak menimpa lencana status.
     const imgRef = useRef(null);
     useEffect(() => {
         const el = imgRef.current;
-        if (!el || !kameraId) return;
+        if (!el || !kameraId || !aktif) return;
         // src dipasang di sini, bukan lewat atribut JSX. React.StrictMode menjalankan
         // efek dua kali di mode dev (pasang -> bersihkan -> pasang lagi); kalau src
         // ditulis di JSX, pembersihan pertama membatalkan permintaan dan React tidak
         // pernah memasangnya kembali karena prop-nya dianggap tidak berubah.
         el.src = `${API_BASE}/api/cameras/${kameraId}/stream`;
         return () => { el.src = ''; };
-    }, [kameraId]);
+    }, [kameraId, aktif]);
 
     // Memutar tampilan 90 derajat setiap kali ditekan. Ini hanya memutar gambar di layar;
     // rotasi yang dipakai model diatur per kamera di halaman Daftar Kamera.
     const switchCamera = () => setRotasi((prev) => (prev + 90) % 360);
-
-    const live = cameraData?.[kameraId];
-    const kamera = daftarKamera.find((c) => c.camera_id === kameraId);
-    const aktif = (kamera?.is_active ?? false) && (live?.is_active ?? true);
     const state = !aktif ? 'unknown' : (live?.fall_state || 'monitoring');
     const durasi = live?.fall_duration ?? 0;
     const posture = live?.current_posture;
@@ -110,9 +111,10 @@ export default function LiveCamera() {
         }
     };
 
-    // Panel diagnostik: semua deteksi frame terakhir, waktu inferensi, dan laju.
+    // Panel diagnostik: semua deteksi frame terakhir, waktu inferensi, dan laju. Hanya
+    // selama kameranya mengalir; untuk kamera terputus backend menjawab 404 tiap detik.
     useEffect(() => {
-        if (!kameraId) return undefined;
+        if (!kameraId || !aktif) return undefined;
         let batal = false;
         const ambil = async () => {
             try {
@@ -123,7 +125,7 @@ export default function LiveCamera() {
         ambil();
         const t = setInterval(ambil, 1000);
         return () => { batal = true; clearInterval(t); };
-    }, [kameraId]);
+    }, [kameraId, aktif]);
 
     const sekarang = useJam(diag?.uji_sampai ? 1000 : 30000);
     const sisaUji = diag?.uji_sampai ? Math.max(0, (msDari(diag.uji_sampai) - sekarang) / 1000) : 0;
@@ -158,7 +160,7 @@ export default function LiveCamera() {
                         id="pilih-kamera-uji"
                         value={kameraId}
                         onChange={(e) => setKameraId(e.target.value)}
-                        className="bg-slate-200 dark:bg-slate-800 hover:opacity-80 px-3 py-2 rounded-xl text-xs md:text-sm font-medium transition-colors focus:outline-none"
+                        className="bg-slate-200 dark:bg-slate-800 hover:opacity-80 px-3 py-2 rounded-xl text-xs md:text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                     >
                         {daftarKamera.length === 0 && <option value="">Belum ada kamera</option>}
                         {daftarKamera.map((c) => (
@@ -194,20 +196,30 @@ export default function LiveCamera() {
             </div>
 
             {errorMsg && (
-                <div className="mb-6 p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-sm">
+                <div className="mb-6 p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-700 dark:text-red-400 text-sm">
                     {errorMsg}
                 </div>
             )}
 
-            <div className="relative bg-slate-950 rounded-3xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-2xl aspect-video flex items-center justify-center">
-                <img
-                    ref={imgRef}
-                    alt={`Video ${kamera?.name || ''}`}
-                    onLoad={() => setErrorMsg('')}
-                    onError={() => setErrorMsg('Video tidak dapat dimuat. Pastikan server (run-backend.bat) berjalan dan kameranya terbaca.')}
-                    style={{ transform: `rotate(${rotasi}deg)` }}
-                    className="w-full h-full object-contain transition-transform motion-reduce:transition-none"
-                />
+            {/* permukaan-gelap: lencana status di atas video memakai warna tema gelap di kedua tema. */}
+            <div className="permukaan-gelap relative bg-slate-950 rounded-3xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-2xl aspect-video flex items-center justify-center">
+                {aktif ? (
+                    <img
+                        ref={imgRef}
+                        alt={`Video ${kamera?.name || ''}`}
+                        onLoad={() => setErrorMsg('')}
+                        onError={() => setErrorMsg('Video tidak dapat dimuat. Periksa kamera ini di Daftar Kamera. Bila semua kamera gagal, periksa apakah server FallDetect berjalan.')}
+                        style={{ transform: `rotate(${rotasi}deg)` }}
+                        className="w-full h-full object-contain transition-transform motion-reduce:transition-none"
+                    />
+                ) : (
+                    <div className="px-6 text-center">
+                        <p className="text-sm font-semibold text-slate-100">
+                            {kamera ? `${kamera.name} tidak mengirim gambar` : 'Belum ada kamera yang dipilih'}
+                        </p>
+                        {kamera && <p className="mt-1 text-xs text-slate-400">Periksa daya dan jaringannya, atau nyalakan kameranya di Daftar Kamera.</p>}
+                    </div>
+                )}
                 <div className="absolute top-4 left-4">
                     <StatusKamera status={status} className="text-sm px-3 py-1 shadow-lg" />
                 </div>
