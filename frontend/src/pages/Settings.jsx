@@ -9,7 +9,7 @@ import { kabariAlarm, mintaIzinNotifikasi, useStatusNotifikasi } from '../hooks/
 import { Penjelasan } from '../components/MenuKecil';
 
 const KARTU = 'bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm';
-const TOMBOL_NETRAL = 'shrink-0 min-h-10 px-3 rounded-lg text-sm font-semibold border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50';
+const TOMBOL_NETRAL = 'shrink-0 min-h-10 px-3 rounded-lg text-sm font-medium border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50';
 const PILIH = 'w-full min-h-10 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50';
 const LABEL = 'text-sm font-medium text-slate-700 dark:text-slate-300';
 
@@ -398,7 +398,7 @@ export default function Settings() {
                                 <button
                                     type="submit"
                                     disabled={sibuk || memuat || !berubah}
-                                    className="w-full min-h-11 bg-emerald-700 hover:bg-emerald-800 disabled:bg-slate-200 disabled:text-slate-500 dark:disabled:bg-slate-800 dark:disabled:text-slate-400 text-white font-semibold rounded-lg transition-colors"
+                                    className="w-full min-h-11 bg-emerald-700 hover:bg-emerald-800 disabled:bg-slate-200 disabled:text-slate-500 dark:disabled:bg-slate-800 dark:disabled:text-slate-400 text-white font-medium rounded-lg transition-colors"
                                 >
                                     {sibuk ? 'Menyimpan…' : berubah ? 'Simpan pengaturan deteksi' : 'Pengaturan deteksi tersimpan'}
                                 </button>

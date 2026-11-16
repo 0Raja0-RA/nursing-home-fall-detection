@@ -221,6 +221,16 @@ export default function SimulationDashboard() {
     const jumlahTerputus = cameras.length - jumlahAktif;
     const sedangLatihan = cameras.filter((c) => cameraData?.[c.camera_id]?.simulated);
     const jumlahJeda = cameras.filter((c) => c.is_active && sisaJeda(c) > 0).length;
+    // Chip jumlah alarm: merah penuh hanya bila ada alarm sungguhan yang belum diklaim, amber
+    // tipis bila semuanya sudah ada yang menuju lokasi, biru tipis bila tinggal latihan.
+    const alarmSungguhan = alerts.filter((a) => !a.simulated);
+    const chipAlarm = alarmSungguhan.some((a) => !a.claimed_by)
+        ? `${CHIP} bg-red-600 text-white font-semibold`
+        : alarmSungguhan.length
+            ? `${CHIP} border border-amber-600 bg-amber-50 text-amber-900 dark:border-amber-400 dark:bg-amber-950 dark:text-amber-100`
+            : alerts.length
+                ? `${CHIP} border border-blue-500 bg-blue-50 text-blue-900 dark:bg-blue-950 dark:text-blue-100`
+                : CHIP_TENANG;
 
     return (
         <div className="p-4 md:p-8 w-full max-w-full min-w-0 overflow-x-hidden">
@@ -286,7 +296,7 @@ export default function SimulationDashboard() {
                                 type="button"
                                 onClick={() => mulaiLatihan(tutup)}
                                 disabled={memulai || !kameraLatihan?.is_active}
-                                className="w-full min-h-11 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-4 rounded-lg text-sm font-semibold"
+                                className="w-full min-h-11 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-4 rounded-lg text-sm font-medium"
                             >
                                 {memulai ? 'Memulai…' : 'Mulai latihan'}
                             </button>
@@ -319,12 +329,13 @@ export default function SimulationDashboard() {
                 )}
                 {/* Chip di baris ringkasan, bukan strip yang menyisip di atas grid. */}
                 {sedangLatihan.length > 0 && (
-                    <span role="status" className={`${CHIP} bg-blue-600 text-white font-semibold`}>
+                    <span role="status" className={`${CHIP} border border-blue-500 bg-blue-50 text-blue-900 dark:bg-blue-950 dark:text-blue-100`}>
                         <FlaskConical className="w-3.5 h-3.5" aria-hidden="true" />
                         Latihan berjalan di {sedangLatihan.map((c) => c.name).join(', ')}
                     </span>
                 )}
-                <span className={alerts.length ? `${CHIP} bg-red-600 text-white font-semibold` : CHIP_TENANG}>
+                {/* Merah penuh hanya bila ada alarm sungguhan yang belum diklaim (prinsip 3). */}
+                <span className={chipAlarm}>
                     <b className="font-semibold tabular-nums">{alerts.length}</b> alarm
                 </span>
                 {!pengunjung && <span className={CHIP_TENANG}>
@@ -334,7 +345,7 @@ export default function SimulationDashboard() {
                     <button
                         type="button"
                         onClick={tesSuara}
-                        className="ml-1 font-semibold text-slate-800 dark:text-slate-100 underline underline-offset-2"
+                        className="ml-1 font-medium text-slate-800 dark:text-slate-100 underline underline-offset-2"
                     >
                         Tes suara
                     </button>
@@ -450,7 +461,7 @@ export default function SimulationDashboard() {
                                                                 type="button"
                                                                 disabled={mengubahJeda === cam.camera_id}
                                                                 onClick={() => { tutup(); ubahJeda(cam, menit); }}
-                                                                className="min-h-10 px-2 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white text-sm font-semibold"
+                                                                className="min-h-10 px-2 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white text-sm font-medium"
                                                             >
                                                                 {menit} menit
                                                             </button>
@@ -483,7 +494,7 @@ export default function SimulationDashboard() {
                                                     type="button"
                                                     disabled={mengubahJeda === cam.camera_id}
                                                     onClick={() => ubahJeda(cam, null)}
-                                                    className="min-h-10 px-3 rounded-lg bg-white text-slate-900 hover:bg-slate-200 disabled:opacity-60 text-sm font-semibold"
+                                                    className="min-h-10 px-3 rounded-lg bg-white text-slate-900 hover:bg-slate-200 disabled:opacity-60 text-sm font-medium"
                                                 >
                                                     Lanjutkan pemantauan
                                                 </button>
@@ -491,7 +502,7 @@ export default function SimulationDashboard() {
                                                     type="button"
                                                     disabled={mengubahJeda === cam.camera_id}
                                                     onClick={() => ubahJeda(cam, 15)}
-                                                    className="min-h-10 px-3 rounded-lg border border-slate-500 text-slate-100 hover:bg-slate-800 disabled:opacity-60 text-sm font-semibold"
+                                                    className="min-h-10 px-3 rounded-lg border border-slate-500 text-slate-100 hover:bg-slate-800 disabled:opacity-60 text-sm font-medium"
                                                 >
                                                     +15 mnt
                                                 </button>
@@ -531,7 +542,7 @@ export default function SimulationDashboard() {
                                             <button
                                                 type="button"
                                                 onClick={() => bukaAsli(cam)}
-                                                className="min-h-9 px-3 rounded-lg bg-white text-slate-900 text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-slate-200"
+                                                className="min-h-9 px-3 rounded-lg bg-white text-slate-900 text-xs font-medium inline-flex items-center gap-1.5 hover:bg-slate-200"
                                             >
                                                 <Eye className="w-3.5 h-3.5" aria-hidden="true" /> Lihat video asli 15 dtk
                                             </button>

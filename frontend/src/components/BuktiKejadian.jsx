@@ -182,8 +182,8 @@ function PemutarKlip({ alert, onTutup }) {
                     </div>
                 </div>
                 <button type="button" onClick={() => setLambat((l) => !l)} aria-pressed={lambat}
-                    className={`shrink-0 min-h-9 px-2.5 rounded-lg text-xs font-semibold border ${lambat
-                        ? 'bg-slate-900 text-white border-slate-900 dark:bg-slate-100 dark:text-slate-900 dark:border-slate-100'
+                    className={`shrink-0 min-h-9 px-2.5 rounded-lg text-xs font-medium border ${lambat
+                        ? 'bg-slate-100 text-slate-900 border-slate-900 ring-1 ring-inset ring-slate-900 dark:bg-slate-800 dark:text-slate-100 dark:border-slate-100 dark:ring-slate-100'
                         : 'border-slate-300 dark:border-slate-700'}`}>
                     0,5×
                 </button>
@@ -207,7 +207,7 @@ export default function BuktiKejadian({ alert }) {
                 <FotoKejadian alert={alert} />
                 {status === 'tersimpan' && (
                     <button type="button" onClick={() => setPutar(true)}
-                        className="absolute left-3 bottom-3 min-h-10 px-3 rounded-full bg-black/75 text-white text-sm font-semibold inline-flex items-center gap-2 hover:bg-black/90">
+                        className="absolute left-3 bottom-3 min-h-10 px-3 rounded-full bg-black/75 text-white text-sm font-medium inline-flex items-center gap-2 hover:bg-black/90">
                         <Play className="w-4 h-4" aria-hidden="true" />
                         Putar klip{alert.klip_detik ? ` · ${durasiTeks(alert.klip_detik)}` : ''}
                     </button>

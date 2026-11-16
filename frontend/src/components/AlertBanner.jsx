@@ -25,7 +25,8 @@ const jam = (iso) => {
 };
 
 // Warna mengikuti aturan tunggal: merah hanya untuk alarm yang belum direspons,
-// amber untuk alarm yang sudah ada yang menuju lokasi, biru untuk latihan.
+// amber untuk alarm yang sudah ada yang menuju lokasi, biru untuk latihan. Isian jenuh
+// hanya untuk merah (prinsip 3); amber dan biru memakai latar tipis supaya tidak bersaing.
 const GAYA = {
     merah: {
         kotak: 'bg-red-700 text-white border-red-900',
@@ -35,18 +36,18 @@ const GAYA = {
         redup: 'text-white/85',
     },
     amber: {
-        kotak: 'bg-amber-400 text-slate-950 border-amber-600',
-        utama: 'bg-slate-950 text-white hover:bg-slate-800',
-        garis: 'border-slate-950/50 hover:bg-black/10',
-        hantu: 'hover:bg-black/10',
-        redup: 'text-slate-900',
+        kotak: 'bg-amber-50 text-amber-950 border-amber-300 dark:bg-amber-950 dark:text-amber-50 dark:border-amber-800',
+        utama: 'bg-slate-900 text-white hover:bg-slate-800 dark:bg-amber-100 dark:text-amber-950 dark:hover:bg-white',
+        garis: 'border-amber-800/40 hover:bg-amber-100 dark:border-amber-200/50 dark:hover:bg-amber-900',
+        hantu: 'hover:bg-amber-100 dark:hover:bg-amber-900',
+        redup: 'text-amber-900 dark:text-amber-200',
     },
     biru: {
-        kotak: 'bg-blue-700 text-white border-blue-900',
-        utama: 'bg-white text-blue-800 hover:bg-blue-50',
-        garis: 'border-white/70 hover:bg-white/10',
-        hantu: 'hover:bg-white/10',
-        redup: 'text-white/85',
+        kotak: 'bg-blue-50 text-blue-950 border-blue-300 dark:bg-blue-950 dark:text-blue-50 dark:border-blue-800',
+        utama: 'bg-blue-700 text-white hover:bg-blue-800 dark:bg-blue-100 dark:text-blue-950 dark:hover:bg-white',
+        garis: 'border-blue-800/40 hover:bg-blue-100 dark:border-blue-200/50 dark:hover:bg-blue-900',
+        hantu: 'hover:bg-blue-100 dark:hover:bg-blue-900',
+        redup: 'text-blue-900 dark:text-blue-200',
     },
 };
 
@@ -66,7 +67,7 @@ function AlarmLain({ a, sekarang, onPilih }) {
         : `belum direspons ${durasiTeks((sekarang - msDari(a.created_at)) / 1000)}`;
     return (
         <button type="button" onClick={onPilih}
-            className="min-h-9 px-2.5 rounded-lg bg-white text-slate-900 text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-slate-100 max-w-full">
+            className="min-h-9 px-2.5 rounded-lg bg-white text-slate-900 border border-black/10 text-xs font-medium inline-flex items-center gap-1.5 hover:bg-slate-100 max-w-full">
             <Ikon className={`w-3.5 h-3.5 shrink-0 ${warna}`} aria-hidden="true" />
             <span className="truncate">{nama}</span>
             <span className="font-normal text-slate-600 whitespace-nowrap">· {a.simulated ? 'latihan' : keadaan}</span>

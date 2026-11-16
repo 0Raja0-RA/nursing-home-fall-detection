@@ -94,7 +94,13 @@ export default function LayarDinding() {
                 <span className="ml-auto flex flex-wrap items-center gap-2 text-sm">
                     {!connected && <span className="px-2.5 py-1 rounded-lg border border-amber-500 text-amber-300">Terputus dari backend</span>}
                     <span className="px-2.5 py-1 rounded-lg bg-slate-800 tabular-nums">{aktifSemua}/{kamera.length} kamera aktif</span>
-                    <span className={`px-2.5 py-1 rounded-lg tabular-nums ${alerts.length ? 'bg-red-600 font-semibold' : 'bg-slate-800'}`}>
+                    {/* Aturan sama dengan lencana menu: merah penuh hanya bila ada alarm sungguhan
+                        yang belum diklaim. Ubin alarmnya tetap berwarna penuh supaya terlihat dari jauh. */}
+                    <span className={`px-2.5 py-1 rounded-lg tabular-nums ${alerts.some((a) => !a.simulated && !a.claimed_by)
+                        ? 'bg-red-600 font-semibold'
+                        : alerts.some((a) => !a.simulated)
+                            ? 'border border-amber-400 bg-amber-950 text-amber-100'
+                            : alerts.length ? 'border border-blue-400 bg-blue-950 text-blue-100' : 'bg-slate-800'}`}>
                         {alerts.length} alarm
                     </span>
                     <span className="text-2xl font-bold tabular-nums">{jamDari(sekarang)}</span>

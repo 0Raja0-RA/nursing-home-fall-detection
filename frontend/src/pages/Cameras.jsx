@@ -10,8 +10,11 @@ import Dialog from '../components/Dialog';
 
 const ROTASI = [0, 90, 180, 270];
 const INPUT = 'w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500';
-const LABEL = 'block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5';
-const TOMBOL = 'min-h-11 px-4 rounded-xl text-sm font-semibold inline-flex items-center justify-center gap-2 transition-colors disabled:opacity-60';
+const LABEL = 'block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5';
+const TOMBOL = 'min-h-11 px-4 rounded-xl text-sm font-medium inline-flex items-center justify-center gap-2 transition-colors disabled:opacity-60';
+// Pilihan yang sedang terpilih: garis tepi tebal di latar yang sedikit terangkat, bukan blok
+// terbalik (prinsip 3).
+const PILIHAN_AKTIF = 'bg-slate-100 text-slate-900 border-slate-900 ring-1 ring-inset ring-slate-900 dark:bg-slate-800 dark:text-slate-100 dark:border-slate-100 dark:ring-slate-100';
 const TOMBOL_NETRAL = `${TOMBOL} border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800`;
 
 /** Sisipkan nama pengguna dan kata sandi ke alamat rtsp:// atau http://, kalau diisi. */
@@ -59,7 +62,7 @@ function StatusKameraDaftar({ cam }) {
     if (!cam.enabled) {
         return (
             <p className="text-xs text-slate-500">
-                <span className="font-semibold text-slate-700 dark:text-slate-300">Dimatikan.</span> Ruang ini tidak dipantau.
+                <span className="font-medium text-slate-700 dark:text-slate-300">Dimatikan.</span> Ruang ini tidak dipantau.
             </p>
         );
     }
@@ -68,7 +71,7 @@ function StatusKameraDaftar({ cam }) {
     if (cam.is_active && Number.isFinite(jeda)) {
         return (
             <p className="text-xs text-slate-700 dark:text-slate-300 tabular-nums">
-                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 mr-1.5 rounded border border-blue-500 text-blue-800 dark:text-blue-200 font-semibold">
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 mr-1.5 rounded border border-blue-500 text-blue-800 dark:text-blue-200 font-medium">
                     <Clock className="w-3 h-3" aria-hidden="true" /> Mode perawatan
                 </span>
                 sampai {jamDari(jeda)}{cam.dijeda_oleh ? `, oleh ${cam.dijeda_oleh}` : ''}. Deteksi dan video dijeda.
@@ -79,7 +82,7 @@ function StatusKameraDaftar({ cam }) {
         return (
             <p className="text-xs text-slate-600 dark:text-slate-400 tabular-nums">
                 <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 mr-1.5" aria-hidden="true" />
-                <span className="font-semibold text-slate-800 dark:text-slate-200">Terhubung</span>
+                <span className="font-medium text-slate-800 dark:text-slate-200">Terhubung</span>
                 {cam.fps > 0 && ` · ${cam.fps.toFixed(1)} fps`}
                 {jam && ` · gambar terakhir ${jam}`}
             </p>
@@ -87,7 +90,7 @@ function StatusKameraDaftar({ cam }) {
     }
     return (
         <p className="text-xs text-slate-700 dark:text-slate-300">
-            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 mr-1.5 rounded border border-dashed border-slate-400 font-semibold">
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 mr-1.5 rounded border border-dashed border-slate-400 font-medium">
                 <VideoOff className="w-3 h-3" aria-hidden="true" /> Terputus
             </span>
             {jam ? `sejak ${jam}` : 'belum pernah mengirim gambar'}. Periksa daya, jaringan, dan alamatnya.
@@ -153,7 +156,7 @@ function PanelKamera({ cam, t, onUbah, onHapus }) {
                 <StatusKameraDaftar cam={cam} />
                 <div className="mt-2"><GambarMini cam={cam} t={t} /></div>
                 <fieldset className="mt-2">
-                    <legend className="text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
+                    <legend className="text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
                         Putar gambar (searah jarum jam). Model membaca gambar yang sudah diputar.
                     </legend>
                     <div className="flex gap-2">
@@ -164,8 +167,8 @@ function PanelKamera({ cam, t, onUbah, onHapus }) {
                                 aria-pressed={cam.rotate === d}
                                 disabled={Boolean(sibuk)}
                                 onClick={() => ubah({ rotate: d }, 'rotasi')}
-                                className={`min-h-10 flex-1 rounded-lg text-sm font-semibold border tabular-nums ${cam.rotate === d
-                                    ? 'bg-slate-900 text-white border-slate-900 dark:bg-slate-100 dark:text-slate-900'
+                                className={`min-h-10 flex-1 rounded-lg text-sm font-medium border tabular-nums ${cam.rotate === d
+                                    ? PILIHAN_AKTIF
                                     : 'border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
                             >
                                 {d}&deg;
@@ -174,7 +177,7 @@ function PanelKamera({ cam, t, onUbah, onHapus }) {
                     </div>
                 </fieldset>
                 <fieldset className="mt-3">
-                    <legend className="text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
+                    <legend className="text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
                         Tampilan video. Model tetap membaca gambar asli.
                     </legend>
                     <div className="flex gap-2">
@@ -185,8 +188,8 @@ function PanelKamera({ cam, t, onUbah, onHapus }) {
                                 aria-pressed={(cam.privasi || 'utuh') === p.id}
                                 disabled={Boolean(sibuk)}
                                 onClick={() => ubah({ privasi: p.id }, 'privasi')}
-                                className={`min-h-10 flex-1 rounded-lg text-sm font-semibold border ${(cam.privasi || 'utuh') === p.id
-                                    ? 'bg-slate-900 text-white border-slate-900 dark:bg-slate-100 dark:text-slate-900'
+                                className={`min-h-10 flex-1 rounded-lg text-sm font-medium border ${(cam.privasi || 'utuh') === p.id
+                                    ? PILIHAN_AKTIF
                                     : 'border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
                             >
                                 {p.label}
@@ -199,7 +202,7 @@ function PanelKamera({ cam, t, onUbah, onHapus }) {
                     </p>
                 </fieldset>
                 <fieldset className="mt-3">
-                    <legend className="text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
+                    <legend className="text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
                         Letak di denah unit pada layar dinding
                     </legend>
                     <div className="flex flex-wrap items-center gap-2 text-sm">
@@ -443,7 +446,7 @@ function FormTambah({ onSelesai }) {
                         </>
                     ) : (
                         <>
-                            <p className="text-xs font-semibold text-slate-600 dark:text-slate-400">Periksa:</p>
+                            <p className="text-xs font-medium text-slate-600 dark:text-slate-400">Periksa:</p>
                             <ol className="list-decimal pl-5 space-y-1 text-slate-700 dark:text-slate-300">
                                 {daftarPeriksa(tes.alamat).map((l) => <li key={l}>{l}</li>)}
                             </ol>
@@ -491,7 +494,7 @@ function FormTambah({ onSelesai }) {
                                             </span>
                                             <span className="block text-xs text-slate-500 font-mono break-all">sumber: {d.source} — {d.name}</span>
                                         </span>
-                                        <span className="text-xs font-semibold underline underline-offset-2 whitespace-nowrap">
+                                        <span className="text-xs font-medium underline underline-offset-2 whitespace-nowrap">
                                             {d.in_use ? 'Sudah dipakai' : 'Pakai kamera ini'}
                                         </span>
                                     </button>
@@ -517,7 +520,7 @@ function FormTambah({ onSelesai }) {
                                             <span className="block font-medium text-sm">{k.label}</span>
                                             <span className="block text-xs text-slate-500 font-mono break-all">{k.source}</span>
                                         </span>
-                                        <span className="text-xs font-semibold underline underline-offset-2 whitespace-nowrap">Pakai alamat ini</span>
+                                        <span className="text-xs font-medium underline underline-offset-2 whitespace-nowrap">Pakai alamat ini</span>
                                     </button>
                                 ))}
                             </div>

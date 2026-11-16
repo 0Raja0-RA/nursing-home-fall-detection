@@ -11,7 +11,7 @@ import { StatusTelegram } from './StatusInsiden';
 import { usePengunjung } from '../context/auth';
 
 const MODEL = { pose: 'Kerangka tubuh (YOLO11-Pose)', bbox: 'Kotak tubuh (model custom)' };
-const TOMBOL = 'min-h-11 px-4 rounded-lg text-sm font-semibold inline-flex items-center justify-center gap-2';
+const TOMBOL = 'min-h-11 px-4 rounded-lg text-sm font-medium inline-flex items-center justify-center gap-2';
 
 /** Ubah putusan alarm yang sudah ditangani. Alasan wajib bila alarm palsu. */
 function FormPutusan({ alert, onSelesai, onBatal }) {
@@ -236,7 +236,7 @@ export default function DetailInsiden({ alert, onTutup, onBerubah }) {
                     <div className="flex items-center justify-between gap-3">
                         <h3 className="text-sm font-semibold">Putusan</h3>
                         {mode !== 'putusan' && !pengunjung && (
-                            <button type="button" onClick={() => setMode('putusan')} className="text-sm font-semibold underline underline-offset-2">
+                            <button type="button" onClick={() => setMode('putusan')} className="text-sm font-medium underline underline-offset-2">
                                 {alert.verdict ? 'Ubah putusan' : 'Beri putusan'}
                             </button>
                         )}
@@ -257,7 +257,7 @@ export default function DetailInsiden({ alert, onTutup, onBerubah }) {
                 <div className="flex items-center justify-between gap-3">
                     <h3 className="text-sm font-semibold">Catatan perawat</h3>
                     {mode !== 'catatan' && !pengunjung && (
-                        <button type="button" onClick={() => setMode('catatan')} className="inline-flex items-center gap-1 text-sm font-semibold underline underline-offset-2">
+                        <button type="button" onClick={() => setMode('catatan')} className="inline-flex items-center gap-1 text-sm font-medium underline underline-offset-2">
                             <Pencil className="w-3.5 h-3.5" aria-hidden="true" />
                             {alert.caregiver_note ? 'Ubah' : 'Tambah catatan'}
                         </button>
@@ -285,7 +285,7 @@ export default function DetailInsiden({ alert, onTutup, onBerubah }) {
                         {alert.telegram_status === 'gagal' && !pengunjung && (
                             <button type="button" disabled={sibuk}
                                 onClick={() => panggil(`/api/alerts/${alert.id}/telegram`, { method: 'POST' })}
-                                className="inline-flex items-center gap-1 text-sm font-semibold underline underline-offset-2 disabled:opacity-50">
+                                className="inline-flex items-center gap-1 text-sm font-medium underline underline-offset-2 disabled:opacity-50">
                                 <RotateCw className="w-3.5 h-3.5" aria-hidden="true" /> Coba lagi
                             </button>
                         )}

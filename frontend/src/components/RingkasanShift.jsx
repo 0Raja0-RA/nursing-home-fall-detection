@@ -172,7 +172,7 @@ export default function RingkasanShift({ onBuka }) {
                         <p className="text-sm text-slate-500">Belum ditandai dibaca shift berikutnya.</p>
                     ) : (
                         <button type="button" onClick={tandaiDibaca} disabled={menandai}
-                            className="min-h-11 px-4 rounded-lg bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 text-sm font-semibold inline-flex items-center gap-2 disabled:opacity-60">
+                            className="min-h-11 px-4 rounded-lg bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 text-sm font-medium inline-flex items-center gap-2 disabled:opacity-60">
                             <CheckCircle2 className="w-4 h-4" aria-hidden="true" /> Tandai sudah dibaca
                         </button>
                     )}

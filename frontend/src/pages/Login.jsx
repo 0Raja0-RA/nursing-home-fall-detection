@@ -110,7 +110,7 @@ export default function Login() {
                 <form onSubmit={handleLogin} className="space-y-6">
                     {/* Input Email */}
                     <div>
-                        <label htmlFor="email" className="block text-sm font-semibold text-slate-600 dark:text-slate-300 mb-2">
+                        <label htmlFor="email" className="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-2">
                             Email
                         </label>
                         <div className="relative">
@@ -135,7 +135,7 @@ export default function Login() {
 
                     {/* Input Password */}
                     <div>
-                        <label htmlFor="password" className="block text-sm font-semibold text-slate-600 dark:text-slate-300 mb-2">
+                        <label htmlFor="password" className="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-2">
                             Password
                         </label>
                         <div className="relative">
@@ -172,7 +172,7 @@ export default function Login() {
                             type="button"
                             onClick={() => jalankan(() => masukPengunjung(tokenQr))}
                             disabled={isLoading}
-                            className="w-full min-h-11 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-100 font-semibold text-sm flex items-center justify-center gap-2 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-70"
+                            className="w-full min-h-11 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-100 font-medium text-sm flex items-center justify-center gap-2 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-70"
                         >
                             <Eye className="w-5 h-5" aria-hidden="true" /> Masuk sebagai pengunjung
                         </button>
@@ -188,7 +188,7 @@ export default function Login() {
 
                 <p className="mt-6 text-center text-xs text-slate-500">
                     Prototipe proyek mahasiswa, bukan alat kesehatan bersertifikat.{' '}
-                    <Link to="/#privasi" className="font-semibold underline underline-offset-2 hover:text-slate-800 dark:hover:text-slate-200">
+                    <Link to="/#privasi" className="font-medium underline underline-offset-2 hover:text-slate-800 dark:hover:text-slate-200">
                         Apa yang disimpan dan siapa yang melihat
                     </Link>
                 </p>

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ChevronRight, Download, FlaskConical, Inbox, Loader2, Plus } from 'lucide-react';
+import { AlertCircle, ChevronRight, Download, FlaskConical, Inbox, Loader2, Plus } from 'lucide-react';
 import { api, bacaGalat, PESAN_TERPUTUS } from '../api';
 import { usePengunjung } from '../context/auth';
 import { useLive } from '../context/LiveContext';
@@ -37,12 +37,19 @@ function Waktu({ iso, sekarang, bertumpuk = false }) {
 // flex-col: isi tombol tidak ditengahkan vertikal, jadi sejajar dengan kartu biasa.
 const KARTU = 'flex flex-col text-left min-w-0 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-2.5 shadow-sm';
 
-/** Satu kartu angka. Bila `onPilih` ada, kartunya sekaligus tombol filter. */
-function Kartu({ judul, nilai, keterangan, onPilih, tegas = false }) {
+/**
+ * Satu kartu angka. Bila `onPilih` ada, kartunya sekaligus tombol filter. Angkanya netral:
+ * merah disimpan untuk alarm yang belum direspons (prinsip 3). `peringatan` menambah ikon
+ * untuk masalah teknis, misalnya pesan Telegram yang gagal terkirim.
+ */
+function Kartu({ judul, nilai, keterangan, onPilih, peringatan = false }) {
     const isi = (
         <>
             <span className="block text-xs text-slate-500">{judul}</span>
-            <span className={`block text-xl font-bold tabular-nums leading-tight mt-0.5 ${tegas ? 'text-red-700 dark:text-red-400' : ''}`}>{nilai}</span>
+            <span className="flex items-center gap-1.5 text-xl font-bold tabular-nums leading-tight mt-0.5">
+                {peringatan && <AlertCircle className="w-4 h-4 shrink-0 text-slate-600 dark:text-slate-300" role="img" aria-label="Perlu diperiksa" />}
+                {nilai}
+            </span>
             <span className="block text-xs text-slate-500 mt-0.5">{keterangan}</span>
         </>
     );
@@ -63,7 +70,7 @@ function KartuMetrik({ metrik, perluTindakan, labelRentang, keAntrean, kePalsu }
         <section aria-label={`Angka ${labelRentang}, tanpa latihan`} className="mb-3">
             <p className="text-xs text-slate-500 mb-1.5">Angka {labelRentang.toLowerCase()}, tanpa latihan.</p>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 lg:gap-3">
-                <Kartu judul="Perlu tindakan" nilai={perluTindakan ?? '–'} tegas={perluTindakan > 0}
+                <Kartu judul="Perlu tindakan" nilai={perluTindakan ?? '–'}
                     keterangan="belum ditangani atau dinilai" onPilih={keAntrean} />
                 <Kartu judul="Median waktu respons"
                     nilai={metrik.median_respons_detik != null ? durasiTeks(metrik.median_respons_detik) : '–'}
@@ -72,7 +79,7 @@ function KartuMetrik({ metrik, perluTindakan, labelRentang, keAntrean, kePalsu }
                     nilai={dinilai ? `${metrik.palsu} dari ${dinilai}` : '–'}
                     keterangan={dinilai ? `${persen}% dari yang dinilai` : 'belum ada yang dinilai'}
                     onPilih={kePalsu} />
-                <Kartu judul="Telegram gagal" nilai={metrik.telegram_gagal} tegas={metrik.telegram_gagal > 0}
+                <Kartu judul="Telegram gagal" nilai={metrik.telegram_gagal} peringatan={metrik.telegram_gagal > 0}
                     keterangan={`dari ${metrik.total} alarm`} />
                 {/* Recall: jatuh yang memicu alarm dibanding semua jatuh yang diketahui, termasuk yang
                     terlewat dan dicatat manual. Tanpa catatan terlewat, angka ini tidak bisa dihitung. */}
@@ -157,7 +164,7 @@ function FormTerlewat({ kamera, onSelesai, onBatal }) {
                 <div className="text-sm font-medium">
                     <div className="flex items-center justify-between gap-2">
                         <label htmlFor="terlewat-waktu">Perkiraan waktu kejadian</label>
-                        <button type="button" onClick={isiSekarang} className="min-h-6 px-1 text-xs font-semibold underline underline-offset-2">
+                        <button type="button" onClick={isiSekarang} className="min-h-6 px-1 text-xs font-medium underline underline-offset-2">
                             Isi jam sekarang
                         </button>
                     </div>
@@ -172,11 +179,11 @@ function FormTerlewat({ kamera, onSelesai, onBatal }) {
             </label>
             {galat && <p role="alert" className="text-sm text-red-700 dark:text-red-400">{galat}</p>}
             <div className="flex justify-end gap-2 pt-1">
-                <button type="button" onClick={onBatal} className="min-h-10 px-4 rounded-lg border border-slate-300 dark:border-slate-700 text-sm font-semibold hover:bg-slate-100 dark:hover:bg-slate-800">
+                <button type="button" onClick={onBatal} className="min-h-10 px-4 rounded-lg border border-slate-300 dark:border-slate-700 text-sm font-medium hover:bg-slate-100 dark:hover:bg-slate-800">
                     Batal
                 </button>
                 <button type="submit" disabled={sibuk || !terpilih}
-                    className="min-h-10 px-4 rounded-lg bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 text-sm font-semibold disabled:opacity-60">
+                    className="min-h-10 px-4 rounded-lg bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 text-sm font-medium disabled:opacity-60">
                     {sibuk ? 'Menyimpan…' : 'Simpan'}
                 </button>
             </div>
@@ -328,10 +335,11 @@ export default function AlertHistory() {
     };
 
     const detailSegar = detail ? (daftar.find((a) => a.id === detail.id) || detail) : null;
-    const tabKelas = (aktif) => `min-h-9 px-3.5 rounded-lg text-sm font-semibold inline-flex items-center gap-2 whitespace-nowrap ${aktif
-        ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900'
+    // Tab aktif: garis bawah di latar yang sedikit terangkat, bukan blok terbalik (prinsip 3).
+    const tabKelas = (aktif) => `min-h-9 px-3.5 rounded-lg text-sm font-medium inline-flex items-center gap-2 whitespace-nowrap ${aktif
+        ? 'bg-slate-100 text-slate-900 shadow-[inset_0_-2px_0_var(--color-slate-900)] dark:bg-slate-800 dark:text-slate-100 dark:shadow-[inset_0_-2px_0_var(--color-slate-100)]'
         : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`;
-    const tombolKepala = 'min-h-10 px-3 rounded-lg border border-slate-300 dark:border-slate-700 text-sm font-semibold inline-flex items-center gap-2 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-60';
+    const tombolKepala = 'min-h-10 px-3 rounded-lg border border-slate-300 dark:border-slate-700 text-sm font-medium inline-flex items-center gap-2 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-60';
     const muatLagi = () => setBatas((b) => b + PER_HALAMAN);
 
     return (
@@ -507,7 +515,7 @@ export default function AlertHistory() {
                                 {adaLagi && (
                                     <div className="p-3 text-center border-t border-slate-200 dark:border-slate-800">
                                         <button type="button" onClick={muatLagi}
-                                            className="min-h-10 px-4 rounded-lg border border-slate-300 dark:border-slate-700 text-sm font-semibold hover:bg-slate-100 dark:hover:bg-slate-800">
+                                            className="min-h-10 px-4 rounded-lg border border-slate-300 dark:border-slate-700 text-sm font-medium hover:bg-slate-100 dark:hover:bg-slate-800">
                                             Muat lebih banyak
                                         </button>
                                     </div>
@@ -538,7 +546,7 @@ export default function AlertHistory() {
                         {adaLagi && (
                             <div className="lg:hidden mt-4 text-center">
                                 <button type="button" onClick={muatLagi}
-                                    className="min-h-11 px-4 rounded-xl border border-slate-300 dark:border-slate-700 text-sm font-semibold hover:bg-slate-100 dark:hover:bg-slate-800">
+                                    className="min-h-11 px-4 rounded-xl border border-slate-300 dark:border-slate-700 text-sm font-medium hover:bg-slate-100 dark:hover:bg-slate-800">
                                     Muat lebih banyak
                                 </button>
                             </div>

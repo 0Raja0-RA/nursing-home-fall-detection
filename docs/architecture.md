@@ -124,6 +124,15 @@ berasal dari riset referensi UI/UX proyek ini (audit 41 temuan, rencana Tahap 1 
    mengandalkan warna saja. Di video, kotak dan kerangka bertepi hitam supaya terlihat di
    latar terang, dan labelnya kata ("berbaring"), tanpa nama kelas model atau angka
    keyakinan; keduanya hanya di Uji Kamera dan "Tampilkan detail AI".
+   Intensitasnya bertingkat. Isian berwarna penuh hanya untuk yang harus ditindak sekarang:
+   banner alarm yang belum direspons dan status di ubin kamera. Yang sedang berjalan (alarm
+   yang sudah diklaim, latihan, Mode perawatan) memakai latar tipis atau garis tepi. Yang
+   normal atau sudah lewat (putusan, angka di kartu, isi riwayat) cukup teks biasa. Lencana
+   jumlah di menu dan chip jumlah alarm merah penuh hanya bila ada alarm sungguhan yang belum
+   diklaim, dan amber bila semuanya sudah diklaim. Menu, tab, dan pilihan yang aktif ditandai
+   garis netral di latar yang sedikit terangkat, bukan blok terbalik. Huruf tebal hanya untuk
+   judul, angka kunci, dan alarm. Ubin alarm di Layar dinding tetap berisi penuh, karena
+   dibaca dari seberang ruangan.
 4. **Penanganan dua langkah, terlihat semua orang.** "Saya ke sana" mencatat nama,
    menghentikan bunyi di semua dashboard, dan menyunting pesan Telegram. "Tandai
    Ditangani" dilakukan setelah penghuni ditolong. Catatan bisa menyusul dari HP: membalas

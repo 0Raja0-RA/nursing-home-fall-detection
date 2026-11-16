@@ -110,7 +110,7 @@ export default function FormPenutupan({ alert, onSelesai, onBatal, polos = false
             )}
 
             <label className="block text-sm">
-                <span className="font-semibold">Catatan tindakan</span>{' '}
+                <span className="font-medium">Catatan tindakan</span>{' '}
                 <span className="text-slate-500">({alasan === 'lainnya' ? 'jelaskan singkat' : 'opsional'})</span>
                 <textarea
                     rows={2}
@@ -128,7 +128,7 @@ export default function FormPenutupan({ alert, onSelesai, onBatal, polos = false
                 <button
                     type="submit"
                     disabled={!siap || sibuk}
-                    className="min-h-11 px-4 rounded-lg text-sm font-semibold bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="min-h-11 px-4 rounded-lg text-sm font-medium bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                     {sibuk ? 'Menyimpan…' : latihan ? 'Tutup latihan' : 'Simpan dan tutup alarm'}
                 </button>

@@ -18,15 +18,22 @@ import Cameras from './pages/Cameras';
 import Login from './pages/Login';
 import LiveCamera from './pages/LiveCamera';
 
-/** Lencana jumlah insiden di menu. Merah hanya kalau ada alarm yang belum ditangani. */
+/**
+ * Lencana jumlah insiden di menu. Merah hanya kalau ada alarm yang belum diklaim, amber
+ * kalau semua alarm terbuka sudah ada yang menuju lokasi, abu-abu kalau tinggal yang
+ * belum dinilai (prinsip 3).
+ */
 function Lencana({ ringkasan }) {
   if (!ringkasan?.perlu_tindakan) return null;
-  const alarm = ringkasan.belum_ditangani > 0;
+  const terbuka = ringkasan.belum_ditangani || 0;
+  const belumDiklaim = terbuka - (ringkasan.sedang_ditangani || 0);
   return (
     <span
-      className={`ml-auto min-w-6 h-6 px-1.5 rounded-full text-xs font-semibold tabular-nums inline-flex items-center justify-center ${alarm
+      className={`ml-auto min-w-6 h-6 px-1.5 rounded-full text-xs font-semibold tabular-nums inline-flex items-center justify-center ${belumDiklaim > 0
         ? 'bg-red-600 text-white'
-        : 'bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-100'}`}
+        : terbuka > 0
+          ? 'bg-amber-100 text-amber-900 ring-1 ring-inset ring-amber-600 dark:bg-amber-950 dark:text-amber-200 dark:ring-amber-400'
+          : 'bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-100'}`}
     >
       {ringkasan.perlu_tindakan}
       <span className="sr-only"> perlu tindakan</span>
@@ -105,8 +112,10 @@ function TataLetakDashboard() {
               onClick={() => setSidebarOpen(false)} // Otomatis tutup sidebar saat menu diklik di HP
               className={({ isActive }) =>
                 // Menu aktif berwarna netral: hijau disisihkan untuk logo, tombol utama, dan sukses.
+                // Penandanya garis kiri di latar yang sedikit terangkat, bukan blok terbalik yang
+                // bersaing dengan alarm (prinsip 3).
                 `flex items-center gap-3 px-4 py-3 rounded-xl transition-colors font-medium text-sm ${isActive
-                  ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900'
+                  ? 'bg-slate-100 text-slate-900 shadow-[inset_3px_0_0_var(--color-slate-900)] dark:bg-slate-800 dark:text-slate-100 dark:shadow-[inset_3px_0_0_var(--color-slate-100)]'
                   : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
                 }`
               }
@@ -145,7 +154,7 @@ function TataLetakDashboard() {
             </button>
             <button
               onClick={keluarSekarang}
-              className="flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              className="flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-medium hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
             >
               <LogOut className="w-4 h-4" /> Keluar
             </button>

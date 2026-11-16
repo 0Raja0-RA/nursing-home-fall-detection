@@ -21,20 +21,27 @@ export default function ToastProvider({ children }) {
         if (tipe !== 'galat') setTimeout(() => tutup(id), LAMA_MS);
     }, [tutup]);
 
-    const butir = (t) => (
-        <div key={t.id} className={`pointer-events-auto flex items-start gap-2.5 rounded-xl px-3.5 py-3 text-sm shadow-lg border ${t.tipe === 'galat'
-            ? 'bg-red-700 border-red-800 text-white'
-            : 'bg-slate-900 border-slate-800 text-white dark:bg-slate-100 dark:border-slate-200 dark:text-slate-900'}`}>
-            {t.tipe === 'galat'
-                ? <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
-                : <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0 text-emerald-400 dark:text-emerald-700" aria-hidden="true" />}
-            <span className="flex-1 min-w-0 break-words">{t.teks}</span>
-            <button type="button" onClick={() => tutup(t.id)} aria-label="Tutup pesan"
-                className="-m-1 p-1 rounded-md opacity-80 hover:opacity-100 hover:bg-white/10 dark:hover:bg-black/10">
-                <X className="w-4 h-4" aria-hidden="true" />
-            </button>
-        </div>
-    );
+    // Galat tidak berlatar merah penuh: merah penuh hanya untuk alarm yang belum direspons
+    // (prinsip 3). Warnanya dibawa tepi kiri dan ikon.
+    const butir = (t) => {
+        const galat = t.tipe === 'galat';
+        return (
+            <div key={t.id} className={`pointer-events-auto flex items-start gap-2.5 rounded-xl px-3.5 py-3 text-sm shadow-lg border ${galat
+                ? 'bg-white border-slate-200 border-l-4 border-l-red-600 text-slate-900 dark:bg-slate-800 dark:border-slate-700 dark:border-l-red-500 dark:text-slate-100'
+                : 'bg-slate-900 border-slate-800 text-white dark:bg-slate-100 dark:border-slate-200 dark:text-slate-900'}`}>
+                {galat
+                    ? <AlertCircle className="w-4 h-4 mt-0.5 shrink-0 text-red-600 dark:text-red-400" aria-hidden="true" />
+                    : <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0 text-emerald-400 dark:text-emerald-700" aria-hidden="true" />}
+                <span className="flex-1 min-w-0 break-words">{t.teks}</span>
+                <button type="button" onClick={() => tutup(t.id)} aria-label="Tutup pesan"
+                    className={`-m-1 p-1 rounded-md opacity-80 hover:opacity-100 ${galat
+                        ? 'hover:bg-slate-100 dark:hover:bg-slate-700'
+                        : 'hover:bg-white/10 dark:hover:bg-black/10'}`}>
+                    <X className="w-4 h-4" aria-hidden="true" />
+                </button>
+            </div>
+        );
+    };
 
     return (
         <KonteksToast.Provider value={kabari}>
