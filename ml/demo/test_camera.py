@@ -128,6 +128,75 @@ class PoseKeypointSmoother:
         self.last_seen.clear()
 
 
+class MultiPersonSmoother:
+    """
+    Mengelola PoseKeypointSmoother terpisah untuk setiap orang di frame (Multi-Person Tracking).
+    Mencegah skeleton antar orang yang berbeda tercampur atau saling tarik-menarik.
+    """
+    def __init__(self, min_cutoff=1.0, beta=0.05):
+        self.min_cutoff = min_cutoff
+        self.beta = beta
+        self.smoothers = {}   # id -> PoseKeypointSmoother
+        self.last_boxes = {}  # id -> np.ndarray [x1, y1, x2, y2]
+        self.last_seen = {}   # id -> float timestamp
+        self.next_id = 0
+
+    def reset(self):
+        self.smoothers.clear()
+        self.last_boxes.clear()
+        self.last_seen.clear()
+
+    def smooth(self, box: np.ndarray, kpts: np.ndarray, timestamp: float) -> np.ndarray:
+        # 1. Bersihkan track lama (> 1.0 detik tidak terlihat)
+        for pid in list(self.last_seen.keys()):
+            if timestamp - self.last_seen[pid] > 1.0:
+                self.smoothers.pop(pid, None)
+                self.last_boxes.pop(pid, None)
+                self.last_seen.pop(pid, None)
+
+        # 2. Cari track orang yang paling cocok berdasarkan jarak pusat bounding box
+        bx_cx = (box[0] + box[2]) / 2.0
+        bx_cy = (box[1] + box[3]) / 2.0
+        bw = max(1.0, box[2] - box[0])
+        bh = max(1.0, box[3] - box[1])
+
+        best_id = None
+        best_dist = 999999.0
+        max_match_dist = max(bw, bh) * 1.5
+
+        for pid, prev_box in self.last_boxes.items():
+            prev_cx = (prev_box[0] + prev_box[2]) / 2.0
+            prev_cy = (prev_box[1] + prev_box[3]) / 2.0
+            dist = math.hypot(bx_cx - prev_cx, bx_cy - prev_cy)
+            if dist < best_dist and dist < max_match_dist:
+                best_dist = dist
+                best_id = pid
+
+        if best_id is None:
+            best_id = self.next_id
+            self.next_id += 1
+            self.smoothers[best_id] = PoseKeypointSmoother(self.min_cutoff, self.beta)
+
+        self.last_boxes[best_id] = box
+        self.last_seen[best_id] = timestamp
+
+        # 3. Smooth keypoint secara terisolasi hanya untuk orang ini
+        smoothed = self.smoothers[best_id].smooth(kpts, timestamp)
+
+        # 4. Bounding Box Guard: Cegah keypoint terlempar jauh keluar dari kotak orangnya
+        pad_x = bw * 0.35
+        pad_y = bh * 0.35
+        min_x, max_x = box[0] - pad_x, box[2] + pad_x
+        min_y, max_y = box[1] - pad_y, box[3] + pad_y
+
+        for i in range(17):
+            if smoothed[i, 2] > 0.15:
+                smoothed[i, 0] = np.clip(smoothed[i, 0], min_x, max_x)
+                smoothed[i, 1] = np.clip(smoothed[i, 1], min_y, max_y)
+
+        return smoothed
+
+
 def list_available_cameras(max_cams: int = 6):
     """Memindai dan mencetak daftar indeks kamera yang terhubung di sistem Windows/Linux."""
     print("==================================================")
@@ -266,7 +335,7 @@ def main():
     rotate_mode = args.rotate
     smooth_mode = not args.no_smooth
     auto_snap_enabled = not args.no_auto_snap
-    smoother = PoseKeypointSmoother()
+    smoother = MultiPersonSmoother()
 
     fps_start = time.time()
     frame_count = 0
@@ -315,7 +384,7 @@ def main():
             for conf, box, kpts in dets:
                 # Terapkan 1-Euro Keypoint Smoothing untuk meredam jitter/getaran skeleton
                 if smooth_mode:
-                    kpts = smoother.smooth(kpts, time.time())
+                    kpts = smoother.smooth(box, kpts, time.time())
 
                 x1, y1, x2, y2 = map(int, box)
                 w_box = max(1, x2 - x1)
