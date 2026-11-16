@@ -78,7 +78,7 @@ export default function Login() {
             {/* Kartu Login */}
             <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 p-8 mt-12 sm:mt-0">
                 <div className="text-center mb-8">
-                    <div className="w-16 h-16 bg-emerald-600 rounded-2xl mx-auto flex items-center justify-center text-white font-bold text-2xl mb-4 shadow-lg shadow-emerald-600/30">
+                    <div className="w-16 h-16 bg-emerald-700 rounded-2xl mx-auto flex items-center justify-center text-white font-bold text-2xl mb-4 shadow-lg shadow-emerald-700/30">
                         FD
                     </div>
                     <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Login Caregiver</h1>

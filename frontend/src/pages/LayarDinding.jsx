@@ -84,12 +84,12 @@ export default function LayarDinding() {
     };
 
     return (
-        <div className="min-h-screen bg-slate-950 text-slate-100 p-4 flex flex-col gap-4">
+        <div className="permukaan-gelap min-h-screen bg-slate-950 text-slate-100 p-4 flex flex-col gap-4">
             <header className="flex flex-wrap items-center gap-3">
                 <Link to="/dashboard" className="p-2 rounded-lg hover:bg-slate-800" aria-label="Kembali ke dashboard">
                     <ArrowLeft className="w-5 h-5" aria-hidden="true" />
                 </Link>
-                <span className="w-9 h-9 rounded-lg bg-emerald-600 text-white font-bold flex items-center justify-center">FD</span>
+                <span className="w-9 h-9 rounded-lg bg-emerald-700 text-white font-bold flex items-center justify-center">FD</span>
                 <h1 className="text-xl font-bold">FallDetect · Layar dinding</h1>
                 <span className="ml-auto flex flex-wrap items-center gap-2 text-sm">
                     {!connected && <span className="px-2.5 py-1 rounded-lg border border-amber-500 text-amber-300">Terputus dari backend</span>}

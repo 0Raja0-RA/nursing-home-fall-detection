@@ -81,7 +81,7 @@ function TataLetakDashboard() {
       `}>
         <div className="mb-8 px-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center text-white font-bold">
+            <span className="w-8 h-8 rounded-lg bg-emerald-700 flex items-center justify-center text-white font-bold">
               FD
             </span>
             <span className="font-bold tracking-tight text-lg">FallDetect</span>
@@ -168,7 +168,7 @@ function TataLetakDashboard() {
           >
             <Menu className="w-5 h-5" />
           </button>
-          <span aria-hidden="true" className="w-7 h-7 rounded-lg bg-emerald-600 flex items-center justify-center text-white text-xs font-bold">
+          <span aria-hidden="true" className="w-7 h-7 rounded-lg bg-emerald-700 flex items-center justify-center text-white text-xs font-bold">
             FD
           </span>
           <span className="font-bold tracking-tight">FallDetect</span>

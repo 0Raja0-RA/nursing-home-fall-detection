@@ -120,7 +120,7 @@ export default function LandingPage() {
                         <img src={logoSvg} alt="" className="w-12 h-12 sm:w-20 sm:h-20 object-contain" />
                         <div>
                             <span className="text-2xl sm:text-3xl font-bold tracking-tight block text-slate-900 dark:text-white">FallDetect</span>
-                            <span className="hidden sm:block text-2xs text-emerald-600 dark:text-emerald-400 font-medium">Pemantauan jatuh untuk panti</span>
+                            <span className="hidden sm:block text-2xs text-emerald-700 dark:text-emerald-400 font-medium">Pemantauan jatuh untuk panti</span>
                         </div>
                     </div>
                 </div>
@@ -142,7 +142,7 @@ export default function LandingPage() {
                     </button>
                     <button
                         onClick={() => navigate('/login')}
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 sm:px-5 py-2.5 rounded-xl font-medium transition-colors flex items-center gap-2 shrink-0"
+                        className="bg-emerald-700 hover:bg-emerald-800 text-white px-4 sm:px-5 py-2.5 rounded-xl font-medium transition-colors flex items-center gap-2 shrink-0"
                     >
                         <span className="sm:hidden">Masuk</span>
                         <span className="hidden sm:inline">Login Caregiver</span>
@@ -167,7 +167,7 @@ export default function LandingPage() {
                     </p>
                     <button
                         onClick={() => navigate('/login')}
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-4 rounded-2xl font-semibold text-lg transition-colors flex items-center gap-3"
+                        className="bg-emerald-700 hover:bg-emerald-800 text-white px-8 py-4 rounded-2xl font-semibold text-lg transition-colors flex items-center gap-3"
                     >
                         <HeartHandshake className="w-5 h-5" aria-hidden="true" /> Masuk ke dasbor
                     </button>

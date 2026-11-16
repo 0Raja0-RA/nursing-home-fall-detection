@@ -464,7 +464,7 @@ export default function SimulationDashboard() {
                             </header>
 
                             <div
-                                className="bg-slate-950 relative flex items-center justify-center text-slate-300 max-h-[75vh] mx-auto"
+                                className="permukaan-gelap bg-slate-950 relative flex items-center justify-center text-slate-300 max-h-[75vh] mx-auto"
                                 style={{ aspectRatio: (aktif && rasio[cam.camera_id]) || 16 / 9 }}
                             >
                                 {dijeda ? (

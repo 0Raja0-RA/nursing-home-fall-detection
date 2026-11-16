@@ -1,10 +1,35 @@
 @import "tailwindcss";
 
 /* Tailwind v4 mengikuti tema sistem operasi untuk dark:. Baris ini membuatnya mengikuti
-   kelas .dark yang dipasang ThemeContext, sehingga tombol tema benar-benar berfungsi. */
-@custom-variant dark (&:where(.dark, .dark *));
+   kelas .dark yang dipasang ThemeContext, sehingga tombol tema benar-benar berfungsi.
+   Bagian yang selalu gelap (.permukaan-gelap: Layar dinding, ubin video) juga memakai gaya dark:
+   di tema terang. */
+@custom-variant dark (&:where(.dark, .dark *, .permukaan-gelap, .permukaan-gelap *));
 
-/* Menambahkan efek custom untuk animasi */
 @theme {
+  /* Menambahkan efek custom untuk animasi */
   --animate-pulse-fast: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+
+  /* Teks sekunder tema terang: slate-500 sedikit digelapkan, 6,0:1 di putih (bawaan 4,76:1).
+     Prinsip 10 di docs/architecture.md. */
+  --color-slate-500: oklch(0.5 0.04 257);
+}
+
+@layer base {
+  /* Tema gelap: latar, kartu, dan judul tetap memakai slate bawaan. Hanya dua abu-abu teks
+     sekunder yang diterangkan, supaya `text-slate-500` yang tidak punya pasangan `dark:` dan
+     `dark:text-slate-400` lolos 4,5:1 dan APCA Lc 60 di slate-950, 900, dan 800. Jadi di tema
+     gelap kedua kelas ini berarti "teks sekunder", bukan warna slate aslinya.
+     .permukaan-gelap: bagian yang selalu gelap di tema apa pun (Layar dinding). */
+  .dark,
+  .permukaan-gelap {
+    --color-slate-500: oklch(0.8 0.035 257); /* #b0bfd5, 9,6:1 di slate-900 */
+    --color-slate-400: oklch(0.82 0.035 257); /* #b6c5db, 10,2:1 di slate-900 */
+  }
+
+  /* Bagian yang selalu putih di tema gelap (formulir penutupan) memakai nilai tema terang. */
+  .dark .permukaan-terang {
+    --color-slate-500: oklch(0.5 0.04 257);
+    --color-slate-400: oklch(70.4% 0.04 256.788);
+  }
 }

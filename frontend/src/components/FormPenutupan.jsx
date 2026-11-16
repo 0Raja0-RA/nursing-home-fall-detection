@@ -86,8 +86,8 @@ export default function FormPenutupan({ alert, onSelesai, onBatal, polos = false
 
     return (
         <form onSubmit={kirim} className={polos
-            ? 'w-full space-y-3 dark:rounded-xl dark:bg-white dark:text-slate-800 dark:p-4'
-            : 'w-full rounded-xl bg-white text-slate-800 p-3 sm:p-4 shadow-sm space-y-3'}>
+            ? 'permukaan-terang w-full space-y-3 dark:rounded-xl dark:bg-white dark:text-slate-800 dark:p-4'
+            : 'permukaan-terang w-full rounded-xl bg-white text-slate-800 p-3 sm:p-4 shadow-sm space-y-3'}>
             {latihan ? (
                 <p className="text-sm text-slate-600">Latihan ditutup tanpa putusan, dan tidak ikut dihitung di riwayat.</p>
             ) : (

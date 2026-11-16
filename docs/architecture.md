@@ -157,6 +157,16 @@ berasal dari riset referensi UI/UX proyek ini (audit 41 temuan, rencana Tahap 1 
    halaman. Di bawah 1280 px ketiga kolom Pengaturan terlalu sempit, jadi kartunya disusun
    menurun. Acuan ujinya area 1536 × 730 dan 1536 × 834 px. Penjelasan panjang di Pengaturan
    ada di ikon ⓘ, berupa menu kecil.
+10. **Teks terbaca di kedua tema.** Semua teks memenuhi kontras minimal 4,5:1 (WCAG AA) dan
+   APCA Lc 60, di tema terang maupun gelap. Tema gelap memakai latar, kartu, dan judul slate
+   bawaan, tetapi `index.css` menerangkan dua abu-abu teks sekunder: di tema gelap
+   `text-slate-500` dan `text-slate-400` menjadi #b0bfd5 dan #b6c5db (9,6:1 dan 10,2:1 di
+   slate-900), jadi `text-slate-500` yang lupa diberi pasangan `dark:` tetap terbaca. Bagian
+   yang selalu gelap atau selalu putih, apa pun temanya, memakai kelas `permukaan-gelap` atau
+   `permukaan-terang` supaya ikut nilai yang benar; di dalam `permukaan-gelap` (Layar dinding,
+   ubin video) gaya `dark:` juga berlaku di tema terang. Di tema terang slate-500 sedikit
+   digelapkan (6,0:1 di putih), dan isian hijau di bawah teks putih memakai emerald-700
+   (5,36:1).
 
 ### Status kamera (tile di Pemantauan)
 
