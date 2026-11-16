@@ -5,7 +5,25 @@
     <link rel="icon" href="/favicon.ico" sizes="32x32" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- interactive-widget: di Android, papan ketik memperkecil tata letak seperti di iOS,
+         sehingga laci setinggi layar dan tombol simpan di bawahnya tetap terlihat. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content" />
+    <!-- Warna bilah status dan bilah alamat HP: bilah atas dashboard (slate-900 gelap, putih terang). -->
+    <meta name="theme-color" content="#0f172b" />
+    <script>
+      // Tema dan Teks besar dipasang sebelum halaman pertama kali digambar, supaya tema gelap
+      // tidak diawali kilatan terang. Kuncinya sama dengan src/context/ThemeContext.jsx.
+      try {
+        if (localStorage.getItem('theme') === 'false') {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#ffffff');
+        } else {
+          document.documentElement.classList.add('dark');
+        }
+        if (localStorage.getItem('teks-besar') === 'true') document.documentElement.classList.add('teks-besar');
+      } catch (e) {
+        document.documentElement.classList.add('dark');
+      }
+    </script>
     <title>FallDetect</title>
   </head>
   <body>

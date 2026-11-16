@@ -38,9 +38,9 @@ export default function Dialog({ judul, keterangan, onTutup, onEsc, children, le
     }, [fokusKolom]);
 
     const bentuk = laci
-        // Menempel di kanan setinggi layar. Bergeser masuk sedikit saat dibuka, kecuali
-        // pengguna meminta gerak dikurangi.
-        ? 'fixed inset-y-0 right-0 left-auto m-0 h-dvh max-h-none w-full max-w-none sm:max-w-lg rounded-none sm:rounded-l-2xl border-y-0 border-r-0 max-sm:border-l-0 transition-[translate,opacity] duration-200 ease-out starting:open:translate-x-8 starting:open:opacity-0 motion-reduce:transition-none'
+        // Menempel di kanan setinggi layar. Bergeser masuk sedikit saat dibuka. Bila pengguna
+        // meminta gerak dikurangi, laci hanya memudar masuk tanpa bergeser.
+        ? 'fixed inset-y-0 right-0 left-auto m-0 h-dvh max-h-none w-full max-w-none sm:max-w-lg rounded-none sm:rounded-l-2xl border-y-0 border-r-0 max-sm:border-l-0 transition-[translate,opacity] duration-200 ease-laci starting:open:translate-x-8 starting:open:opacity-0 motion-reduce:transition-opacity'
         // m-auto: preflight Tailwind menolkan margin, padahal margin auto bawaan browser
         // itulah yang menaruh dialog modal di tengah layar.
         : `m-auto w-[calc(100vw-2rem)] ${lebar} rounded-2xl`;
@@ -73,7 +73,8 @@ export default function Dialog({ judul, keterangan, onTutup, onEsc, children, le
             onClose={() => { if (!ref.current?.open) onTutup(); }}
             // Klik di latar (bukan di isi) mengenai elemen dialog itu sendiri.
             onClick={(e) => { if (e.target === ref.current) onTutup(); }}
-            className={`p-0 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 shadow-xl backdrop:bg-slate-950/60 ${bentuk}`}
+            // overscroll-contain: menggulir sampai ujung isi dialog tidak ikut menggulir halaman di belakangnya.
+            className={`p-0 overscroll-contain border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 shadow-xl backdrop:bg-slate-950/60 ${bentuk}`}
         >
             {laci ? (
                 <div className="min-h-full flex flex-col">

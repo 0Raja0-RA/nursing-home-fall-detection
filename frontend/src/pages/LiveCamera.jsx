@@ -206,7 +206,7 @@ export default function LiveCamera() {
                     onLoad={() => setErrorMsg('')}
                     onError={() => setErrorMsg('Video tidak dapat dimuat. Pastikan server (run-backend.bat) berjalan dan kameranya terbaca.')}
                     style={{ transform: `rotate(${rotasi}deg)` }}
-                    className="w-full h-full object-contain transition-transform"
+                    className="w-full h-full object-contain transition-transform motion-reduce:transition-none"
                 />
                 <div className="absolute top-4 left-4">
                     <StatusKamera status={status} className="text-sm px-3 py-1 shadow-lg" />

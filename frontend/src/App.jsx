@@ -70,7 +70,8 @@ function TataLetakDashboard() {
     // overflow-x-clip, bukan overflow-x-hidden: hidden menjadikan wadah ini wadah gulir,
     // sehingga banner alarm dan sidebar yang sticky ikut tergulir pergi alih-alih
     // menempel di atas layar. clip tetap memotong luapan ke samping tanpa efek itu.
-    <div className="flex min-h-screen bg-slate-100 dark:bg-slate-950 text-slate-800 dark:text-slate-200 font-sans transition-colors overflow-x-clip relative">
+    // data-dasbor: penanda untuk index.css (dashboard tidak dimuat ulang saat ditarik di HP).
+    <div data-dasbor className="flex min-h-dvh bg-slate-100 dark:bg-slate-950 text-slate-800 dark:text-slate-200 font-sans overflow-x-clip relative">
 
       {/* Overlay Gelap saat Sidebar Terbuka di HP */}
       {sidebarOpen && (
@@ -80,11 +81,14 @@ function TataLetakDashboard() {
         />
       )}
 
-      {/* Sidebar (Collapsible Drawer) */}
+      {/* Sidebar (Collapsible Drawer). h-dvh, bukan h-screen: 100vh di HP dan tablet lebih
+          tinggi dari layar yang terlihat saat bilah alamat tampil, sehingga tombol Keluar di
+          bawahnya bisa tertutup. Isinya menggulir bila layar terlalu pendek (HP mendatar). */}
       <aside className={`
-        fixed md:sticky md:top-0 md:h-screen md:self-start inset-y-0 left-0 z-50
+        fixed md:sticky md:top-0 md:h-dvh md:self-start inset-y-0 left-0 z-50
         w-64 in-[.teks-besar]:w-72 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800
-        flex flex-col p-4 shrink-0 transition-transform duration-300 ease-in-out
+        flex flex-col p-4 shrink-0 overflow-y-auto overscroll-contain
+        transition-transform duration-300 ease-laci motion-reduce:transition-none
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
       `}>
         <div className="mb-8 px-4 flex items-center justify-between">
@@ -219,7 +223,7 @@ function DashboardLayout() {
 
 function LayarPenuh({ children }) {
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-700 dark:text-slate-200 flex flex-col items-center justify-center gap-3 p-6 text-center">
+    <div className="min-h-svh bg-slate-50 dark:bg-slate-950 text-slate-700 dark:text-slate-200 flex flex-col items-center justify-center gap-3 p-6 text-center">
       {children}
     </div>
   );

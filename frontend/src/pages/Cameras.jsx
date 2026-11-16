@@ -242,7 +242,7 @@ function PanelKamera({ cam, t, onUbah, onHapus }) {
                 <label className="flex-1">
                     <span className={LABEL}>Alamat baru</span>
                     <input value={alamat} onChange={(e) => setAlamat(e.target.value)} placeholder={cam.source}
-                        className={`${INPUT} font-mono`} spellCheck={false} autoCapitalize="none" />
+                        className={`${INPUT} font-mono`} inputMode="url" spellCheck={false} autoCapitalize="none" autoCorrect="off" />
                     <span className="block text-xs text-slate-500 mt-1">Kosongkan bila alamatnya tidak berubah. Alamat diperiksa dulu sebelum disimpan.</span>
                 </label>
                 <button type="submit" disabled={Boolean(sibuk) || !alamat.trim()} className={TOMBOL_NETRAL}>
@@ -385,7 +385,7 @@ function FormTambah({ onSelesai }) {
             <label className="block">
                 <span className={LABEL}>Alamat kamera</span>
                 <input value={alamat} onChange={(e) => setAlamat(e.target.value)} required
-                    placeholder="http://192.168.43.1:8080/video" spellCheck={false} autoCapitalize="none"
+                    placeholder="http://192.168.43.1:8080/video" inputMode="url" spellCheck={false} autoCapitalize="none" autoCorrect="off"
                     className={`${INPUT} font-mono`} />
                 <span className="block text-xs text-slate-500 mt-1">
                     Webcam laptop: <code>0</code>. Kamera HP (IP Webcam): <code>http://IP-HP:8080/video</code>.
@@ -398,7 +398,7 @@ function FormTambah({ onSelesai }) {
                     <label>
                         <span className={LABEL}>Nama pengguna kamera <span className="font-normal text-slate-500">(opsional)</span></span>
                         <input value={pengguna} onChange={(e) => setPengguna(e.target.value)} autoComplete="off"
-                            spellCheck={false} autoCapitalize="none" className={INPUT} />
+                            spellCheck={false} autoCapitalize="none" autoCorrect="off" className={INPUT} />
                     </label>
                     <label>
                         <span className={LABEL}>Kata sandi kamera <span className="font-normal text-slate-500">(opsional)</span></span>

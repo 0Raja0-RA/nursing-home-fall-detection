@@ -109,7 +109,7 @@ export default function LandingPage() {
     }, [hash]);
 
     return (
-        <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 transition-colors">
+        <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200">
             {/* Navbar */}
             <nav className="flex justify-between items-center px-4 sm:px-8 py-6 max-w-7xl mx-auto">
                 <div className="flex items-center gap-3">

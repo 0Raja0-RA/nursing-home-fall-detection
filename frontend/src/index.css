@@ -22,6 +22,9 @@
   --text-xs: 0.8125rem;
   --text-xs--line-height: 1.125rem;
   --text-sm--line-height: 1.3125rem;
+
+  /* Kurva laci (menu samping HP dan laci detail): langsung bergerak cepat lalu melambat. */
+  --ease-laci: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 @layer base {
@@ -29,17 +32,58 @@
      sekunder yang diterangkan, supaya `text-slate-500` yang tidak punya pasangan `dark:` dan
      `dark:text-slate-400` lolos 4,5:1 dan APCA Lc 60 di slate-950, 900, dan 800. Jadi di tema
      gelap kedua kelas ini berarti "teks sekunder", bukan warna slate aslinya.
-     .permukaan-gelap: bagian yang selalu gelap di tema apa pun (Layar dinding). */
+     .permukaan-gelap: bagian yang selalu gelap di tema apa pun (Layar dinding).
+     color-scheme membuat bilah gulir, ikon kalender, dan daftar pilihan bawaan browser ikut
+     gelap, tidak putih di tengah halaman gelap. */
   .dark,
   .permukaan-gelap {
     --color-slate-500: oklch(0.8 0.035 257); /* #b0bfd5, 9,6:1 di slate-900 */
     --color-slate-400: oklch(0.82 0.035 257); /* #b6c5db, 10,2:1 di slate-900 */
+    color-scheme: dark;
   }
 
   /* Bagian yang selalu putih di tema gelap (formulir penutupan) memakai nilai tema terang. */
   .dark .permukaan-terang {
     --color-slate-500: oklch(0.5 0.04 257);
     --color-slate-400: oklch(70.4% 0.04 256.788);
+    color-scheme: light;
+  }
+
+  /* Latar halaman mengikuti tema aplikasi. Latar inilah yang terlihat saat halaman memantul
+     di ujung guliran HP, dan di tepi layar ponsel berponi yang diputar mendatar. */
+  html {
+    background-color: var(--color-slate-100);
+  }
+  html.dark {
+    background-color: var(--color-slate-950);
+  }
+
+  /* Dashboard tidak dimuat ulang saat ditarik ke bawah di HP. Muat ulang yang tidak sengaja
+     memutus siaran langsung dan mengunci bunyi alarm sampai layar disentuh lagi
+     (hooks/useAlarmSound.js). contain, bukan none: pantulan bawaan browser tetap ada. */
+  html:has([data-dasbor]) {
+    overscroll-behavior-y: contain;
+  }
+
+  /* Tanda tekan. Preflight Tailwind mematikan kilatan ketuk bawaan HP, dan gaya hover: hanya
+     berlaku di perangkat ber-mouse, jadi tanpa ini tombol tidak berubah apa pun saat disentuh.
+     Hanya opasitas, tanpa gerak. */
+  :where(button, a[href], [role="button"], summary):active:not(:disabled, [aria-disabled="true"]) {
+    opacity: 0.7;
+  }
+
+  /* Ketukan langsung diteruskan, tanpa menunggu kemungkinan ketukan ganda untuk zoom. Zoom
+     dengan dua jari tetap bisa. */
+  :where(button, a[href], [role="button"], summary, label, input, select, textarea) {
+    touch-action: manipulation;
+  }
+
+  /* Menahan jari di tombol tidak menyorot tulisannya atau memunculkan menu salin. Teks isi
+     halaman tetap bisa disalin. */
+  :where(button, [role="button"]) {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
   }
 
   /* Banner alarm menempel di atas halaman. Saat halaman digulir, elemen yang difokus keyboard
@@ -79,5 +123,16 @@
         hyphens: auto;
       }
     }
+  }
+}
+
+/* Di layar sentuh, kolom isian berhuruf minimal 16 px. iOS Safari memperbesar halaman saat
+   kolom berhuruf lebih kecil difokus, dan tidak mengecilkannya lagi setelahnya. Sengaja di
+   luar @layer: aturan tanpa lapisan mengalahkan text-sm dan text-xs di lapisan utilities. */
+@media (pointer: coarse) {
+  input:not([type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="file"]),
+  select,
+  textarea {
+    font-size: max(1rem, 16px);
   }
 }

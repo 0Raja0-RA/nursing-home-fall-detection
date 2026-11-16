@@ -3,23 +3,25 @@ import { createContext, useContext, useState, useEffect } from 'react';
 const ThemeContext = createContext();
 
 export function ThemeProvider({ children }) {
-    // 1. Baca dari localStorage, jika kosong default ke true (dark mode)
+    // Tema gelap kecuali pengguna pernah memilih terang. Penyimpanan browser yang diblokir
+    // tidak boleh menggagalkan aplikasi. Skrip kecil di index.html membaca kunci yang sama
+    // sebelum halaman digambar, supaya tema gelap tidak diawali kilatan terang.
     const [darkMode, setDarkMode] = useState(() => {
-        const saved = localStorage.getItem('theme');
-        if (saved !== null) {
-            return JSON.parse(saved);
+        try {
+            return localStorage.getItem('theme') !== 'false';
+        } catch {
+            return true;
         }
-        return true; // Default awal gelap
     });
 
     useEffect(() => {
-        const root = document.documentElement;
-        if (darkMode) {
-            root.classList.add('dark');
-            localStorage.setItem('theme', JSON.stringify(true));
-        } else {
-            root.classList.remove('dark');
-            localStorage.setItem('theme', JSON.stringify(false));
+        document.documentElement.classList.toggle('dark', darkMode);
+        // Bilah status dan bilah alamat browser HP mengikuti warna bilah atas dashboard.
+        document.querySelector('meta[name="theme-color"]')?.setAttribute('content', darkMode ? '#0f172b' : '#ffffff');
+        try {
+            localStorage.setItem('theme', JSON.stringify(darkMode));
+        } catch {
+            // Penyimpanan browser diblokir: pilihan berlaku sampai halaman ditutup.
         }
     }, [darkMode]);
 

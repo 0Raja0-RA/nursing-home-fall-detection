@@ -91,7 +91,7 @@ export default function MenuKecil({ pemicu, judul, children }) {
                 ref={panel}
                 id={idPanel}
                 popover="auto"
-                className="m-0 p-0 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 shadow-xl max-sm:inset-x-0 max-sm:top-auto max-sm:bottom-0 max-sm:w-full max-sm:max-w-none max-sm:max-h-[80dvh] max-sm:rounded-b-none max-sm:backdrop:bg-slate-950/40"
+                className="m-0 p-0 overscroll-contain rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 shadow-xl max-sm:inset-x-0 max-sm:top-auto max-sm:bottom-0 max-sm:w-full max-sm:max-w-none max-sm:max-h-[80dvh] max-sm:rounded-b-none max-sm:backdrop:bg-slate-950/40"
             >
                 <div className="flex items-start justify-between gap-2 pl-4 pr-2 pt-2">
                     <p className="font-semibold text-sm pt-1.5">{judul}</p>

@@ -5,7 +5,7 @@ import { api, PESAN_TERPUTUS } from '../api';
 import { useAuth } from '../context/auth';
 import logo from '../assets/logo-falldetect.svg';
 
-const INPUT = 'w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl py-3 pl-11 pr-4 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all text-sm';
+const INPUT = 'w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl py-3 pl-11 pr-4 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm';
 
 /**
  * Token pengunjung dari QR di stand: /lihat#t=TOKEN.
@@ -67,7 +67,8 @@ export default function Login() {
     };
 
     return (
-        <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col justify-center items-center p-4 transition-colors">
+        // min-h-svh: kartu berada di tengah layar yang terlihat, walau bilah alamat HP tampil.
+        <div className="min-h-svh bg-slate-50 dark:bg-slate-950 flex flex-col justify-center items-center p-4">
             {/* Tombol Kembali */}
             <button
                 onClick={() => navigate('/')}
@@ -122,7 +123,9 @@ export default function Login() {
                                 inputMode="email"
                                 autoComplete="username"
                                 autoCapitalize="none"
+                                autoCorrect="off"
                                 spellCheck={false}
+                                enterKeyHint="next"
                                 required
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
@@ -145,6 +148,7 @@ export default function Login() {
                                 id="password"
                                 type="password"
                                 autoComplete="current-password"
+                                enterKeyHint="go"
                                 required
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
@@ -158,7 +162,7 @@ export default function Login() {
                     <button
                         type="submit"
                         disabled={isLoading}
-                        className="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-emerald-700/30 transition-all flex items-center justify-center gap-2 disabled:opacity-70 text-sm"
+                        className="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-emerald-700/30 transition-colors flex items-center justify-center gap-2 disabled:opacity-70 text-sm"
                     >
                         {isLoading ? 'Memeriksa…' : <><LogIn className="w-5 h-5" aria-hidden="true" /> Masuk ke Dashboard</>}
                     </button>
