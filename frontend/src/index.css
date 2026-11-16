@@ -57,6 +57,15 @@
   p {
     text-wrap: pretty;
   }
+
+  /* Teks besar per perangkat (tombol di samping tombol tema, disimpan di browser):
+     text-xs 14 px dan text-sm 16 px. Kolom Pengaturan boleh menggulir di dalam kolomnya. */
+  .teks-besar {
+    --text-xs: 0.875rem;
+    --text-xs--line-height: 1.25rem;
+    --text-sm: 1rem;
+    --text-sm--line-height: 1.5rem;
+  }
 }
 
 @layer components {

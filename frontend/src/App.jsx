@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, NavLink, Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, History, Settings as SettingsIcon, Video, Sun, Moon, LogOut, Menu, X, Loader2, ServerOff } from 'lucide-react';
+import { LayoutDashboard, History, Settings as SettingsIcon, Video, Sun, Moon, LogOut, Menu, X, Loader2, ServerOff, ALargeSmall } from 'lucide-react';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { LiveProvider, useLive } from './context/LiveContext';
 import LayarDinding from './pages/LayarDinding';
@@ -43,7 +43,7 @@ function Lencana({ ringkasan }) {
 
 // Komponen Sidebar untuk Dashboard Caregiver
 function TataLetakDashboard() {
-  const { darkMode, setDarkMode } = useTheme();
+  const { darkMode, setDarkMode, teksBesar, setTeksBesar } = useTheme();
   const { akun, keluar } = useAuth();
   const pengunjung = usePengunjung();
   const { ringkasan } = useLive();
@@ -82,7 +82,7 @@ function TataLetakDashboard() {
       {/* Sidebar (Collapsible Drawer) */}
       <aside className={`
         fixed md:sticky md:top-0 md:h-screen md:self-start inset-y-0 left-0 z-50
-        w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800
+        w-64 in-[.teks-besar]:w-72 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800
         flex flex-col p-4 shrink-0 transition-transform duration-300 ease-in-out
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
       `}>
@@ -144,14 +144,28 @@ function TataLetakDashboard() {
             )}
           </div>
           <div className="flex items-center justify-between">
-            <button
-              onClick={() => setDarkMode(!darkMode)}
-              className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:opacity-80 transition-opacity"
-              title="Ubah tema"
-              aria-label="Ubah tema"
-            >
-              {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-            </button>
+            {/* Pilihan tampilan per perangkat: tema dan Teks besar (prinsip 10). */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setDarkMode(!darkMode)}
+                className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:opacity-80 transition-opacity"
+                title="Ubah tema"
+                aria-label="Ubah tema"
+              >
+                {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+              </button>
+              <button
+                onClick={() => setTeksBesar(!teksBesar)}
+                aria-pressed={teksBesar}
+                className={`p-2.5 rounded-xl hover:opacity-80 transition-opacity ${teksBesar
+                  ? 'bg-slate-200 text-slate-900 ring-1 ring-inset ring-slate-900 dark:bg-slate-700 dark:text-slate-100 dark:ring-slate-100'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'}`}
+                title="Teks besar"
+                aria-label="Teks besar"
+              >
+                <ALargeSmall className="w-5 h-5" />
+              </button>
+            </div>
             <button
               onClick={keluarSekarang}
               className="flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-medium hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"

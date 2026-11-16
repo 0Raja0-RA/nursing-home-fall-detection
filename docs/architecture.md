@@ -177,7 +177,9 @@ berasal dari riset referensi UI/UX proyek ini (audit 41 temuan, rencana Tahap 1 
    digelapkan (6,0:1 di putih), dan isian hijau di bawah teks putih memakai emerald-700
    (5,36:1). Font-nya Inter, berkasnya ikut aplikasi lewat `@fontsource-variable/inter`
    sehingga tetap tampil tanpa internet. Huruf terkecil 13 px: `text-xs` diubah dari 12 ke
-   13 px di `index.css`, dan ukuran tetap seperti `text-[11px]` tidak dipakai. Teks rata kiri
+   13 px di `index.css`, dan ukuran tetap seperti `text-[11px]` tidak dipakai. "Teks besar"
+   (14 dan 16 px) bisa dinyalakan per perangkat lewat tombol di samping tombol tema; saat
+   menyala, kolom Pengaturan boleh menggulir di dalam kolomnya. Teks rata kiri
    dengan `text-wrap: pretty`. Paragraf penjelasan tiga baris atau lebih diberi kelas
    `paragraf-penuh`: rata kiri-kanan hanya di layar minimal 640 px dan di kotak minimal 360 px
    (wadahnya berkelas `@container`, misalnya isi ⓘ yang lebarnya 400 px), dengan pemenggalan

@@ -28,8 +28,27 @@ export function ThemeProvider({ children }) {
         setDarkMode(prev => !prev);
     };
 
+    // Teks besar per perangkat (prinsip 10 di docs/architecture.md): kelas .teks-besar di <html>
+    // menaikkan text-xs ke 14 px dan text-sm ke 16 px. Disimpan di browser seperti tema.
+    const [teksBesar, setTeksBesar] = useState(() => {
+        try {
+            return localStorage.getItem('teks-besar') === 'true';
+        } catch {
+            return false;
+        }
+    });
+
+    useEffect(() => {
+        document.documentElement.classList.toggle('teks-besar', teksBesar);
+        try {
+            localStorage.setItem('teks-besar', String(teksBesar));
+        } catch {
+            // Penyimpanan browser diblokir: pilihan berlaku sampai halaman ditutup.
+        }
+    }, [teksBesar]);
+
     return (
-        <ThemeContext.Provider value={{ darkMode, setDarkMode, toggleTheme }}>
+        <ThemeContext.Provider value={{ darkMode, setDarkMode, toggleTheme, teksBesar, setTeksBesar }}>
             {children}
         </ThemeContext.Provider>
     );
