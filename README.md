@@ -26,7 +26,7 @@ nursing-home-fall-detection/
 ├── backend/         # FastAPI: REST, WebSocket, pipeline deteksi
 ├── frontend/        # React + Vite dashboard
 ├── docs/            # Dokumentasi, sumber flowchart, dan GIF-nya
-├── deployment/      # docker-compose + template .env
+├── deployment/      # Dockerfile, docker-compose, template .env, video uji
 ├── tools/           # Skrip bantu (uji kamera, chat_id Telegram, pembuat GIF)
 ├── run-backend.bat  # Jalankan backend
 └── run-frontend.bat # Jalankan dashboard
@@ -238,19 +238,36 @@ alasannya ada di [docs/deploy-pameran.md](docs/deploy-pameran.md).
 ---
 
 
-## Docker Deployment
+## Docker
 
-> **Belum diuji, dan diketahui belum sesuai.** Berkas Compose dan Dockerfile masih dari
-> kerangka awal proyek: `backend/Dockerfile` memakai `python:3.11-slim`, padahal
-> `ultralytics` butuh 3.12. Jalur Docker juga belum menangani akses kamera dari dalam
-> container, yang di Windows tidak sesederhana memasang volume.
->
-> Untuk sekarang, pakai `run-backend.bat` dan `run-frontend.bat` di Quick Start.
+Satu container berisi backend dan dashboard hasil build, sama seperti mode pameran, jadi
+dashboard dan API berada di satu alamat.
 
-```bash
-cd deployment
-docker compose up --build
-```
+1. Salin `deployment/.env.example` menjadi `deployment/.env`, lalu isi `DEMO_USERNAME` dan
+   `DEMO_PASSWORD`. Akun ini dibuat otomatis saat backend menyala.
+2. Siapkan sumber kamera. Webcam laptop tidak bisa dibuka dari dalam Docker di Windows, jadi
+   pilih salah satu:
+   - taruh video di `deployment/video/` dan isi `CAMERA_SOURCE=/app/video/<nama>.mp4`;
+   - pakai kamera HP lewat aplikasi IP Webcam: `CAMERA_SOURCE=http://<ip-hp>:8080/video`.
+3. Jalankan:
+
+   ```bash
+   cd deployment
+   docker compose up --build
+   ```
+
+4. Buka http://localhost:8000 untuk dashboard, dan http://localhost:8000/docs untuk
+   dokumentasi API.
+
+Catatan:
+- Image memakai PyTorch versi CPU, tanpa GPU, dan berukuran sekitar 2,8 GB. Build pertama
+  mengunduh Node, Python, dan PyTorch, jadi butuh internet; di koneksi lambat bisa sekitar
+  30 menit. Build berikutnya memakai cache dan jauh lebih cepat.
+- Bobot model dibaca dari `ml/models` (langkah 3 Quick Start). Bila `yolo11n-pose.pt` tidak
+  ada, Ultralytics mengunduh model pose resmi saat frame pertama.
+- Database, foto kejadian, dan klip tersimpan di volume `falldetect-data`.
+  `docker compose down` mematikan container tanpa menghapus data; tambahkan `-v` untuk ikut
+  menghapus data.
 
 ---
 

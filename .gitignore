@@ -56,6 +56,9 @@ Thumbs.db
 
 # ---- Docker -------------------------------------------------
 *.log
+# Video uji untuk kamera di Docker: bisa besar dan memuat wajah orang.
+deployment/video/*
+!deployment/video/README.md
 
 # ---- Database -----------------------------------------------
 *.db

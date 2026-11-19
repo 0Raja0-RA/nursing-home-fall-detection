@@ -1,46 +1,43 @@
 # ============================================================
-# Fall Detection — Docker Compose
+# FallDetect — Docker Compose
 # ============================================================
-# Jalankan seluruh stack (backend + frontend) dengan:
+# Satu service: backend FastAPI yang ikut menyajikan dashboard. Setelah jalan,
+# buka http://localhost:8000 (dashboard) dan http://localhost:8000/docs (API).
+#
+# Persiapan sekali, di folder deployment:
+#   1. Salin .env.example menjadi .env, lalu isi DEMO_USERNAME dan DEMO_PASSWORD.
+#   2. Siapkan sumber kamera (lihat bagian kamera di .env.example).
+# Lalu jalankan:
 #   docker compose up --build
 # ============================================================
 
 services:
-  # ---- Backend (FastAPI) ------------------------------------
-  backend:
+  falldetect:
     build:
-      context: ../backend
-      dockerfile: Dockerfile
-    container_name: fall-detection-backend
+      context: ..
+      dockerfile: deployment/Dockerfile
+    image: falldetect:latest
+    container_name: falldetect
     ports:
       - "8000:8000"
     env_file:
-      - .env.example   # Ganti ke .env di production
+      - .env
     volumes:
-      # Mount model files dari host
+      # Bobot model dari repo. Bila yolo11n-pose.pt tidak ada, Ultralytics
+      # mengunduh model pose resmi saat frame pertama.
       - ../ml/models:/app/ml/models:ro
-      # Mount database file (persist di luar container)
-      - fall-detection-db:/app/data
+      # Video untuk kamera. Webcam laptop tidak bisa dibuka dari dalam Docker di Windows.
+      - ./video:/app/video:ro
+      # Database, foto kejadian, dan klip.
+      - falldetect-data:/app/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      # Image tidak memasang curl, jadi health check memakai Python.
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health', timeout=5)"]
       interval: 30s
       timeout: 10s
       retries: 3
-
-  # ---- Frontend (React + Vite) ------------------------------
-  frontend:
-    build:
-      context: ../frontend
-      dockerfile: Dockerfile
-    container_name: fall-detection-frontend
-    ports:
-      - "5173:80"
-    depends_on:
-      backend:
-        condition: service_healthy
-    restart: unless-stopped
+      start_period: 60s
 
 volumes:
-  fall-detection-db:
-    driver: local
+  falldetect-data:

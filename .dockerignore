@@ -1,0 +1,12 @@
+# Konteks build image Docker (deployment/Dockerfile): hanya berkas yang dibutuhkan image.
+# Semua dikecualikan lebih dulu, lalu yang dipakai dibuka satu per satu, supaya .venv,
+# node_modules, database, klip, bobot model, dan .env tidak pernah ikut terkirim ke Docker.
+*
+!backend/requirements.txt
+!backend/app/**
+!frontend/**
+frontend/node_modules
+frontend/dist
+**/__pycache__
+**/.env
+**/.env.*
