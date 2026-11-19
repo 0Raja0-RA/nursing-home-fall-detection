@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { BellOff, CheckCircle2, FlaskConical, Footprints, TriangleAlert, Video, VolumeX, WifiOff } from 'lucide-react';
+import { BellOff, CheckCircle2, FlaskConical, Footprints, TriangleAlert, Video, VolumeX, WifiOff, X } from 'lucide-react';
 import { api, bacaGalat, PESAN_TERPUTUS } from '../api';
 import { usePengunjung } from '../context/auth';
 import { useLive } from '../context/LiveContext';
@@ -8,7 +8,7 @@ import { useToast } from '../context/toast';
 import { aktifkanSuara, bunyikan, useStatusSuara } from '../hooks/useAlarmSound';
 import { kabariAlarm } from '../hooks/useNotifikasi';
 import { usePengaturan } from '../hooks/usePengaturan';
-import { labelPutusan } from '../putusan';
+import { ALASAN_PALSU, labelAlasan, labelPutusan } from '../putusan';
 import { jamDari } from '../statusKamera';
 import { durasiTeks, msDari, useJam } from '../waktu';
 import Dialog from './Dialog';
@@ -126,6 +126,7 @@ export default function AlertBanner() {
     const kabari = useToast();
     const [menutup, setMenutup] = useState(null);   // id alert yang dialog penutupannya terbuka
     const [mengklaim, setMengklaim] = useState(null);
+    const [menutupPalsu, setMenutupPalsu] = useState(null);   // id alert yang sedang ditutup sebagai alarm palsu
     // Bisu hanya berlaku untuk alarm yang sedang tampil: alarm baru tetap berbunyi.
     const [bisu, setBisu] = useState(null);   // { sampai: ms epoch, ids: number[] }
     // Alarm yang dipilih pengguna. Tanpa pilihan, yang paling mendesak yang tampil.
@@ -243,6 +244,34 @@ export default function AlertBanner() {
 
     const bisukan = () => setBisu({ sampai: Date.now() + BISU_MENIT * 60_000, ids: alerts.map((a) => a.id) });
 
+    // Jalan pintas untuk alarm yang jelas salah: tutup sebagai "Alarm palsu" dengan satu
+    // alasan, tanpa menekan "Saya ke sana" dulu. Ini bukan menghapus diam-diam: putusan,
+    // alasan, dan nama penutupnya tercatat di Riwayat Insiden dan ikut dihitung sebagai
+    // alarm palsu (prinsip 5 dan 6 di docs/architecture.md). Memakai endpoint /ack yang sama
+    // dengan formulir Tandai Ditangani, jadi Telegram dan dashboard lain ikut diperbarui.
+    const tutupSebagaiPalsu = async (alarm, alasan) => {
+        const namaRuang = alarm.camera_name || alarm.camera_id;
+        setMenutupPalsu(alarm.id);
+        try {
+            const r = await api(`/api/alerts/${alarm.id}/ack`, {
+                method: 'PUT',
+                // tanpa_telegram: deteksi yang salah tidak perlu menyunting pesan di grup.
+                json: { verdict: 'palsu', reason: alasan, note: null, tanpa_telegram: true },
+            });
+            if (!r.ok) {
+                kabari(await bacaGalat(r), 'galat');
+                return;
+            }
+            setFokusId(null);
+            dismissAlert(alarm.id);
+            kabari(`Alarm ${namaRuang} ditutup: alarm palsu, ${labelAlasan(alasan).toLowerCase()}.`);
+        } catch {
+            kabari(`${PESAN_TERPUTUS} Alarm tetap ditampilkan; coba lagi.`, 'galat');
+        } finally {
+            setMenutupPalsu(null);
+        }
+    };
+
     const tombol = 'min-h-11 px-3 sm:px-4 rounded-lg text-sm font-semibold inline-flex items-center justify-center gap-1.5 sm:gap-2 whitespace-nowrap disabled:opacity-60';
     // Di HP dua tombol utama berbagi satu baris. Ikonnya baru tampil mulai lebar 400 px,
     // supaya "Tandai Ditangani" tetap muat di HP 360 px tanpa terpotong.
@@ -340,6 +369,48 @@ export default function AlertBanner() {
                                 <span className="hidden sm:inline">Bisukan {BISU_MENIT} menit</span>
                             </button>
                         ))}
+                        {/* Silang: tutup alarm yang jelas salah. Memilih alasan dulu, supaya angka
+                            alarm palsu tetap jujur. "Lainnya" membuka formulir lengkap karena
+                            wajib dijelaskan di catatan. Tidak untuk latihan (tutup lewat dialog). */}
+                        {!diklaim && !pengunjung && !latihan && (
+                            <MenuKecil
+                                judul="Tutup sebagai alarm palsu. Pilih alasannya:"
+                                pemicu={(p) => (
+                                    <button
+                                        type="button"
+                                        {...p}
+                                        disabled={menutupPalsu === a.id}
+                                        aria-label="Tutup sebagai alarm palsu"
+                                        title="Tutup sebagai alarm palsu"
+                                        className={`${tombol} shrink-0 min-w-11 px-2.5 sm:px-3 font-medium border ${gaya.garis}`}
+                                    >
+                                        <X className="w-4 h-4" aria-hidden="true" />
+                                        <span className="hidden sm:inline">{menutupPalsu === a.id ? 'Menutup…' : 'Alarm palsu'}</span>
+                                    </button>
+                                )}
+                            >
+                                {(tutup) => (
+                                    <ul className="space-y-1.5">
+                                        {ALASAN_PALSU.filter((x) => x.id !== 'lainnya').map((x) => (
+                                            <li key={x.id}>
+                                                <button type="button"
+                                                    onClick={() => { tutup(); tutupSebagaiPalsu(a, x.id); }}
+                                                    className="w-full min-h-11 px-3 rounded-lg border border-slate-200 dark:border-slate-700 text-sm font-medium text-left hover:bg-slate-100 dark:hover:bg-slate-800">
+                                                    {x.label}
+                                                </button>
+                                            </li>
+                                        ))}
+                                        <li>
+                                            <button type="button"
+                                                onClick={() => { tutup(); setMenutup(a.id); }}
+                                                className="w-full min-h-11 px-3 rounded-lg border border-slate-200 dark:border-slate-700 text-sm font-medium text-left hover:bg-slate-100 dark:hover:bg-slate-800">
+                                                Lainnya, tulis catatan…
+                                            </button>
+                                        </li>
+                                    </ul>
+                                )}
+                            </MenuKecil>
+                        )}
                     </div>
                 </div>
 

@@ -122,13 +122,38 @@ async def tambah_catatan(db: AsyncSession, alert: AlertRecord, baris: str) -> Al
     return alert
 
 
-async def _umumkan(alert: AlertRecord, event: str) -> None:
-    """Siarkan ke dashboard, lalu perbarui pesan Telegram-nya di latar belakang."""
+async def _umumkan(alert: AlertRecord, event: str, telegram: bool = True) -> None:
+    """Siarkan ke dashboard, lalu perbarui pesan Telegram-nya di latar belakang.
+
+    telegram=False: dashboard tetap diberi tahu, pesan Telegram dibiarkan apa adanya.
+    """
     data = alert_ke_dict(alert)
     await manager.broadcast(WSMessage(event=event, data=data))
-    if alert.telegram_message_id:
+    if telegram and alert.telegram_message_id:
         from app.services.notification_service import perbarui_pesan
         asyncio.create_task(perbarui_pesan(data, alert.telegram_message_id, bool(alert.telegram_foto)))
+
+
+async def _tarik_dari_telegram(alert: AlertRecord, db: AsyncSession) -> None:
+    """Alarm palsu yang ditutup lewat tombol silang tidak boleh tersisa di grup.
+
+    Pesan yang sudah terkirim dihapus. Pesan yang belum terkirim (masih menunggu masa
+    tunda atau sedang dikirim) ditandai dibatalkan, dan pengirimnya berhenti atau
+    menarik kembali pesannya sendiri. Putusan dan alasannya tetap ada di database.
+    """
+    if alert.telegram_message_id:
+        from app.services.notification_service import hapus_pesan
+        message_id = alert.telegram_message_id
+        alert.telegram_message_id = None
+        alert.telegram_foto = False
+        alert.telegram_status = "dihapus"
+        await db.commit()
+        await db.refresh(alert)
+        asyncio.create_task(hapus_pesan(message_id))
+    elif alert.telegram_status == "mengirim":
+        alert.telegram_status = "dibatalkan"
+        await db.commit()
+        await db.refresh(alert)
 
 
 async def klaim(db: AsyncSession, alert_id: int, nama: str) -> AlertRecord:
@@ -167,11 +192,15 @@ async def tutup(
     verdict: Optional[Putusan] = None,
     alasan: Optional[str] = None,
     catatan: Optional[str] = None,
+    tanpa_telegram: bool = False,
 ) -> AlertRecord:
     """"Tandai Ditangani", dengan putusan dan catatan opsional.
 
     Menutup ulang alert yang sudah ditangani boleh: penangan dan jamnya tetap,
     catatan dan putusan yang dikirim menimpa yang lama, yang tidak dikirim dibiarkan.
+
+    tanpa_telegram: pesan Telegram alarm ini tidak disunting (untuk alarm palsu yang
+    ditutup lewat tombol silang). Putusan dan alasannya tetap tersimpan di database.
     """
     alert = await ambil(db, alert_id)
     if not alert.acknowledged:
@@ -187,9 +216,12 @@ async def tutup(
     log.info(f"[{alert.camera_id}] alert #{alert.id} ditangani {nama}"
              + (f", putusan {alert.verdict}" if alert.verdict else ", belum dinilai"))
 
+    if tanpa_telegram:
+        await _tarik_dari_telegram(alert, db)
+
     await tutup_insiden_kamera(alert, db)
     # Nama event lama dipertahankan: dashboard menghapus banner saat menerima alert_ack.
-    await _umumkan(alert, "alert_ack")
+    await _umumkan(alert, "alert_ack", telegram=not tanpa_telegram)
     return alert
 
 

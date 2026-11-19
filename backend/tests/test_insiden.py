@@ -98,6 +98,51 @@ def test_klaim_menyunting_pesan_telegram_yang_sama(uji):
     assert data["claimed_by"] == "Siti"
 
 
+def test_tutup_biasa_menyunting_pesan_telegram(uji):
+    uji.klien.put("/api/alerts/1/ack", json={"verdict": "jatuh"})
+    data, message_id, _ = uji.sunting.call_args.args
+    assert message_id == 501 and data["verdict"] == "jatuh"
+
+
+def test_tutup_palsu_tanpa_telegram_menghapus_pesan_grup_bukan_menyuntingnya(uji):
+    """Tombol silang: alarm palsu ditutup dan tercatat di database; pesan di grup dihapus."""
+    with patch("app.services.notification_service.hapus_pesan", new=AsyncMock()) as hapus:
+        r = uji.klien.put("/api/alerts/1/ack", json={
+            "verdict": "palsu", "reason": "bukan_orang", "tanpa_telegram": True})
+    assert r.status_code == 200
+    d = r.json()
+    assert d["acknowledged"] is True and d["verdict"] == "palsu" and d["verdict_reason"] == "bukan_orang"
+    assert d["telegram_status"] == "dihapus"
+    hapus.assert_called_once_with(501)
+    uji.sunting.assert_not_called()
+    assert uji.siar.await_args.args[0].event == "alert_ack", "dashboard tetap diberi tahu"
+
+
+def test_tutup_palsu_tanpa_telegram_sebelum_terkirim_membatalkan_pengiriman(uji):
+    """Pesan belum sempat terkirim (masih masa tunda): tidak ada yang perlu dihapus."""
+    async def siapkan():
+        async with uji.factory() as s:
+            a = await s.get(AlertRecord, 1)
+            a.telegram_message_id, a.telegram_foto, a.telegram_status = None, False, "mengirim"
+            await s.commit()
+    uji.klien.portal.call(siapkan)
+    with patch("app.services.notification_service.hapus_pesan", new=AsyncMock()) as hapus:
+        d = uji.klien.put("/api/alerts/1/ack", json={
+            "verdict": "palsu", "reason": "orang_lain", "tanpa_telegram": True}).json()
+    assert d["telegram_status"] == "dibatalkan"
+    hapus.assert_not_called()
+    uji.sunting.assert_not_called()
+
+
+def test_tanpa_telegram_ditolak_untuk_putusan_selain_palsu(uji):
+    for body in ({"verdict": "jatuh", "tanpa_telegram": True},
+                 {"verdict": "belum_yakin", "tanpa_telegram": True},
+                 {"tanpa_telegram": True}):
+        assert uji.klien.put("/api/alerts/1/ack", json=body).status_code == 422
+    uji.sunting.assert_not_called()
+    assert uji.klien.get("/api/alerts/1").json()["acknowledged"] is False, "alarm tidak boleh tertutup"
+
+
 def test_klaim_ulang_oleh_orang_yang_sama_tidak_mengubah_jam(uji):
     pertama = uji.klien.put("/api/alerts/1/claim").json()
     kedua = uji.klien.put("/api/alerts/1/claim")
