@@ -125,6 +125,11 @@ class Settings(BaseSettings):
     DASHBOARD_URL: str = ""
     # Kamera dianggap terputus dan dikabarkan ke grup setelah selama ini tanpa gambar.
     CAMERA_OFFLINE_NOTIFY_SEC: float = 30.0
+    # Tunda pengiriman pesan alarm ke Telegram sekian detik sesudah dashboard berbunyi,
+    # supaya pengamat dashboard sempat menekan tombol silang pada alarm yang jelas salah
+    # dan grup tidak ikut terganggu. 0 = langsung terkirim (perilaku lama). Harga yang
+    # dibayar: jatuh sungguhan sampai ke HP perawat selambat ini.
+    TELEGRAM_TUNDA_DETIK: float = 0.0
 
     # ---- Klip kejadian --------------------------------------
     # Beberapa detik sebelum dan sesudah alarm, disimpan sebagai bukti di Riwayat

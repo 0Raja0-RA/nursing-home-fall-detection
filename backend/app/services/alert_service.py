@@ -12,6 +12,7 @@ Tugas utama:
 4. (Opsional) Mengirim pesan ke Telegram, sesuai pengaturan di dashboard.
 """
 
+import asyncio
 import time
 from typing import Dict, Optional
 
@@ -32,6 +33,9 @@ class AlertService:
         self.settings = get_settings()
         # Menyimpan timestamp alert terakhir per camera_id
         self._last_alert_time: Dict[str, float] = {}
+        # Pengiriman Telegram yang sedang menunggu masa tunda. Disimpan supaya tidak
+        # dibuang pemungut sampah sebelum selesai.
+        self._menunggu: set = set()
 
     async def process_confirmed_fall(self, camera_id: str, duration: float) -> None:
         """Dipanggil oleh detection_pipeline saat CONFIRMED_FALL."""
@@ -102,9 +106,35 @@ class AlertService:
 
         # 4. Telegram, lengkap dengan potret kejadiannya.
         if status_tg == "mengirim":
-            await self.kirim_telegram(db_alert.id, foto=foto, tg=tg, nama_ruang=nama_kamera)
+            tunda = self.settings.TELEGRAM_TUNDA_DETIK
+            if tunda > 0:
+                # Dashboard sudah berbunyi. Grup menunggu dulu: alarm yang dibatalkan lewat
+                # tombol silang dalam masa ini tidak pernah sampai ke Telegram.
+                tugas = asyncio.create_task(
+                    self._kirim_setelah_tunda(db_alert.id, tunda, foto, tg, nama_kamera))
+                self._menunggu.add(tugas)
+                tugas.add_done_callback(self._menunggu.discard)
+            else:
+                await self.kirim_telegram(db_alert.id, foto=foto, tg=tg, nama_ruang=nama_kamera)
         elif status_tg == "dilewati":
             log.info(f"[{camera_id}] Latihan tidak dikirim ke Telegram (pengaturan bawaan).")
+
+    async def _kirim_setelah_tunda(self, alert_id: int, tunda: float, foto: Optional[bytes],
+                                   tg: Optional[TelegramSettings], nama_ruang: Optional[str]) -> None:
+        """Tunggu, lalu kirim ke Telegram kecuali alarmnya sudah dibatalkan sebagai alarm palsu."""
+        await asyncio.sleep(tunda)
+        factory = get_session_factory()
+        async with factory() as session:
+            alert = await session.get(AlertRecord, alert_id)
+            if alert is None:
+                return
+            if alert.telegram_status == "dibatalkan" or alert.verdict == "palsu":
+                alert.telegram_status = "dibatalkan"
+                await session.commit()
+                log.info(f"[{alert.camera_id}] alert #{alert_id} dibatalkan sebagai alarm palsu "
+                         f"sebelum terkirim ke Telegram.")
+                return
+        await self.kirim_telegram(alert_id, foto=foto, tg=tg, nama_ruang=nama_ruang)
 
     @staticmethod
     def _status_awal_telegram(latihan: bool, tg: TelegramSettings, siap: bool) -> str:
@@ -132,6 +162,8 @@ class AlertService:
             alert = await session.get(AlertRecord, alert_id)
             if alert is None:
                 return
+            if alert.telegram_status == "dibatalkan":
+                return      # sudah ditutup sebagai alarm palsu: jangan ganggu grup
             if tg is None:
                 tg = await SettingRepository(session).telegram()
             if foto is None:
@@ -146,14 +178,25 @@ class AlertService:
             alert = await session.get(AlertRecord, alert_id)
             if alert is None:
                 return
-            alert.telegram_status = "terkirim" if hasil.berhasil else "gagal"
-            alert.notified = hasil.berhasil
-            alert.telegram_message_id = hasil.message_id
-            alert.telegram_foto = hasil.dengan_foto
+            dibatalkan = alert.telegram_status == "dibatalkan"
+            if dibatalkan:
+                # Ditutup sebagai alarm palsu selagi pesan ini masih dikirim: tarik kembali.
+                alert.telegram_status = "dihapus" if (hasil.berhasil and hasil.message_id) else "dibatalkan"
+                alert.telegram_message_id = None
+                alert.telegram_foto = False
+            else:
+                alert.telegram_status = "terkirim" if hasil.berhasil else "gagal"
+                alert.notified = hasil.berhasil
+                alert.telegram_message_id = hasil.message_id
+                alert.telegram_foto = hasil.dengan_foto
             await session.commit()
             await session.refresh(alert)
             berubah = bool(alert.claimed_by or alert.acknowledged)
             data = alert_ke_dict(alert)
+        if dibatalkan:
+            if hasil.berhasil and hasil.message_id:
+                await ns.hapus_pesan(hasil.message_id)
+            return
         data["camera_name"] = nama_ruang or data.get("camera_name") or data["camera_id"]
 
         # Perawat bisa sudah menekan "Saya ke sana" selama pesan ini masih dikirim

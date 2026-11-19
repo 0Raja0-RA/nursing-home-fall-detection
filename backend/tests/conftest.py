@@ -14,9 +14,14 @@ di-cache), dan menang atas isi `.env`:
   ujinya sendiri.
 - Token dan chat Telegram kosong, jadi tidak ada tes yang bisa mengirim ke grup sungguhan.
   Tes Telegram menambal setelan atau fungsi kirimnya sendiri.
+- CAMERA_FPS dan TELEGRAM_TUNDA_DETIK memakai nilai bawaan kode, bukan setelan pameran di
+  `.env` lokal. Sejumlah tes menghitung frame, bukan detik (mengandaikan 15 fps), dan tes
+  pengiriman mengandaikan Telegram langsung terkirim. Tes masa tunda mengisinya sendiri.
 """
 import os
 
 os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
 os.environ["TELEGRAM_BOT_TOKEN"] = ""
 os.environ["TELEGRAM_CHAT_ID"] = ""
+os.environ["CAMERA_FPS"] = "15"
+os.environ["TELEGRAM_TUNDA_DETIK"] = "0"
