@@ -74,6 +74,16 @@ def _gambar_skeleton(frame: np.ndarray, keypoints: list[list[float]], warna) -> 
             cv2.line(frame, pa, pb, GELAP, tebal + 2, cv2.LINE_AA)
             cv2.line(frame, pa, pb, warna, tebal, cv2.LINE_AA)
 
+    # Hidung ke tengah kedua bahu. Bukan ruas COCO, jadi tidak ada di TULANG; ini
+    # penanda kepala-ke-badan seperti di ml/demo/test_camera.py, berguna saat orang
+    # duduk dekat kamera dan pinggulnya tidak terlihat. Hanya gambar: tidak ikut
+    # menentukan postur.
+    hidung, bahu_kiri, bahu_kanan = titik(0), titik(5), titik(6)
+    if hidung and bahu_kiri and bahu_kanan:
+        tengah = ((bahu_kiri[0] + bahu_kanan[0]) // 2, (bahu_kiri[1] + bahu_kanan[1]) // 2)
+        cv2.line(frame, hidung, tengah, GELAP, 5, cv2.LINE_AA)
+        cv2.line(frame, hidung, tengah, (255, 0, 255), 3, cv2.LINE_AA)
+
     for i in range(len(keypoints)):
         p = titik(i)
         if p:
@@ -156,8 +166,17 @@ def dasar_privasi(frame: np.ndarray, privasi: str) -> np.ndarray:
     return frame
 
 
-def ke_jpeg(gambar: np.ndarray, lebar_maks: Optional[int] = None, mutu: int = 95) -> Optional[bytes]:
-    """Byte JPEG, diperkecil dulu bila lebih lebar dari lebar_maks. Mutu 95 = bawaan OpenCV."""
+# Bawaan untuk stream dan foto kejadian. Mutu 95 pada lebar penuh membuat satu frame
+# ratusan KB, dan itu dikirim ke setiap penonton (apalagi lewat tunnel ke HP). 85 pada
+# lebar maksimal 1280 hampir tak terbedakan dengan mata, tetapi jauh lebih kecil.
+# Hanya gambar yang dikirim ke layar yang dikecilkan; model menerima frame asli.
+LEBAR_JPEG_MAKS = 1280
+MUTU_JPEG = 85
+
+
+def ke_jpeg(gambar: np.ndarray, lebar_maks: Optional[int] = LEBAR_JPEG_MAKS,
+            mutu: int = MUTU_JPEG) -> Optional[bytes]:
+    """Byte JPEG, diperkecil dulu bila lebih lebar dari lebar_maks (None = tanpa batas)."""
     if lebar_maks and gambar.shape[1] > lebar_maks:
         tinggi = round(gambar.shape[0] * lebar_maks / gambar.shape[1])
         gambar = cv2.resize(gambar, (lebar_maks, tinggi), interpolation=cv2.INTER_AREA)

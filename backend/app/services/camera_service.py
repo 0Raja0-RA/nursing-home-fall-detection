@@ -33,6 +33,9 @@ from app.core.logging import get_logger, utc_now_naive
 log = get_logger("app.services.camera_service")
 
 
+# Resolusi yang diminta dari kamera lokal (lebar, tinggi). Lihat _buka_capture.
+RESOLUSI_KAMERA_LOKAL = (640, 480)
+
 # Derajat searah jarum jam -> kode rotasi OpenCV. None = tanpa rotasi.
 _ROTATE_CODES = {
     0: None,
@@ -345,6 +348,18 @@ class CameraService:
             cap = cv2.VideoCapture(src, cv2.CAP_DSHOW)
         else:
             cap = cv2.VideoCapture(src)
+        if isinstance(src, int) and cap.isOpened():
+            # Kamera lokal (webcam, Iriun) diminta mengirim 640x480 pada 30 fps, sama dengan
+            # ml/demo/test_camera.py yang terbukti ringan. Tanpa ini driver memakai resolusi
+            # bawaannya (bisa 720p atau 1080p): decode, gambar kotak, dan JPEG yang dikirim
+            # ke tiap penonton jadi jauh lebih berat, padahal model hanya memakai 640 px.
+            # Hanya permintaan: bila driver menolak, ia memilih resolusi terdekat.
+            try:
+                cap.set(cv2.CAP_PROP_FRAME_WIDTH, RESOLUSI_KAMERA_LOKAL[0])
+                cap.set(cv2.CAP_PROP_FRAME_HEIGHT, RESOLUSI_KAMERA_LOKAL[1])
+                cap.set(cv2.CAP_PROP_FPS, 30)
+            except Exception:
+                pass
         if not self._is_file:
             try:
                 cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
@@ -473,5 +488,14 @@ class CameraService:
                 frame_count = 0
                 fps_start = time.time()
 
-            # Throttle ke target FPS
-            time.sleep(max(0, frame_interval - 0.001))
+            # File video dibaca secepat decode, jadi perlu ditahan ke target FPS supaya
+            # tidak berputar dipercepat. Siaran langsung (webcam, Iriun, IP Webcam, RTSP)
+            # TIDAK boleh ditahan: kamera mengirim sekitar 30 fps, dan membaca lebih
+            # lambat dari itu membuat frame menumpuk di buffer driver sehingga gambar di
+            # layar tertinggal beberapa detik. read() sudah menunggu frame berikutnya,
+            # jadi loop ini mengikuti irama kamera sendiri. Pipeline deteksi tetap
+            # memproses paling banyak CAMERA_FPS per detik (lihat detection_pipeline).
+            if self._is_file:
+                time.sleep(max(0, frame_interval - 0.001))
+            else:
+                time.sleep(0.001)   # pengaman bila driver mengembalikan frame tanpa menunggu
