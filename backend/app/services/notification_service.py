@@ -344,6 +344,22 @@ async def ganti_tombol(alert: dict, message_id: int, tahap: Optional[str] = None
     return ok
 
 
+async def hapus_pesan(message_id: int) -> bool:
+    """Hapus pesan alarm dari grup, untuk alarm palsu yang ditutup lewat tombol silang.
+
+    Bot hanya bisa menghapus pesannya sendiri (dalam 48 jam). Gagal menghapus tidak
+    menggagalkan apa pun: riwayatnya tetap tersimpan di database.
+    """
+    if not dikonfigurasi() or not message_id:
+        return False
+    ok, alasan, _ = await _panggil("deleteMessage", json_={
+        "chat_id": get_settings().TELEGRAM_CHAT_ID, "message_id": message_id,
+    })
+    if not ok:
+        log.info(f"⚠️  Gagal menghapus pesan Telegram {message_id}: {alasan}")
+    return ok
+
+
 async def jawab_callback(callback_id: str, teks: str, peringatan: bool = False) -> None:
     """Jawaban kecil di layar penekan tombol. peringatan=True memunculkan jendela yang harus ditutup."""
     await _panggil("answerCallbackQuery", json_={

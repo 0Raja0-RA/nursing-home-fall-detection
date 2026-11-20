@@ -87,6 +87,8 @@ export function StatusTelegram({ alert }) {
     if (s === 'mengirim') return <span className={`${teks} text-slate-600 dark:text-slate-300`}><Loader2 className="w-3.5 h-3.5 motion-safe:animate-spin" aria-hidden="true" /> Mengirim</span>;
     if (s === 'gagal') return <span className={`${teks} font-semibold text-slate-800 dark:text-slate-100`}><AlertCircle className="w-3.5 h-3.5" aria-hidden="true" /> Gagal terkirim</span>;
     if (s === 'mati') return <span className={`${teks} text-slate-500`}><SendHorizonal className="w-3.5 h-3.5" aria-hidden="true" /> Telegram belum diatur</span>;
+    if (s === 'dibatalkan') return <span className={`${teks} text-slate-500`}><SendHorizonal className="w-3.5 h-3.5" aria-hidden="true" /> Tidak dikirim (alarm palsu)</span>;
+    if (s === 'dihapus') return <span className={`${teks} text-slate-500`}><SendHorizonal className="w-3.5 h-3.5" aria-hidden="true" /> Dihapus dari grup (alarm palsu)</span>;
     if (s === 'dilewati') return <span className={`${teks} text-slate-500`}><SendHorizonal className="w-3.5 h-3.5" aria-hidden="true" /> Tidak dikirim (latihan)</span>;
     return <span className={`${teks} text-slate-500`}><SendHorizonal className="w-3.5 h-3.5" aria-hidden="true" /> Tidak terkirim</span>;
 }

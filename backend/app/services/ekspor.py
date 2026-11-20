@@ -36,6 +36,8 @@ _LABEL_TELEGRAM = {
     "mengirim": "sedang dikirim",
     "mati": "belum dikonfigurasi",
     "dilewati": "tidak dikirim (latihan)",
+    "dibatalkan": "tidak dikirim (alarm palsu)",
+    "dihapus": "dihapus dari grup (alarm palsu)",
 }
 
 

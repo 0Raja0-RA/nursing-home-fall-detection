@@ -591,3 +591,68 @@ async def test_mode_uji_mencatat_sebagai_latihan(lingkungan, monkeypatch):
         alert = (await AlertRepository(s).get_recent_alerts())[0]
     assert alert.simulated is True and alert.message.startswith("[SIMULASI]")
     assert lingkungan["telegram"] == [], "latihan tidak dikirim ke Telegram secara bawaan"
+
+
+# ---- Masa tunda Telegram: alarm palsu tidak boleh sampai ke grup --------------------
+
+@pytest.mark.asyncio
+async def test_telegram_ditunda_lalu_terkirim_bila_tidak_dibatalkan(lingkungan, monkeypatch):
+    svc = _service()
+    monkeypatch.setattr(svc.settings, "TELEGRAM_TUNDA_DETIK", 0.15)
+
+    await svc.process_confirmed_fall("cam-01", 10.0)
+
+    assert lingkungan["urutan"] == ["websocket"], "dashboard menyala dulu, grup menunggu"
+    assert lingkungan["telegram"] == []
+    await asyncio.sleep(0.5)
+    assert lingkungan["urutan"] == ["websocket", "telegram"]
+
+
+@pytest.mark.asyncio
+async def test_alarm_palsu_dalam_masa_tunda_tidak_pernah_terkirim(lingkungan, monkeypatch):
+    from app.db.models import AlertRecord
+    svc = _service()
+    monkeypatch.setattr(svc.settings, "TELEGRAM_TUNDA_DETIK", 0.15)
+    await svc.process_confirmed_fall("cam-01", 10.0)
+
+    # Yang dilakukan tombol silang: putusan palsu, pengiriman ditandai dibatalkan.
+    async with lingkungan["factory"]() as s:
+        a = await s.get(AlertRecord, 1)
+        a.acknowledged, a.verdict, a.verdict_reason = True, "palsu", "bukan_orang"
+        a.telegram_status = "dibatalkan"
+        await s.commit()
+
+    await asyncio.sleep(0.5)
+    assert lingkungan["telegram"] == [], "alarm palsu tidak boleh masuk Telegram"
+    async with lingkungan["factory"]() as s:
+        assert (await s.get(AlertRecord, 1)).telegram_status == "dibatalkan"
+
+
+@pytest.mark.asyncio
+async def test_alarm_dibatalkan_selagi_pesan_dikirim_ditarik_kembali(lingkungan, monkeypatch):
+    """Silang ditekan tepat saat pesan sedang dikirim: pesan yang baru terkirim dihapus."""
+    from app.db.models import AlertRecord
+    from app.services import notification_service as ns
+    dihapus: list[int] = []
+
+    async def kirim_lalu_dibatalkan(alert, foto=None, mode_foto="buram"):
+        async with lingkungan["factory"]() as s:
+            a = await s.get(AlertRecord, alert["id"])
+            a.telegram_status = "dibatalkan"
+            await s.commit()
+        return ns.HasilKirim(True, 777, True)
+
+    async def hapus_palsu(message_id):
+        dihapus.append(message_id)
+        return True
+
+    monkeypatch.setattr(ns, "kirim_alert", kirim_lalu_dibatalkan)
+    monkeypatch.setattr(ns, "hapus_pesan", hapus_palsu)
+
+    await _service().process_confirmed_fall("cam-01", 10.0)
+
+    assert dihapus == [777]
+    async with lingkungan["factory"]() as s:
+        a = await s.get(AlertRecord, 1)
+    assert a.telegram_status == "dihapus" and a.telegram_message_id is None
+    assert lingkungan["disunting"] == []

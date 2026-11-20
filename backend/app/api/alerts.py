@@ -347,6 +347,7 @@ async def acknowledge_alert(
             verdict=payload.verdict if payload else None,
             alasan=payload.reason if payload else None,
             catatan=_rapikan_catatan(payload.note if payload else None),
+            tanpa_telegram=payload.tanpa_telegram if payload else False,
         )
     except insiden.InsidenTidakAda:
         raise HTTPException(status_code=404, detail="Alert not found")

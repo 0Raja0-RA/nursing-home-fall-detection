@@ -49,8 +49,7 @@ MODE_INFO = [
         "label": "Kerangka tubuh",
         "description": "Membaca sudut bahu ke pinggul, jadi kasur dan sofa tidak terbaca jatuh. "
                        "Bahu dan pinggul harus terlihat.",
-        "teknis": "YOLO11-Pose (yolo11n-pose.pt), model rilis Ultralytics, dengan ambang sudut dari "
-                  "eksperimen tim.",
+        "teknis": "YOLO11-Pose (Ultralytics), dengan ambang sudut dari eksperimen tim.",
         "recommended": True,
     },
     {

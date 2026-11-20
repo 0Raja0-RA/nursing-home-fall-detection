@@ -175,6 +175,16 @@ class AckRequest(_DenganPutusan):
     """
     note: Optional[str] = Field(None, max_length=CATATAN_MAKS,
                                 description="Tindakan yang diambil perawat")
+    tanpa_telegram: bool = Field(
+        False,
+        description="Jangan sunting pesan Telegram alarm ini. Hanya untuk alarm palsu: "
+                    "jatuh sungguhan harus tetap terlihat statusnya di grup.")
+
+    @model_validator(mode="after")
+    def _tanpa_telegram_hanya_untuk_palsu(self):
+        if self.tanpa_telegram and self.verdict != Putusan.PALSU:
+            raise ValueError("Menutup tanpa memperbarui Telegram hanya boleh untuk alarm palsu.")
+        return self
 
 
 class VerdictUpdate(_DenganPutusan):
